@@ -1,0 +1,21 @@
+{
+  "name": "karding-bot",
+  "version": "2.0.0",
+  "description": "Telegram bot for AXE TEAM",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "profit": "node profit_system.js",
+    "dev": "node bot.js"
+  },
+  "dependencies": {
+    "axios": "^1.16.0",
+    "canvas": "^3.2.3",
+    "dotenv": "^16.4.5",
+    "node-telegram-bot-api": "^0.66.0",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.0"
+  }
+}
