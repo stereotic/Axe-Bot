@@ -12,9 +12,15 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const profileBanner = require('./profile_banner');
+const { loadPinnedMessageId, updatePinnedMessage } = require('./update_pinned');
+
+// Короткий текст, если нет картинки для меню (пустой sendMessage/caption Telegram отклоняет).
+const MENU_PANEL_FALLBACK = 'Выбери раздел:';
+// Короткий текст для ручной доставки reply-клавиатуры через /sendkeyboard.
+const REPLY_KEYBOARD_NOTICE = '🦋';
 
 const token = process.env.BOT_TOKEN;
-const adminIds = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(id => parseInt(id)) : [];
+const adminIds = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(id => parseInt(id.trim())).filter(Boolean) : [];
 const PAYOUT_ADMIN_ID = 6383039210; // ID для получения заявок на выплату
 
 // ID каналов для profit system
@@ -151,7 +157,7 @@ const WORK_INFO = `<b>🏠Сервис:</b> <b>Кардинг</b>
 ┗ 👨‍💻: @Enhtein
 
 <b>📚 Мануал</b>:
-┗ <a href="https://telegra.ph/Napravlenie-Karding-02-22">Кардинг</a> ← Читать
+┗ <a href="https://telegra.ph/Napravlenie-Karding-05-12">Кардинг</a> ← Читать
 
 • <b>WORK-Панель</b>, <i>и  реферальная ссылка находится в </i><i><b>магазине</b> по команде</i> /bb`;
 
@@ -160,23 +166,7 @@ const FEEDBACK_INFO = `• <b>Feedback</b>
 <b>📨Связаться с администрацией</b>
 ┗ @FeedbackAXEbot`;
 
-// Переменная для хранения ID закрепленного сообщения
-let pinnedMessageId = null;
 
-// Функция загрузки ID закрепленного сообщения из базы
-function loadPinnedMessageId() {
-  return new Promise((resolve) => {
-    db.get('SELECT value FROM stats WHERE key = ?', ['pinned_message_id'], (err, row) => {
-      if (!err && row) {
-        pinnedMessageId = parseInt(row.value);
-        console.log('📌 Загружен ID закрепленного сообщения:', pinnedMessageId);
-      } else {
-        console.log('📌 ID закрепленного сообщения не найден в базе');
-      }
-      resolve();
-    });
-  });
-}
 
 // Функция получения курса доллара
 async function getUsdRate() {
@@ -214,152 +204,13 @@ function getTopWorkerToday(callback) {
   });
 }
 
-// Функция создания текста закрепленного сообщения
-async function createPinnedMessageText() {
-  return new Promise((resolve, reject) => {
-    db.get('SELECT value FROM stats WHERE key = ?', ['project_balance'], async (err, balanceRow) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      const projectBalance = parseInt(balanceRow?.value || '2000000');
-      const usdRate = await getUsdRate();
-
-      // Получаем кассу за сутки
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayStr = today.toISOString().split('T')[0];
-
-      db.get(`
-        SELECT SUM(amount) as daily_total
-        FROM profits
-        WHERE DATE(created_at) = ?
-      `, [todayStr], (err, dailyRow) => {
-        const dailyTotal = dailyRow?.daily_total || 0;
-
-        getTopWorkerToday((topWorker) => {
-          let topWorkerText = '#';
-
-          if (topWorker) {
-            const workerName = topWorker.username ? `@${topWorker.username}` : topWorker.name;
-            topWorkerText = `${workerName}`;
-          }
-
-          const messageText = `🦋<b>AXE TEAM </b>🦋
-
-<b>🏦Касса проекта -</b> <i>${projectBalance.toLocaleString()}₽</i>
-<b>☀️Касса за сутки -</b> <i>${dailyTotal.toLocaleString()}₽</i>
-📊<b>Курс USD/RUB:</b> ${usdRate}₽
-
-<b>🌶ТОП 1 ЗА СУТКИ</b> - ${topWorkerText}
-
-<b>⚖️Инфраструктура</b>
-┣<b>Основной бот -</b> <a href="https://t.me/AXE_xBot"><b>ССЫЛКА</b></a>
-┣<b>Feedback</b> - <a href="https://t.me/FeedbackAXEbot"><b>CCЫЛКА</b></a>
-┣<b>Материалы -</b> <a href="https://t.me/+GMixQrZvJkQ4ODE6"><b>ССЫЛКА</b></a>
-┣<b>Профиты</b> - <a href="https://t.me/+euO9gzLMUMFhNmJi"><b>ССЫЛКА</b></a><b> </b>
-┗<b>AXE NEWS - </b><a href="https://t.me/+BO1F4O1KUd0zZTI6"><b>ССЫЛКА</b></a>
-
-<b>⚙️Команды чата</b>
-┣<b>Профиль - </b><b>/me</b><b> </b>
-┣<b>Администрация - </b><b>/staff</b><b>
-┣Материлы - /materials
-┣Топ суток - </b><b>/topd</b><b>
-┣Топ месяца - </b><b>/topm</b><b>
-┣Топ за все время -  </b><b>/top</b><b>
-┗Актуальный реквизит - </b><b>/card</b>
-
-<b>⭐️Активные бонусы </b>
-<b>1.</b> <b>#AXE</b> <i>в нике аккаунта +3% к выплате профита.</i>
-<b>2.</b> <i><b>Топ 1</b> суток </i><i><b>+5%</b> к выплате профита</i>
-<b>🔥Соблюдение двух условий = +8% в выплате профита</b>
-
-<b>AXE TEAM</b> <b>-</b> <b>"</b><i>Все великие достижения требовали времени.</i><b>"</b>`;
-
-          resolve(messageText);
-        });
-      });
-    });
-  });
-}
-
-// Функция обновления закрепленного сообщения
-async function updatePinnedMessage() {
-  try {
-    console.log('🔄 Начинаю обновление закрепленного сообщения. Текущий ID:', pinnedMessageId);
-    const messageText = await createPinnedMessageText();
-
-    if (pinnedMessageId) {
-      // Обновляем существующее сообщение
-      try {
-        console.log('📝 Пытаюсь обновить сообщение с ID:', pinnedMessageId);
-        await bot.editMessageText(messageText, {
-          chat_id: GENERAL_CHAT_ID,
-          message_id: pinnedMessageId,
-          parse_mode: 'HTML',
-          disable_web_page_preview: true
-        });
-        console.log('✅ Закрепленное сообщение обновлено');
-      } catch (error) {
-        // Если сообщение не изменилось - это нормально, игнорируем
-        if (error.message.includes('message is not modified')) {
-          console.log('ℹ️ Сообщение не изменилось, обновление не требуется');
-          return;
-        }
-
-        // Если сообщение не найдено (удалено), создаем новое
-        if (error.message.includes('message to edit not found') || error.message.includes('message not found')) {
-          console.log('⚠️ Сообщение не найдено (удалено), создаем новое');
-          const sentMessage = await bot.sendMessage(GENERAL_CHAT_ID, messageText, {
-            parse_mode: 'HTML',
-            disable_web_page_preview: true
-          });
-          await bot.pinChatMessage(GENERAL_CHAT_ID, sentMessage.message_id, { disable_notification: true });
-          pinnedMessageId = sentMessage.message_id;
-
-          // Сохраняем новый ID в базу
-          db.run('INSERT OR REPLACE INTO stats (key, value) VALUES (?, ?)', ['pinned_message_id', pinnedMessageId.toString()], (err) => {
-            if (err) console.error('Error saving pinned message ID:', err);
-            else console.log('💾 ID сохранен в базу:', pinnedMessageId);
-          });
-
-          console.log('✅ Новое сообщение закреплено, ID:', pinnedMessageId);
-        } else {
-          // Другая ошибка - просто логируем
-          console.error('❌ Ошибка обновления сообщения:', error.message);
-        }
-      }
-    } else {
-      // Создаем новое закрепленное сообщение
-      console.log('📌 ID не найден, создаю новое закрепленное сообщение');
-      const sentMessage = await bot.sendMessage(GENERAL_CHAT_ID, messageText, {
-        parse_mode: 'HTML',
-        disable_web_page_preview: true
-      });
-      await bot.pinChatMessage(GENERAL_CHAT_ID, sentMessage.message_id, { disable_notification: true });
-      pinnedMessageId = sentMessage.message_id;
-
-      // Сохраняем ID в базу
-      db.run('INSERT OR REPLACE INTO stats (key, value) VALUES (?, ?)', ['pinned_message_id', pinnedMessageId.toString()], (err) => {
-        if (err) console.error('Error saving pinned message ID:', err);
-        else console.log('💾 ID сохранен в базу:', pinnedMessageId);
-      });
-
-      console.log('✅ Закрепленное сообщение создано, ID:', pinnedMessageId);
-    }
-  } catch (error) {
-    console.error('❌ Ошибка обновления закрепленного сообщения:', error);
-  }
-}
-
 // Запуск автоматического обновления закрепленного сообщения каждые 10 минут
-setInterval(updatePinnedMessage, 10 * 60 * 1000);
+setInterval(() => updatePinnedMessage(bot, GENERAL_CHAT_ID), 10 * 60 * 1000);
 
 // Первое обновление через 5 секунд после запуска (с загрузкой ID из базы)
 setTimeout(async () => {
   await loadPinnedMessageId();
-  await updatePinnedMessage();
+  await updatePinnedMessage(bot, GENERAL_CHAT_ID);
 }, 5000);
 
 // Вспомогательные функции
@@ -409,19 +260,40 @@ async function sendProfileMessage(chatId, user, topPosition, options = {}) {
   try {
     const profileMedia = await profileBanner.buildProfileMedia(bot, user, topPosition);
 
-    const message = await bot.sendPhoto(chatId, profileMedia.buffer, {
+    const sendOptions = {
       caption: profileMedia.caption,
-      parse_mode: 'HTML',
-      reply_markup: options.reply_markup || keyboards.profile
-    });
+      parse_mode: 'HTML'
+    };
+
+    // Добавляем reply_markup только если он явно указан или не передан параметр
+    if (options.reply_markup !== undefined) {
+      if (options.reply_markup !== null) {
+        sendOptions.reply_markup = options.reply_markup;
+      }
+    } else {
+      sendOptions.reply_markup = keyboards.profile;
+    }
+
+    const message = await bot.sendPhoto(chatId, profileMedia.buffer, sendOptions);
 
     return message;
   } catch (error) {
     console.error('Profile banner error:', error);
-    const message = await bot.sendMessage(chatId, profileBanner.buildProfileCaption(user, topPosition), {
-      parse_mode: 'HTML',
-      reply_markup: options.reply_markup || keyboards.profile
-    });
+
+    const sendOptions = {
+      parse_mode: 'HTML'
+    };
+
+    // Добавляем reply_markup только если он явно указан или не передан параметр
+    if (options.reply_markup !== undefined) {
+      if (options.reply_markup !== null) {
+        sendOptions.reply_markup = options.reply_markup;
+      }
+    } else {
+      sendOptions.reply_markup = keyboards.profile;
+    }
+
+    const message = await bot.sendMessage(chatId, profileBanner.buildProfileCaption(user, topPosition), sendOptions);
 
     return message;
   }
@@ -432,28 +304,65 @@ async function updateProfileMessage(chatId, messageId, user, topPosition) {
   return sendProfileMessage(chatId, user, topPosition);
 }
 
+function telegramErrorSummary(err) {
+  if (!err) return '';
+  try {
+    const raw = err.response && err.response.body;
+    let b = raw;
+    if (typeof raw === 'string') {
+      try {
+        b = JSON.parse(raw);
+      } catch (_) {
+        b = null;
+      }
+    }
+    if (b && typeof b === 'object' && b.description) {
+      return `${b.error_code || '—'} ${b.description}`;
+    }
+  } catch (_) {}
+  return err.message || String(err);
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 const mainKeyboardRefresh = new Map();
+const mainKeyboardSendPending = new Set();
+
+async function sendMainKeyboard(chatId, options = {}) {
+  const message = await bot.sendMessage(chatId, REPLY_KEYBOARD_NOTICE, {
+    reply_markup: keyboards.main,
+    disable_notification: options.disableNotification !== false
+  });
+
+  return message;
+}
 
 // Функция для восстановления основной клавиатуры
 function ensureMainKeyboard(chatId) {
   if (String(chatId).startsWith('-')) return;
+  mainKeyboardRefresh.set(chatId, Date.now());
+  // Reply-клавиатура применяется отдельным сообщением (текст видимый — иначе API часто отклоняет).
+}
 
+const callbackDebounce = new Map();
+
+// Функция для предотвращения дублирования callback (Баг 2)
+function shouldProcessCallback(userId, callbackData) {
+  const key = `${userId}_${callbackData}`;
   const now = Date.now();
-  const lastRefresh = mainKeyboardRefresh.get(chatId) || 0;
+  const lastCall = callbackDebounce.get(key) || 0;
 
-  if (now - lastRefresh < 2500) return;
-  mainKeyboardRefresh.set(chatId, now);
+  if (now - lastCall < 1000) return false;
+  callbackDebounce.set(key, now);
 
-  // Reply-клавиатура применяется отдельным сообщением. Не удаляем его мгновенно:
-  // Telegram-клиенты иногда не успевают принять обновление за десятки миллисекунд.
-  bot.sendMessage(chatId, '\u200B', {
-    reply_markup: keyboards.main,
-    disable_notification: true
-  }).then((msg) => {
-    setTimeout(() => {
-      bot.deleteMessage(chatId, msg.message_id).catch(() => {});
-    }, 5000);
-  }).catch(() => {});
+  // Очищаем старые записи
+  setTimeout(() => callbackDebounce.delete(key), 2000);
+  return true;
 }
 
 // Функция переноса профиля
@@ -534,15 +443,18 @@ function handleProtectedCallback(query, data, chatId, userId) {
 
       if (fs.existsSync(menuImagePath)) {
         bot.sendPhoto(chatId, menuImagePath, {
-          caption: '',
           reply_markup: keyboards.menu
         }).then(() => {
           ensureMainKeyboard(chatId);
+        }).catch(() => {
+          ensureMainKeyboard(chatId);
         });
       } else {
-        bot.sendMessage(chatId, '', {
+        bot.sendMessage(chatId, MENU_PANEL_FALLBACK, {
           reply_markup: keyboards.menu
         }).then(() => {
+          ensureMainKeyboard(chatId);
+        }).catch(() => {
           ensureMainKeyboard(chatId);
         });
       }
@@ -695,7 +607,10 @@ function handleProtectedCallback(query, data, chatId, userId) {
           return;
         }
 
-        bot.sendMessage(chatId, `✅ Вы успешно закрепились за куратором @${mentorData.username}!`);
+        // Баг 3 исправлен: отправляем в личку пользователю (userId), а не в текущий чат (chatId)
+        bot.sendMessage(userId, `✅ Вы успешно закрепились за куратором @${mentorData.username}!`).catch(err => {
+          console.error('Error sending to user:', err);
+        });
 
         // Отправляем уведомление куратору (если у нас есть его ID)
         if (mentorData.userId) {
@@ -1233,7 +1148,6 @@ bot.onText(/\/start/, (msg) => {
           });
         }
         // Отправляем основную клавиатуру отдельно
-        ensureMainKeyboard(chatId);
       }).catch((err) => {
         console.error('Error getting info banner:', err);
         bot.sendMessage(chatId, '❌ Ошибка получения информации');
@@ -1301,7 +1215,7 @@ bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])$/, (msg, match) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
 
-  const workerUsername = match[1].replace('@', '').replace('/', '');
+  const workerUsername = match[1].replace(/^\/+/, '').replace(/@.+$/, '');
   const amount = parseInt(match[2]);
   const direction = parseInt(match[3]);
 
@@ -1488,16 +1402,11 @@ bot.on('message', async (msg) => {
 
       if (fs.existsSync(imagePath)) {
         bot.sendPhoto(chatId, imagePath, {
-          caption: '',
           reply_markup: keyboards.menu
-        }).then(() => {
-          ensureMainKeyboard(chatId);
         });
       } else {
-        bot.sendMessage(chatId, '', {
+        bot.sendMessage(chatId, MENU_PANEL_FALLBACK, {
           reply_markup: keyboards.menu
-        }).then(() => {
-          ensureMainKeyboard(chatId);
         });
       }
       return;
@@ -1512,13 +1421,24 @@ bot.on('callback_query', (query) => {
   const data = query.data;
   const username = query.from.username || '';
 
+  // Баг 2 исправлен: предотвращаем дублирование сообщений
+  if (!shouldProcessCallback(userId, data)) {
+    bot.answerCallbackQuery(query.id).catch(() => {});
+    return;
+  }
+
   // Обновляем username пользователя при каждом callback
   updateUsername(userId, username);
 
-  // Обработка profit system (только для админов)
-  if (adminIds.includes(userId)) {
-    if (data.startsWith('send_profit_accounting_')) {
-      const profitId = data.replace('send_profit_accounting_', '');
+  const adminProfitAction = data.startsWith('send_all_') || data.startsWith('send_accounting_') || data.startsWith('send_public_');
+  if (adminProfitAction && !adminIds.includes(userId)) {
+    bot.answerCallbackQuery(query.id, { text: '❌ У вас нет прав на это действие' });
+    return;
+  }
+
+  // Обработка profit system
+  if (data.startsWith('send_profit_accounting_') || (data.startsWith('send_profit_') && !data.startsWith('send_profit_accounting_'))) {
+      const profitId = data.startsWith('send_profit_accounting_') ? data.replace('send_profit_accounting_', '') : data.replace('send_profit_', '');
       const profit = profitData[profitId];
 
       if (!profit) {
@@ -1528,12 +1448,10 @@ bot.on('callback_query', (query) => {
 
       bot.answerCallbackQuery(query.id);
 
-      // Обновляем статистику проекта (всегда)
       utils.updateProjectStats(profit.amount, (err) => {
         if (err) console.error('Error updating project stats:', err);
       });
 
-      // Сохраняем профит в БД и обновляем баланс только если воркер зарегистрирован
       if (profit.isRegistered && profit.userId !== 0) {
         db.run('INSERT INTO profits (user_id, amount, amount_to_pay, direction) VALUES (?, ?, ?, ?)',
           [profit.userId, profit.amount, profit.workerPayout, profit.direction],
@@ -1545,7 +1463,6 @@ bot.on('callback_query', (query) => {
 
             const dbProfitId = this.lastID;
 
-            // Сохраняем доли
             for (const [role, amount] of Object.entries(profit.shares)) {
               db.run('INSERT OR IGNORE INTO profit_shares (profit_id, role, percentage, amount) VALUES (?, ?, ?, ?)',
                 [dbProfitId, role, utils.PROFIT_SHARES[role], amount],
@@ -1555,7 +1472,6 @@ bot.on('callback_query', (query) => {
               );
             }
 
-            // Обновляем баланс и статистику воркера
             db.run(`UPDATE users SET
               balance = balance + ?,
               total_earned = total_earned + ?,
@@ -1567,9 +1483,6 @@ bot.on('callback_query', (query) => {
                   console.error('Error updating user:', err);
                 } else {
                   console.log(`✅ Updated balance for user ${profit.userId}: +${profit.workerPayout}₽`);
-
-                  // Инвалидируем кэш баннера при обновлении профиля
-                  // Обновляем статус воркера
                   utils.updateWorkerStatus(profit.userId, (err) => {
                     if (err) console.error('Error updating status:', err);
                   });
@@ -1580,11 +1493,7 @@ bot.on('callback_query', (query) => {
         );
       }
 
-      // Удаляем предыдущее сообщение
-      bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
-
-      // Формируем одно сообщение с информацией для обоих каналов
-      const combinedText = `<b>📊 БУХГАЛТЕРИЯ:</b>
+      let combinedText = `<b>📊 БУХГАЛТЕРИЯ:</b>
 🚀${profit.directionName}
 👤Воркер: @${profit.username}
 💸Сумма профита: ${profit.amount.toLocaleString()}₽
@@ -1602,7 +1511,6 @@ bot.on('callback_query', (query) => {
 🏠Сервис: ${profit.directionName}
 ┣👤Воркер: ${profit.name}`;
 
-      // Добавляем куратора в предпросмотр, если он есть и направление = 1
       if (profit.direction === 1 && profit.curator) {
         combinedText += `\n┣💸Сумма: ${profit.amount.toLocaleString()}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
       } else {
@@ -1617,11 +1525,20 @@ bot.on('callback_query', (query) => {
         ]
       };
 
-      bot.sendMessage(chatId, combinedText, { parse_mode: 'HTML', reply_markup: combinedKeyboard });
+      bot.sendMessage(chatId, combinedText, { parse_mode: 'HTML', reply_markup: combinedKeyboard })
+        .then(() => {
+          bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
+        })
+        .catch((err) => {
+          console.error('Error sending profit action menu:', err);
+          bot.answerCallbackQuery(query.id, { text: '❌ Не удалось показать опции публикации профита, попробуйте снова.' });
+          bot.sendMessage(chatId, '❌ Не удалось показать опции публикации профита, попробуйте снова.').catch(() => {});
+        });
       return;
     }
 
-    if (data.startsWith('send_all_')) {
+    if (adminIds.includes(userId)) {
+      if (data.startsWith('send_all_')) {
       const profitId = data.replace('send_all_', '');
       const profit = profitData[profitId];
 
@@ -1863,7 +1780,7 @@ bot.on('callback_query', (query) => {
             } else {
               // Пользователь не существует - создаем
               db.run('INSERT INTO users (user_id, username, name, application_approved) VALUES (?, ?, ?, ?)',
-                [application.user_id, application.username, application.username, 0],
+                [application.user_id, application.username, application.name || application.username, 1],
                 (err) => {
                   if (err) {
                     console.error('Error creating user:', err);
@@ -2000,15 +1917,21 @@ bot.on('callback_query', (query) => {
                     caption: banner,
                     reply_markup: keyboards.info,
                     parse_mode: 'HTML'
+                  }).then(() => {
+                    ensureMainKeyboard(chatId);
+                  }).catch(() => {
+                    ensureMainKeyboard(chatId);
                   });
                 } else {
                   bot.sendMessage(chatId, banner, {
                     reply_markup: keyboards.info,
                     parse_mode: 'HTML'
+                  }).then(() => {
+                    ensureMainKeyboard(chatId);
+                  }).catch(() => {
+                    ensureMainKeyboard(chatId);
                   });
                 }
-                // Отправляем основную клавиатуру отдельно
-                ensureMainKeyboard(chatId);
               }).catch((err) => {
                 console.error('Error getting info banner:', err);
               });
@@ -2393,6 +2316,7 @@ ${withdrawal.check_message || ''}`;
 bot.onText(/\/me/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
+  const isPrivateChat = msg.chat.type === 'private';
 
   getUser(userId, async (err, user) => {
     if (err || !user) {
@@ -2403,8 +2327,14 @@ bot.onText(/\/me/, async (msg) => {
     utils.getTopPosition(userId, async (err, topPosition) => {
       const position = err ? 0 : topPosition;
 
-      await sendProfileMessage(chatId, user, position);
-      ensureMainKeyboard(chatId);
+      // Баг 4 исправлен: в чате отправляем без кнопок, в личке - с кнопками
+      if (isPrivateChat) {
+        await sendProfileMessage(chatId, user, position);
+        ensureMainKeyboard(chatId);
+      } else {
+        // В чате отправляем профиль без кнопок (передаем null)
+        await sendProfileMessage(chatId, user, position, { reply_markup: null });
+      }
     });
   });
 });
@@ -2786,8 +2716,84 @@ bot.onText(/\/updatepin/, async (msg) => {
 
   bot.sendMessage(chatId, '🔄 Обновляю закрепленное сообщение...');
   await loadPinnedMessageId();
-  await updatePinnedMessage();
+  await updatePinnedMessage(bot, GENERAL_CHAT_ID);
   bot.sendMessage(chatId, '✅ Закрепленное сообщение обновлено!');
+});
+
+// Команда для отправки основной клавиатуры всем принятым пользователям (только для админов)
+bot.onText(/\/sendkeyboard/, async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  if (!adminIds.includes(userId)) {
+    bot.sendMessage(chatId, '❌ У вас нет прав администратора');
+    return;
+  }
+
+  // Проверка, что команда используется в личных сообщениях
+  if (msg.chat.type !== 'private') {
+    bot.sendMessage(chatId, '❌ Эта команда работает только в личных сообщениях с ботом');
+    return;
+  }
+
+  bot.sendMessage(chatId, '⌨️ Начинаю отправку клавиатуры всем принятым пользователям...');
+
+  // Получаем всех принятых пользователей (исключаем невалидные id)
+  db.all(
+    'SELECT DISTINCT user_id FROM users WHERE application_approved = 1 AND user_id IS NOT NULL AND user_id > 0',
+    async (err, users) => {
+    if (err) {
+      console.error('Error getting users:', err);
+      bot.sendMessage(chatId, '❌ Ошибка получения списка пользователей');
+      return;
+    }
+
+    if (!users || users.length === 0) {
+      bot.sendMessage(chatId, '❌ В базе данных нет принятых пользователей');
+      return;
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+    let firstFailureReason = '';
+    const totalUsers = users.length;
+
+    // Функция для отправки клавиатуры с задержкой
+    const sendWithDelay = async (user, index) => {
+      return new Promise((resolve) => {
+        setTimeout(async () => {
+          const targetId = Number(user.user_id);
+          try {
+            await sendMainKeyboard(targetId, { disableNotification: true });
+            successCount++;
+          } catch (error) {
+            const summary = telegramErrorSummary(error);
+    if (!firstFailureReason && summary) firstFailureReason = summary.slice(0, 400);
+            console.error(`Failed to send keyboard to user ${targetId}:`, summary);
+            failCount++;
+          }
+          resolve();
+        }, index * 100); // Задержка 100мс между сообщениями
+      });
+    };
+
+    // Отправляем клавиатуру всем пользователям
+    const promises = users.map((user, index) => sendWithDelay(user, index));
+    await Promise.all(promises);
+
+    // Отправляем статистику админу
+    const statsMessage = `✅ <b>Отправка клавиатуры завершена!</b>
+
+📊 Статистика:
+• Всего пользователей: ${totalUsers}
+• Успешно доставлено: ${successCount}
+• Не доставлено: ${failCount}${failCount > 0 && firstFailureReason ? `
+
+<i>Пример ошибки Telegram (первый сбой):</i>
+<code>${escapeHtml(firstFailureReason)}</code>` : ''}`;
+
+    bot.sendMessage(chatId, statsMessage, { parse_mode: 'HTML' });
+  });
 });
 
 // Команда /broadcast - начать рассылку (только для админов)
@@ -2859,7 +2865,7 @@ bot.onText(/\/setcard/, (msg) => {
     ]
   };
 
-  bot.sendMessage(chatId, '💳 <b>Управление реквизитами</b>\n\nВыберите действие:', {
+  bot.sendMessage(chatId, '💳 <b>Управление реквизитами</b>', {
     parse_mode: 'HTML',
     reply_markup: keyboard
   });
@@ -2876,10 +2882,8 @@ bot.on('chat_join_request', async (chatJoinRequest) => {
     await bot.approveChatJoinRequest(chatId, userId);
     console.log(`✅ Автоматически одобрен запрос на вступление от @${username} (ID: ${userId}) в чат ${chatId}`);
 
-    // Отправляем приветственное сообщение с клавиатурой в личку
-    await bot.sendMessage(userId, '', {
-      reply_markup: keyboards.main
-    });
+    // Отправляем приветственное сообщение с клавиатурой в личку (пустой текст API не принимает)
+    await sendMainKeyboard(userId, { disableNotification: true });
   } catch (error) {
     console.error('❌ Ошибка одобрения запроса на вступление:', error);
   }

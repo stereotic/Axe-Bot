@@ -2,6 +2,7 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const db = require('./database');
 const utils = require('./utils');
+const { updatePinnedMessage } = require('./update_pinned');
 
 const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
@@ -138,6 +139,9 @@ bot.on('callback_query', (query) => {
         utils.updateProjectStats(profit.amount, (err) => {
           if (err) console.error('Error updating project stats:', err);
         });
+
+        // Обновляем закрепленное сообщение
+        updatePinnedMessage(bot, GENERAL_CHAT_ID).catch(err => console.error('Error updating pinned message:', err));
 
         // Отправляем в бухгалтерию
         const accountingText = `🚀${profit.directionName}
