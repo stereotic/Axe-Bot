@@ -624,63 +624,6 @@ function handleProtectedCallback(query, data, chatId, userId) {
       });
       break;
 
-    case 'card':
-      bot.answerCallbackQuery(query.id);
-
-      // Удаляем старое сообщение
-      bot.deleteMessage(chatId, messageId).catch(() => {});
-
-      // Используем ту же логику что и команда /card
-      const cardSystem = require('./card_system');
-      cardSystem.getAllCards((err, cards) => {
-        if (err || !cards || cards.length === 0) {
-          bot.sendMessage(chatId, '❌ Реквизиты отсутствуют');
-          ensureMainKeyboard(chatId);
-          return;
-        }
-
-        // Устанавливаем индекс на первую карту
-        const userCardIndex = require('./card_view_handlers').userCardIndex || {};
-        userCardIndex[userId] = 0;
-
-        // Отправляем первую карту
-        const card = cards[0];
-        const cardText = cardSystem.formatCardRequisite(card);
-
-        const genderEmoji = cardSystem.getGenderEmoji(card.gender);
-        const countryFlag = cardSystem.getCountryFlag(card.country);
-
-        const keyboard = {
-          inline_keyboard: [
-            [
-              { text: '🔔 Уведомления', callback_data: 'card_notifications' }
-            ],
-            [
-              { text: '🔍 Проверить чек', callback_data: 'card_check_status' }
-            ],
-            [
-              { text: '💳 Запросить реквизит', callback_data: 'card_request' }
-            ],
-            [
-              { text: '◀️', callback_data: 'card_nav_left' },
-              { text: `${genderEmoji} | ${countryFlag}`, callback_data: 'card_info' },
-              { text: '▶️', callback_data: 'card_nav_right' }
-            ],
-            [
-              { text: '◀️ Назад в меню', callback_data: 'back_to_menu' }
-            ]
-          ]
-        };
-
-        bot.sendMessage(chatId, cardText, {
-          parse_mode: 'HTML',
-          reply_markup: keyboard
-        }).then(() => {
-          ensureMainKeyboard(chatId);
-        });
-      });
-      break;
-
     case 'community':
       bot.answerCallbackQuery(query.id);
       const communityImagePath = path.join(__dirname, 'images', 'buy_card.jpg');
@@ -2225,7 +2168,7 @@ ${withdrawal.check_message || ''}`;
 
   // Обработка остальных callback
   // Проверяем одобрена ли заявка для доступа к основному функционалу
-  const protectedCallbacks = ['profile', 'work', 'training', 'card', 'community', 'feedback', 'settings',
+  const protectedCallbacks = ['profile', 'work', 'training', 'community', 'feedback', 'settings',
                                'materials', 'profile_settings', 'change_name', 'hide_profile',
                                'transfer_profile', 'withdraw', 'cancel_withdraw', 'back_to_menu',
                                'show_mentor', 'assign_mentor'];
@@ -2306,6 +2249,68 @@ ${withdrawal.check_message || ''}`;
       });
       return;
     }
+  }
+
+  // Обработка callback 'card' (без проверки одобрения заявки)
+  if (data === 'card') {
+    bot.answerCallbackQuery(query.id);
+
+    // Удаляем старое сообщение
+    bot.deleteMessage(chatId, messageId).catch(() => {});
+
+    // Используем ту же логику что и команда /card
+    const cardSystem = require('./card_system');
+    const { sendNoCardsMessage, userCardIndex } = require('./card_view_handlers');
+
+    cardSystem.getAllCards((err, cards) => {
+      if (err || !cards || cards.length === 0) {
+        sendNoCardsMessage(bot, chatId);
+        ensureMainKeyboard(chatId);
+        return;
+      }
+
+      // Устанавливаем индекс на первую карту
+      userCardIndex[userId] = 0;
+
+      // Отправляем первую карту
+      const card = cards[0];
+      const cardText = cardSystem.formatCardRequisite(card);
+
+      const genderEmoji = cardSystem.getGenderEmoji(card.gender);
+      const countryFlag = cardSystem.getCountryFlag(card.country);
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: '🔔 Уведомления', callback_data: 'card_notifications' }
+          ],
+          [
+            { text: '🔍 Проверить чек', callback_data: 'card_check_status' }
+          ],
+          [
+            { text: '💳 Запросить реквизит', callback_data: 'card_request' }
+          ],
+          [
+            { text: '◀️', callback_data: 'card_nav_left' },
+            { text: `${genderEmoji} | ${countryFlag}`, callback_data: 'card_info' },
+            { text: '▶️', callback_data: 'card_nav_right' }
+          ],
+          [
+            { text: '◀️ Назад в меню', callback_data: 'back_to_menu' }
+          ]
+        ]
+      };
+
+      bot.sendMessage(chatId, cardText, {
+        parse_mode: 'HTML',
+        reply_markup: keyboard
+      }).then(() => {
+        ensureMainKeyboard(chatId);
+      }).catch(err => {
+        console.error('Error sending card message:', err);
+      });
+    });
+    return;
   }
 
   // Обработка неизвестных callback

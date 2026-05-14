@@ -14,7 +14,7 @@ function setupCardViewHandlers(bot) {
     // Получаем все реквизиты
     cardSystem.getAllCards((err, cards) => {
       if (err || !cards || cards.length === 0) {
-        bot.sendMessage(chatId, '❌ Реквизиты отсутствуют');
+        sendNoCardsMessage(bot, chatId);
         return;
       }
 
@@ -76,7 +76,7 @@ function setupCardViewHandlers(bot) {
       // Инициализируем состояние запроса
       cardSystem.cardRequestState[userId] = { step: 'amount' };
 
-      bot.sendMessage(chatId, '💰 <b>Введите сумму депозита:</b>\n\nНапример: 10000', {
+      bot.sendMessage(chatId, '💰 <b>Введите сумму депозита:</b>', {
         parse_mode: 'HTML'
       });
     }
@@ -88,7 +88,7 @@ function setupCardViewHandlers(bot) {
       // Получаем текущую карту пользователя
       cardSystem.getAllCards((err, cards) => {
         if (err || !cards || cards.length === 0) {
-          bot.sendMessage(chatId, '❌ Реквизиты отсутствуют');
+          sendNoCardsMessage(bot, chatId);
           return;
         }
 
@@ -112,6 +112,23 @@ function setupCardViewHandlers(bot) {
       bot.answerCallbackQuery(query.id, {
         text: '🔔 Уведомления включены',
         show_alert: false
+      });
+    }
+
+    // Кнопка "Обновить" - проверяет наличие реквизитов
+    if (data === 'card_refresh') {
+      bot.answerCallbackQuery(query.id);
+
+      cardSystem.getAllCards((err, cards) => {
+        if (err || !cards || cards.length === 0) {
+          // Если реквизитов всё нет, обновляем сообщение с тем же текстом
+          editNoCardsMessage(bot, chatId, query.message.message_id);
+          return;
+        }
+
+        // Если реквизиты появились, показываем первую карту
+        userCardIndex[userId] = 0;
+        editCardMessage(bot, chatId, query.message.message_id, userId, cards);
       });
     }
   });
@@ -177,4 +194,49 @@ function createCardKeyboard(card, currentIndex, totalCards) {
   };
 }
 
-module.exports = { setupCardViewHandlers };
+// Функция отправки сообщения об отсутствии реквизитов
+function sendNoCardsMessage(bot, chatId) {
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: 'Запросить реквизит💳', callback_data: 'card_request' }
+      ],
+      [
+        { text: '🔄Обновить', callback_data: 'card_refresh' }
+      ]
+    ]
+  };
+
+  bot.sendMessage(chatId, '⏰Общие реквизиты временно отсутствуют', {
+    parse_mode: 'HTML',
+    reply_markup: keyboard
+  });
+}
+
+// Функция редактирования сообщения об отсутствии реквизитов
+function editNoCardsMessage(bot, chatId, messageId) {
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: 'Запросить реквизит💳', callback_data: 'card_request' }
+      ],
+      [
+        { text: '🔄Обновить', callback_data: 'card_refresh' }
+      ]
+    ]
+  };
+
+  bot.editMessageText('⏰Общие реквизиты временно отсутствуют', {
+    chat_id: chatId,
+    message_id: messageId,
+    parse_mode: 'HTML',
+    reply_markup: keyboard
+  }).catch(err => {
+    // Игнорируем ошибку "message is not modified"
+    if (!err.message.includes('message is not modified')) {
+      console.error('Error editing no-cards message:', err);
+    }
+  });
+}
+
+module.exports = { setupCardViewHandlers, userCardIndex };
