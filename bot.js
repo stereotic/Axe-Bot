@@ -5,7 +5,7 @@ const keyboards = require('./keyboards');
 const utils = require('./utils');
 const cardSystem = require('./card_system');
 const { setupCardHandlers } = require('./card_handlers');
-const { setupCardViewHandlers } = require('./card_view_handlers');
+const { setupCardViewHandlers, openCardView, startCardRequestInPrivate } = require('./card_view_handlers');
 const { setupCardRequestHandlers } = require('./card_request_handlers');
 const { setupCheckHandlers } = require('./check_handlers');
 const fs = require('fs');
@@ -16,8 +16,8 @@ const { loadPinnedMessageId, updatePinnedMessage } = require('./update_pinned');
 
 // Короткий текст, если нет картинки для меню (пустой sendMessage/caption Telegram отклоняет).
 const MENU_PANEL_FALLBACK = 'Выбери раздел:';
-// Короткий текст для ручной доставки reply-клавиатуры через /sendkeyboard.
-const REPLY_KEYBOARD_NOTICE = '🦋';
+// Минимальный текст для /sendkeyboard (Telegram не принимает пустое сообщение).
+const REPLY_KEYBOARD_PLACEHOLDER = '\u2800';
 
 const token = process.env.BOT_TOKEN;
 const adminIds = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(id => parseInt(id.trim())).filter(Boolean) : [];
@@ -330,23 +330,22 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;');
 }
 
-const mainKeyboardRefresh = new Map();
-const mainKeyboardSendPending = new Set();
-
+// Только для /sendkeyboard, /start и завершения регистрации (не после кнопок меню).
 async function sendMainKeyboard(chatId, options = {}) {
-  const message = await bot.sendMessage(chatId, REPLY_KEYBOARD_NOTICE, {
+  return bot.sendMessage(chatId, REPLY_KEYBOARD_PLACEHOLDER, {
     reply_markup: keyboards.main,
     disable_notification: options.disableNotification !== false
   });
-
-  return message;
 }
 
-// Функция для восстановления основной клавиатуры
-function ensureMainKeyboard(chatId) {
-  if (String(chatId).startsWith('-')) return;
-  mainKeyboardRefresh.set(chatId, Date.now());
-  // Reply-клавиатура применяется отдельным сообщением (текст видимый — иначе API часто отклоняет).
+// Сначала отправляем новый экран, потом удаляем меню (чтобы не оставлять чат пустым).
+function replaceMenuMessage(chatId, messageId, sendPromise) {
+  return Promise.resolve(sendPromise)
+    .then(() => bot.deleteMessage(chatId, messageId).catch(() => {}))
+    .catch((err) => {
+      console.error(`replaceMenuMessage failed for ${chatId}:`, telegramErrorSummary(err));
+      return bot.sendMessage(chatId, '❌ Не удалось открыть раздел. Попробуйте ещё раз.').catch(() => {});
+    });
 }
 
 const callbackDebounce = new Map();
@@ -435,28 +434,16 @@ function handleProtectedCallback(query, data, chatId, userId) {
   switch (data) {
     case 'back_to_menu':
       bot.answerCallbackQuery(query.id);
-      // Возвращаемся в главное меню
       const menuImagePath = path.join(__dirname, 'images', 'info.jpg');
 
-      // Удаляем старое сообщение и отправляем новое с картинкой
-      bot.deleteMessage(chatId, messageId).catch(() => {});
-
       if (fs.existsSync(menuImagePath)) {
-        bot.sendPhoto(chatId, menuImagePath, {
+        replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, menuImagePath, {
           reply_markup: keyboards.menu
-        }).then(() => {
-          ensureMainKeyboard(chatId);
-        }).catch(() => {
-          ensureMainKeyboard(chatId);
-        });
+        }));
       } else {
-        bot.sendMessage(chatId, MENU_PANEL_FALLBACK, {
+        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, MENU_PANEL_FALLBACK, {
           reply_markup: keyboards.menu
-        }).then(() => {
-          ensureMainKeyboard(chatId);
-        }).catch(() => {
-          ensureMainKeyboard(chatId);
-        });
+        }));
       }
       break;
 
@@ -471,10 +458,23 @@ function handleProtectedCallback(query, data, chatId, userId) {
         utils.getTopPosition(userId, async (err, position) => {
           const topPosition = err ? 0 : position;
 
-          bot.deleteMessage(chatId, messageId).catch(() => {});
-          await sendProfileMessage(chatId, user, topPosition);
-          ensureMainKeyboard(chatId);
+          try {
+            await sendProfileMessage(chatId, user, topPosition);
+            await bot.deleteMessage(chatId, messageId).catch(() => {});
+          } catch (error) {
+            console.error('Profile menu navigation error:', error);
+            bot.sendMessage(chatId, '❌ Не удалось открыть профиль. Попробуйте ещё раз.').catch(() => {});
+          }
         });
+      });
+      break;
+
+    case 'card':
+      bot.answerCallbackQuery(query.id);
+      openCardView(bot, chatId, userId, {
+        deleteMessageId: messageId,
+        showBackToMenu: true,
+        chatType: query.message.chat.type
       });
       break;
 
@@ -482,24 +482,17 @@ function handleProtectedCallback(query, data, chatId, userId) {
       bot.answerCallbackQuery(query.id);
       const workImagePath = path.join(__dirname, 'images', 'work.jpg');
 
-      // Удаляем старое сообщение и отправляем новое с картинкой
-      bot.deleteMessage(chatId, messageId).catch(() => {});
-
       if (fs.existsSync(workImagePath)) {
-        bot.sendPhoto(chatId, workImagePath, {
+        replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, workImagePath, {
           caption: WORK_INFO,
           reply_markup: keyboards.work,
           parse_mode: 'HTML'
-        }).then(() => {
-          ensureMainKeyboard(chatId);
-        });
+        }));
       } else {
-        bot.sendMessage(chatId, WORK_INFO, {
+        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, WORK_INFO, {
           reply_markup: keyboards.work,
           parse_mode: 'HTML'
-        }).then(() => {
-          ensureMainKeyboard(chatId);
-        });
+        }));
       }
       break;
 
@@ -515,24 +508,17 @@ function handleProtectedCallback(query, data, chatId, userId) {
         ]
       };
 
-      // Удаляем старое сообщение и отправляем новое с картинкой
-      bot.deleteMessage(chatId, messageId).catch(() => {});
-
       if (fs.existsSync(trainingImagePath)) {
-        bot.sendPhoto(chatId, trainingImagePath, {
+        replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, trainingImagePath, {
           caption: '<b><i>Тег куратора • Процент</i></b>',
           parse_mode: 'HTML',
           reply_markup: trainingKeyboard
-        }).then(() => {
-          ensureMainKeyboard(chatId);
-        });
+        }));
       } else {
-        bot.sendMessage(chatId, '<b>Обучение</b>\n\n<b><i>Тег куратора • Процент</i></b>', {
+        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, '<b>Обучение</b>\n\n<b><i>Тег куратора • Процент</i></b>', {
           parse_mode: 'HTML',
           reply_markup: trainingKeyboard
-        }).then(() => {
-          ensureMainKeyboard(chatId);
-        });
+        }));
       }
       break;
 
@@ -575,23 +561,17 @@ function handleProtectedCallback(query, data, chatId, userId) {
 
         const mentorBannerPath = path.join(__dirname, 'images', 'mentor_banner.jpg');
 
-        bot.deleteMessage(chatId, messageId).catch(() => {});
-
         if (fs.existsSync(mentorBannerPath)) {
-          bot.sendPhoto(chatId, mentorBannerPath, {
+          replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, mentorBannerPath, {
             caption: mentorText,
             parse_mode: 'HTML',
             reply_markup: mentorKeyboard
-          }).then(() => {
-            ensureMainKeyboard(chatId);
-          });
+          }));
         } else {
-          bot.sendMessage(chatId, mentorText, {
+          replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, mentorText, {
             parse_mode: 'HTML',
             reply_markup: mentorKeyboard
-          }).then(() => {
-            ensureMainKeyboard(chatId);
-          });
+          }));
         }
       });
       break;
@@ -629,9 +609,6 @@ function handleProtectedCallback(query, data, chatId, userId) {
       const communityImagePath = path.join(__dirname, 'images', 'buy_card.jpg');
       const communityText = '<b>⭐️Для создания комьюнити необходимо согласование администрации.\n\nОбратитесь в Feedback</b>';
 
-      // Удаляем старое сообщение и отправляем новое с картинкой
-      bot.deleteMessage(chatId, messageId).catch(() => {});
-
       const communityKeyboard = {
         inline_keyboard: [
           [{ text: '🗣Feedback', url: 'https://t.me/FeedbackAXEbot' }],
@@ -640,20 +617,16 @@ function handleProtectedCallback(query, data, chatId, userId) {
       };
 
       if (fs.existsSync(communityImagePath)) {
-        bot.sendPhoto(chatId, communityImagePath, {
+        replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, communityImagePath, {
           caption: communityText,
           parse_mode: 'HTML',
           reply_markup: communityKeyboard
-        }).then(() => {
-          ensureMainKeyboard(chatId);
-        });
+        }));
       } else {
-        bot.sendMessage(chatId, communityText, {
+        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, communityText, {
           parse_mode: 'HTML',
           reply_markup: communityKeyboard
-        }).then(() => {
-          ensureMainKeyboard(chatId);
-        });
+        }));
       }
       break;
 
@@ -661,24 +634,17 @@ function handleProtectedCallback(query, data, chatId, userId) {
       bot.answerCallbackQuery(query.id);
       const feedbackImagePath = path.join(__dirname, 'images', 'feedback.jpg');
 
-      // Удаляем старое сообщение и отправляем новое с картинкой
-      bot.deleteMessage(chatId, messageId).catch(() => {});
-
       if (fs.existsSync(feedbackImagePath)) {
-        bot.sendPhoto(chatId, feedbackImagePath, {
+        replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, feedbackImagePath, {
           caption: FEEDBACK_INFO,
           parse_mode: 'HTML',
           reply_markup: keyboards.feedback
-        }).then(() => {
-          ensureMainKeyboard(chatId);
-        });
+        }));
       } else {
-        bot.sendMessage(chatId, FEEDBACK_INFO, {
+        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, FEEDBACK_INFO, {
           parse_mode: 'HTML',
           reply_markup: keyboards.feedback
-        }).then(() => {
-          ensureMainKeyboard(chatId);
-        });
+        }));
       }
       break;
 
@@ -687,21 +653,14 @@ function handleProtectedCallback(query, data, chatId, userId) {
       const settingsImagePath = path.join(__dirname, 'images', 'settings.jpg');
       const settingsText = '⚙️ Настройки';
 
-      // Удаляем старое сообщение и отправляем новое с картинкой
-      bot.deleteMessage(chatId, messageId).catch(() => {});
-
       if (fs.existsSync(settingsImagePath)) {
-        bot.sendPhoto(chatId, settingsImagePath, {
+        replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, settingsImagePath, {
           reply_markup: keyboards.settings_menu
-        }).then(() => {
-          ensureMainKeyboard(chatId);
-        });
+        }));
       } else {
-        bot.sendMessage(chatId, settingsText, {
+        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, settingsText, {
           reply_markup: keyboards.settings_menu
-        }).then(() => {
-          ensureMainKeyboard(chatId);
-        });
+        }));
       }
       break;
 
@@ -710,15 +669,12 @@ function handleProtectedCallback(query, data, chatId, userId) {
       const materialsImagePath = path.join(__dirname, 'images', 'materials.jpg');
       const materialsText = '📂 Материалы\n\nЗдесь будут доступны обучающие материалы';
 
-      // Удаляем старое сообщение и отправляем новое с картинкой
-      bot.deleteMessage(chatId, messageId).catch(() => {});
-
       if (fs.existsSync(materialsImagePath)) {
-        bot.sendPhoto(chatId, materialsImagePath, {
+        replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, materialsImagePath, {
           caption: materialsText
-        });
+        }));
       } else {
-        bot.sendMessage(chatId, materialsText);
+        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, materialsText));
       }
       break;
 
@@ -733,19 +689,14 @@ function handleProtectedCallback(query, data, chatId, userId) {
         const settingsImagePath = path.join(__dirname, 'images', 'settings.jpg');
         const settingsText = '⚙️ Настройки профиля';
 
-        // Удаляем старое сообщение и отправляем новое с картинкой
-        bot.deleteMessage(chatId, messageId).catch(() => {});
-
         if (fs.existsSync(settingsImagePath)) {
-          bot.sendPhoto(chatId, settingsImagePath, {
+          replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, settingsImagePath, {
             reply_markup: keyboards.profile_settings(user.profile_hidden)
-          }).then(() => {
-            ensureMainKeyboard(chatId);
-          });
+          }));
         } else {
-          bot.sendMessage(chatId, settingsText, {
+          replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, settingsText, {
             reply_markup: keyboards.profile_settings(user.profile_hidden)
-          });
+          }));
         }
       });
       break;
@@ -783,7 +734,6 @@ function handleProtectedCallback(query, data, chatId, userId) {
 
                 bot.sendMessage(chatId, '✅ Имя успешно изменено!');
                 await sendProfileMessage(chatId, user, topPosition);
-                ensureMainKeyboard(chatId);
               });
             });
           }
@@ -1037,6 +987,14 @@ bot.onText(/\/start/, (msg) => {
   // Обновляем username пользователя
   updateUsername(userId, username);
 
+  const startParam = (msg.text.match(/\/start(?:@\w+)?\s+(\S+)/) || [])[1];
+  if (startParam === 'card_request' && msg.chat.type === 'private') {
+    startCardRequestInPrivate(bot, userId).catch((err) => {
+      console.error('Error starting card request from deep link:', err);
+    });
+    return;
+  }
+
   // Проверяем есть ли параметр (для просмотра профиля)
   const match = msg.text.match(/\/start\s+profile_(\d+)/);
 
@@ -1090,7 +1048,9 @@ bot.onText(/\/start/, (msg) => {
             parse_mode: 'HTML'
           });
         }
-        // Отправляем основную клавиатуру отдельно
+        sendMainKeyboard(chatId).catch((err) => {
+          console.error('sendMainKeyboard on /start failed:', telegramErrorSummary(err));
+        });
       }).catch((err) => {
         console.error('Error getting info banner:', err);
         bot.sendMessage(chatId, '❌ Ошибка получения информации');
@@ -1334,7 +1294,6 @@ bot.on('message', async (msg) => {
             parse_mode: 'HTML'
           });
         }
-        ensureMainKeyboard(chatId);
       }).catch((err) => {
         console.error('Error getting info banner:', err);
         bot.sendMessage(chatId, '❌ Ошибка получения информации');
@@ -1861,19 +1820,15 @@ bot.on('callback_query', (query) => {
                     reply_markup: keyboards.info,
                     parse_mode: 'HTML'
                   }).then(() => {
-                    ensureMainKeyboard(chatId);
-                  }).catch(() => {
-                    ensureMainKeyboard(chatId);
-                  });
+                    sendMainKeyboard(chatId).catch(() => {});
+                  }).catch(() => {});
                 } else {
                   bot.sendMessage(chatId, banner, {
                     reply_markup: keyboards.info,
                     parse_mode: 'HTML'
                   }).then(() => {
-                    ensureMainKeyboard(chatId);
-                  }).catch(() => {
-                    ensureMainKeyboard(chatId);
-                  });
+                    sendMainKeyboard(chatId).catch(() => {});
+                  }).catch(() => {});
                 }
               }).catch((err) => {
                 console.error('Error getting info banner:', err);
@@ -2168,14 +2123,14 @@ ${withdrawal.check_message || ''}`;
 
   // Обработка остальных callback
   // Проверяем одобрена ли заявка для доступа к основному функционалу
-  const protectedCallbacks = ['profile', 'work', 'training', 'community', 'feedback', 'settings',
+  const protectedCallbacks = ['profile', 'work', 'training', 'card', 'community', 'feedback', 'settings',
                                'materials', 'profile_settings', 'change_name', 'hide_profile',
                                'transfer_profile', 'withdraw', 'cancel_withdraw', 'back_to_menu',
                                'show_mentor', 'assign_mentor'];
 
   if (protectedCallbacks.includes(data) || data.startsWith('confirm_withdraw_')) {
     db.get('SELECT application_approved FROM users WHERE user_id = ?', [userId], (err, user) => {
-      if (err || !user || user.application_approved !== 1) {
+      if (err || !user || Number(user.application_approved) !== 1) {
         bot.answerCallbackQuery(query.id, { text: '❌ Доступ запрещен. Пройдите процесс регистрации.' });
         return;
       }
@@ -2251,68 +2206,6 @@ ${withdrawal.check_message || ''}`;
     }
   }
 
-  // Обработка callback 'card' (без проверки одобрения заявки)
-  if (data === 'card') {
-    bot.answerCallbackQuery(query.id);
-
-    // Удаляем старое сообщение
-    bot.deleteMessage(chatId, messageId).catch(() => {});
-
-    // Используем ту же логику что и команда /card
-    const cardSystem = require('./card_system');
-    const { sendNoCardsMessage, userCardIndex } = require('./card_view_handlers');
-
-    cardSystem.getAllCards((err, cards) => {
-      if (err || !cards || cards.length === 0) {
-        sendNoCardsMessage(bot, chatId);
-        ensureMainKeyboard(chatId);
-        return;
-      }
-
-      // Устанавливаем индекс на первую карту
-      userCardIndex[userId] = 0;
-
-      // Отправляем первую карту
-      const card = cards[0];
-      const cardText = cardSystem.formatCardRequisite(card);
-
-      const genderEmoji = cardSystem.getGenderEmoji(card.gender);
-      const countryFlag = cardSystem.getCountryFlag(card.country);
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: '🔔 Уведомления', callback_data: 'card_notifications' }
-          ],
-          [
-            { text: '🔍 Проверить чек', callback_data: 'card_check_status' }
-          ],
-          [
-            { text: '💳 Запросить реквизит', callback_data: 'card_request' }
-          ],
-          [
-            { text: '◀️', callback_data: 'card_nav_left' },
-            { text: `${genderEmoji} | ${countryFlag}`, callback_data: 'card_info' },
-            { text: '▶️', callback_data: 'card_nav_right' }
-          ],
-          [
-            { text: '◀️ Назад в меню', callback_data: 'back_to_menu' }
-          ]
-        ]
-      };
-
-      bot.sendMessage(chatId, cardText, {
-        parse_mode: 'HTML',
-        reply_markup: keyboard
-      }).then(() => {
-        ensureMainKeyboard(chatId);
-      }).catch(err => {
-        console.error('Error sending card message:', err);
-      });
-    });
-    return;
-  }
-
   // Обработка неизвестных callback
   bot.answerCallbackQuery(query.id);
 });
@@ -2335,7 +2228,6 @@ bot.onText(/\/me/, async (msg) => {
       // Баг 4 исправлен: в чате отправляем без кнопок, в личке - с кнопками
       if (isPrivateChat) {
         await sendProfileMessage(chatId, user, position);
-        ensureMainKeyboard(chatId);
       } else {
         // В чате отправляем профиль без кнопок (передаем null)
         await sendProfileMessage(chatId, user, position, { reply_markup: null });
@@ -2364,9 +2256,7 @@ bot.onText(/\/staff/, (msg) => {
 🗣<b>Feedback</b>
 ┗@FeedbackAXEbot`;
 
-  bot.sendMessage(chatId, staffText, { parse_mode: 'HTML', disable_web_page_preview: true }).then(() => {
-    ensureMainKeyboard(chatId);
-  }).catch(err => {
+  bot.sendMessage(chatId, staffText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
     console.error('Error sending staff message:', err);
   });
 });
@@ -2384,9 +2274,7 @@ bot.onText(/\/top$/, (msg) => {
           ORDER BY total_profit DESC, u.user_id ASC
           LIMIT 10`, (err, users) => {
     if (err || !users || users.length === 0) {
-      bot.sendMessage(chatId, '📊 Топ пуст').then(() => {
-        ensureMainKeyboard(chatId);
-      }).catch(err => {
+      bot.sendMessage(chatId, '📊 Топ пуст').catch(err => {
         console.error('Error sending top message:', err);
       });
       return;
@@ -2401,9 +2289,7 @@ bot.onText(/\/top$/, (msg) => {
       topText += `${medal}: <a href="${profileLink}">${user.name}</a> - ${user.total_profit.toLocaleString()}₽\n`;
     });
 
-    bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).then(() => {
-      ensureMainKeyboard(chatId);
-    }).catch(err => {
+    bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
       console.error('Error sending top message:', err);
     });
   });
@@ -2421,9 +2307,7 @@ bot.onText(/\/topd$/, (msg) => {
           ORDER BY daily_total DESC
           LIMIT 10`, (err, results) => {
     if (err || !results || results.length === 0) {
-      bot.sendMessage(chatId, '📊 Топ дня пуст').then(() => {
-        ensureMainKeyboard(chatId);
-      }).catch(err => {
+      bot.sendMessage(chatId, '📊 Топ дня пуст').catch(err => {
         console.error('Error sending topd message:', err);
       });
       return;
@@ -2443,9 +2327,7 @@ bot.onText(/\/topd$/, (msg) => {
       }
     });
 
-    bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).then(() => {
-      ensureMainKeyboard(chatId);
-    }).catch(err => {
+    bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
       console.error('Error sending topd message:', err);
     });
   });
@@ -2463,9 +2345,7 @@ bot.onText(/\/topm$/, (msg) => {
           ORDER BY monthly_total DESC
           LIMIT 10`, (err, results) => {
     if (err || !results || results.length === 0) {
-      bot.sendMessage(chatId, '📊 Топ месяца пуст').then(() => {
-        ensureMainKeyboard(chatId);
-      }).catch(err => {
+      bot.sendMessage(chatId, '📊 Топ месяца пуст').catch(err => {
         console.error('Error sending topm message:', err);
       });
       return;
@@ -2485,39 +2365,10 @@ bot.onText(/\/topm$/, (msg) => {
       }
     });
 
-    bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).then(() => {
-      ensureMainKeyboard(chatId);
-    }).catch(err => {
+    bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
       console.error('Error sending topm message:', err);
     });
   });
-});
-
-// Команда /card
-bot.onText(/^\/card$/, (msg) => {
-  const chatId = msg.chat.id;
-
-  db.all('SELECT * FROM cards ORDER BY created_at DESC', (err, cards) => {
-    if (err) {
-      bot.sendMessage(chatId, '❌ Ошибка базы данных');
-      return;
-    }
-
-    if (!cards || cards.length === 0) {
-      // Ничего не отправляем, если реквизитов нет
-      return;
-    }
-
-    let cardText = '💳 Актуальные реквизиты:\n\n';
-    cards.forEach((card, index) => {
-      cardText += `${index + 1}. ${card.card_info}\n`;
-    });
-
-    bot.sendMessage(chatId, cardText).then(() => {
-      ensureMainKeyboard(chatId);
-    });
-  });
-  return true; // Предотвращаем дальнейшую обработку
 });
 
 // Команда /materials
@@ -2533,8 +2384,6 @@ bot.onText(/\/materials/, (msg) => {
   bot.sendMessage(chatId, '<b>📂 Обучающие материалы доступны в нашем канале:</b>', {
     parse_mode: 'HTML',
     reply_markup: materialsKeyboard
-  }).then(() => {
-    ensureMainKeyboard(chatId);
   }).catch(err => {
     console.error('Error sending materials message:', err);
   });
