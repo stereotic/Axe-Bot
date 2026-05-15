@@ -9,10 +9,6 @@ const keyboards = {
     one_time_keyboard: false
   },
 
-  removeMain: {
-    remove_keyboard: true
-  },
-
   info: {
     inline_keyboard: [
       [{ text: 'Чат 💬', url: 'https://t.me/+1EwzBdEWNQgxYWFi' }],
