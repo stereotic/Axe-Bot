@@ -16,8 +16,6 @@ const { loadPinnedMessageId, updatePinnedMessage } = require('./update_pinned');
 
 // Короткий текст, если нет картинки для меню (пустой sendMessage/caption Telegram отклоняет).
 const MENU_PANEL_FALLBACK = 'Выбери раздел:';
-// Минимальный текст для /sendkeyboard (Telegram не принимает пустое сообщение).
-const REPLY_KEYBOARD_PLACEHOLDER = '\u2800';
 
 const token = process.env.BOT_TOKEN;
 const adminIds = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(id => parseInt(id.trim())).filter(Boolean) : [];
@@ -60,7 +58,8 @@ const broadcastMode = {};
 const REQUIRED_CHAT_ID = '-1003986505552'; // AXE | CHAT (https://t.me/+1EwzBdEWNQgxYWFi)
 const REQUIRED_CHANNEL_ID = '-1003772027635'; // AXE | NEWS (https://t.me/+BO1F4O1KUd0zZTI6)
 
-const bot = new TelegramBot(token, {
+const telegramProxy = process.env.TELEGRAM_PROXY?.trim();
+const botOptions = {
   polling: {
     interval: 300,
     autoStart: true,
@@ -68,7 +67,13 @@ const bot = new TelegramBot(token, {
       timeout: 30
     }
   }
-});
+};
+if (telegramProxy) {
+  botOptions.request = { proxy: telegramProxy };
+  console.log(`🌐 Telegram API через прокси: ${telegramProxy}`);
+}
+
+const bot = new TelegramBot(token, botOptions);
 
 // Подключаем обработчики системы реквизитов
 setupCardHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, CASH_CHANNEL_ID);
@@ -84,7 +89,8 @@ bot.setMyCommands([
   { command: 'top', description: 'Топ воркеров за все время' },
   { command: 'topd', description: 'Топ воркеров за день' },
   { command: 'topm', description: 'Топ воркеров за месяц' },
-  { command: 'card', description: 'Актуальные реквизиты' }
+  { command: 'card', description: 'Актуальные реквизиты' },
+  { command: 'keyboard', description: 'Показать кнопки Меню и Информация' }
 ]).then(() => {
   console.log('✅ Меню команд установлено');
 }).catch((err) => {
@@ -93,7 +99,15 @@ bot.setMyCommands([
 
 // Обработка ошибок polling
 bot.on('polling_error', (error) => {
-  console.error('Polling error:', error.code, error.message);
+  const msg = error.message || String(error);
+  console.error('Polling error:', error.code, msg);
+  if (msg.includes('ETIMEDOUT') || msg.includes('ECONNRESET') || msg.includes('ECONNREFUSED')) {
+    console.error(
+      '⚠️ Нет связи с api.telegram.org. Бот не получает /start и не может отвечать.\n' +
+        '   • Включи VPN или укажи TELEGRAM_PROXY в .env (например http://127.0.0.1:7890)\n' +
+        '   • Не запускай локально бота, если он уже работает на сервере с тем же BOT_TOKEN'
+    );
+  }
 });
 
 // Обработка общих ошибок
@@ -330,11 +344,130 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;');
 }
 
-// Только для /sendkeyboard, /start и завершения регистрации (не после кнопок меню).
-async function sendMainKeyboard(chatId, options = {}) {
-  return bot.sendMessage(chatId, REPLY_KEYBOARD_PLACEHOLDER, {
-    reply_markup: keyboards.main,
+function isApplicationApproved(user) {
+  return Boolean(user && Number(user.application_approved) === 1);
+}
+
+function isSubscribedChatMember(member) {
+  if (!member) return false;
+  if (['member', 'administrator', 'creator'].includes(member.status)) return true;
+  // Ограниченный участник чата всё ещё считается подписанным
+  if (member.status === 'restricted' && member.is_member) return true;
+  return false;
+}
+
+// Снять reply-клавиатуру «Меню» / «Информация» (в Telegram она не исчезает сама при удалении из БД).
+async function removeMainKeyboard(chatId) {
+  const texts = ['·', '—', '.'];
+  let lastError;
+
+  for (const text of texts) {
+    try {
+      const sent = await bot.sendMessage(chatId, text, {
+        reply_markup: keyboards.removeMain,
+        disable_notification: true
+      });
+      await bot.deleteMessage(chatId, sent.message_id).catch(() => {});
+      return sent;
+    } catch (err) {
+      lastError = err;
+      const summary = telegramErrorSummary(err);
+      if (summary.includes('text is empty') || summary.includes('message text is empty')) {
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastError;
+}
+
+// Панель «Информация» (inline-ссылки на каналы).
+async function sendInfoPanel(chatId, options = {}) {
+  const banner = await INFO_BANNER();
+  const imagePath = path.join(__dirname, 'images', 'menu.jpg');
+  const sendOpts = {
+    parse_mode: 'HTML',
+    disable_notification: options.disableNotification === true,
+    reply_markup: options.withMainKeyboard ? keyboards.main : keyboards.info
+  };
+
+  if (fs.existsSync(imagePath)) {
+    return bot.sendPhoto(chatId, imagePath, { caption: banner, ...sendOpts });
+  }
+  return bot.sendMessage(chatId, banner, sendOpts);
+}
+
+// После регистрации: одно сообщение — инфо AXE TEAM, 4 inline-кнопки и reply «Меню»/«Информация».
+async function sendOnboardingCompleteMessage(chatId, options = {}) {
+  const banner = await INFO_BANNER();
+  const imagePath = path.join(__dirname, 'images', 'menu.jpg');
+  const baseOpts = {
+    parse_mode: 'HTML',
     disable_notification: options.disableNotification !== false
+  };
+
+  const sendWithMarkup = (markup) => {
+    const opts = { ...baseOpts, reply_markup: markup };
+    if (fs.existsSync(imagePath)) {
+      return bot.sendPhoto(chatId, imagePath, { caption: banner, ...opts });
+    }
+    return bot.sendMessage(chatId, banner, opts);
+  };
+
+  // Telegram в одном сообщении не принимает inline + reply вместе — пробуем, иначе инфо + keyboards.main.
+  const combinedMarkup = {
+    keyboard: keyboards.main.keyboard,
+    resize_keyboard: keyboards.main.resize_keyboard,
+    is_persistent: keyboards.main.is_persistent,
+    one_time_keyboard: keyboards.main.one_time_keyboard,
+    inline_keyboard: keyboards.info.inline_keyboard
+  };
+
+  try {
+    return await sendWithMarkup(combinedMarkup);
+  } catch (err) {
+    const summary = telegramErrorSummary(err);
+    if (!summary.includes('reply markup') && !summary.includes('keyboard')) {
+      throw err;
+    }
+    return sendWithMarkup(keyboards.main);
+  }
+}
+
+async function deliverMainKeyboard(chatId, options = {}) {
+  return sendOnboardingCompleteMessage(chatId, options);
+}
+
+async function sendMainKeyboard(chatId, options = {}) {
+  return deliverMainKeyboard(chatId, options);
+}
+
+async function showWelcomeAfterApproval(chatId) {
+  try {
+    await sendOnboardingCompleteMessage(chatId, { disableNotification: true });
+  } catch (err) {
+    console.error(`showWelcomeAfterApproval failed for ${chatId}:`, telegramErrorSummary(err));
+    try {
+      await sendInfoPanel(chatId, { withMainKeyboard: true, disableNotification: true });
+    } catch (err2) {
+      console.error(`showWelcomeAfterApproval fallback failed for ${chatId}:`, telegramErrorSummary(err2));
+      await bot
+        .sendMessage(chatId, 'Добро пожаловать в <b>AXE TEAM</b>. Нажми /start.', {
+          parse_mode: 'HTML',
+          reply_markup: keyboards.main
+        })
+        .catch(() => {});
+    }
+  }
+}
+
+function finalizeUserApproval(userId, callback) {
+  db.run('UPDATE users SET application_approved = 1 WHERE user_id = ?', [userId], (err) => {
+    if (err) {
+      console.error('Error finalizing user approval:', err);
+    }
+    if (callback) callback(err);
   });
 }
 
@@ -1031,38 +1164,22 @@ bot.onText(/\/start/, (msg) => {
       return;
     }
 
-    // Если пользователь существует и заявка одобрена - показываем главное меню
-    if (user && user.application_approved === 1) {
-      const imagePath = path.join(__dirname, 'images', 'menu.jpg');
-
-      INFO_BANNER().then((banner) => {
-        if (fs.existsSync(imagePath)) {
-          bot.sendPhoto(chatId, imagePath, {
-            caption: banner,
-            reply_markup: keyboards.info,
-            parse_mode: 'HTML'
-          });
-        } else {
-          bot.sendMessage(chatId, banner, {
-            reply_markup: keyboards.info,
-            parse_mode: 'HTML'
-          });
-        }
-        sendMainKeyboard(chatId).catch((err) => {
-          console.error('sendMainKeyboard on /start failed:', telegramErrorSummary(err));
-        });
-      }).catch((err) => {
-        console.error('Error getting info banner:', err);
-        bot.sendMessage(chatId, '❌ Ошибка получения информации');
+    const runStartFlow = () => {
+    // Полностью принятый пользователь — инфо + reply-клавиатура
+    if (isApplicationApproved(user)) {
+      showWelcomeAfterApproval(chatId).catch((err) => {
+        console.error('/start welcome failed:', telegramErrorSummary(err));
+        bot.sendMessage(chatId, '❌ Ошибка загрузки. Нажми /start ещё раз.').catch(() => {});
       });
       return;
     }
 
-    // Если пользователь существует но заявка не одобрена - проверяем статус заявки
-    if (user && user.application_approved === 0) {
+    // Заявка ещё не завершена (правила / подписка)
+    if (user && Number(user.application_approved) === 0) {
       db.get('SELECT * FROM applications WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', [userId], (err, application) => {
         if (err) {
           console.error('Error checking application:', err);
+          bot.sendMessage(chatId, '❌ Ошибка проверки заявки. Попробуй /start ещё раз.').catch(() => {});
           return;
         }
 
@@ -1110,6 +1227,16 @@ bot.onText(/\/start/, (msg) => {
       parse_mode: 'HTML',
       reply_markup: keyboards.application_start
     });
+    };
+
+    if (!isApplicationApproved(user)) {
+      removeMainKeyboard(chatId)
+        .catch((removeErr) => console.warn('/start remove keyboard:', telegramErrorSummary(removeErr)))
+        .finally(runStartFlow);
+      return;
+    }
+
+    runStartFlow();
   });
 });
 
@@ -1274,28 +1401,16 @@ bot.on('message', async (msg) => {
 
   // Проверяем одобрена ли заявка пользователя
   db.get('SELECT application_approved FROM users WHERE user_id = ?', [userId], (err, user) => {
-    if (err || !user || user.application_approved !== 1) {
+    if (err || !isApplicationApproved(user)) {
+      if (text === '📖Информация📖' || text === '🦋Меню🦋') {
+        removeMainKeyboard(chatId).catch(() => {});
+      }
       return;
     }
 
     if (text === '📖Информация📖') {
-      const imagePath = path.join(__dirname, 'images', 'menu.jpg');
-
-      INFO_BANNER().then((banner) => {
-        if (fs.existsSync(imagePath)) {
-          bot.sendPhoto(chatId, imagePath, {
-            caption: banner,
-            reply_markup: keyboards.info,
-            parse_mode: 'HTML'
-          });
-        } else {
-          bot.sendMessage(chatId, banner, {
-            reply_markup: keyboards.info,
-            parse_mode: 'HTML'
-          });
-        }
-      }).catch((err) => {
-        console.error('Error getting info banner:', err);
+      sendInfoPanel(chatId).catch((err) => {
+        console.error('Error sending info panel:', err);
         bot.sendMessage(chatId, '❌ Ошибка получения информации');
       });
       return;
@@ -1675,18 +1790,20 @@ bot.on('callback_query', (query) => {
             }
 
             if (user) {
-              // Пользователь существует - обновляем статус
-              db.run('UPDATE users SET application_approved = 1 WHERE user_id = ?', [application.user_id], (err) => {
-                if (err) console.error('Error updating user:', err);
-              });
-            } else {
-              // Пользователь не существует - создаем
-              db.run('INSERT INTO users (user_id, username, name, application_approved) VALUES (?, ?, ?, ?)',
-                [application.user_id, application.username, application.name || application.username, 1],
+              // До проверки подписки — ещё не полный доступ (клавиатура после check_subscription)
+              db.run(
+                'UPDATE users SET username = ?, application_approved = 0 WHERE user_id = ?',
+                [application.username, application.user_id],
                 (err) => {
-                  if (err) {
-                    console.error('Error creating user:', err);
-                  }
+                  if (err) console.error('Error updating user:', err);
+                }
+              );
+            } else {
+              db.run(
+                'INSERT INTO users (user_id, username, name, application_approved) VALUES (?, ?, ?, 0)',
+                [application.user_id, application.username, application.name || application.username],
+                (err) => {
+                  if (err) console.error('Error creating user:', err);
                 }
               );
             }
@@ -1792,46 +1909,22 @@ bot.on('callback_query', (query) => {
     bot.getChatMember(REQUIRED_CHAT_ID, userId)
       .then(chatMember => {
         console.log(`Chat member status: ${chatMember.status}`);
-        const chatStatus = ['member', 'administrator', 'creator'].includes(chatMember.status);
+        const chatStatus = isSubscribedChatMember(chatMember);
 
         // Проверяем подписку на канал
         bot.getChatMember(REQUIRED_CHANNEL_ID, userId)
           .then(channelMember => {
             console.log(`Channel member status: ${channelMember.status}`);
-            const channelStatus = ['member', 'administrator', 'creator'].includes(channelMember.status);
+            const channelStatus = isSubscribedChatMember(channelMember);
 
             if (chatStatus && channelStatus) {
               bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
 
-              // Обновляем статус пользователя - заявка полностью одобрена
-              db.run('UPDATE users SET application_approved = 1 WHERE user_id = ?', [userId], (err) => {
-                if (err) {
-                  console.error('Error updating user approval status:', err);
-                }
-              });
-
-              // Показываем информацию
-              const imagePath = path.join(__dirname, 'images', 'menu.jpg');
-
-              INFO_BANNER().then((banner) => {
-                if (fs.existsSync(imagePath)) {
-                  bot.sendPhoto(chatId, imagePath, {
-                    caption: banner,
-                    reply_markup: keyboards.info,
-                    parse_mode: 'HTML'
-                  }).then(() => {
-                    sendMainKeyboard(chatId).catch(() => {});
-                  }).catch(() => {});
-                } else {
-                  bot.sendMessage(chatId, banner, {
-                    reply_markup: keyboards.info,
-                    parse_mode: 'HTML'
-                  }).then(() => {
-                    sendMainKeyboard(chatId).catch(() => {});
-                  }).catch(() => {});
-                }
-              }).catch((err) => {
-                console.error('Error getting info banner:', err);
+              finalizeUserApproval(userId, () => {
+                showWelcomeAfterApproval(chatId).catch((err) => {
+                  console.error('check_subscription onboarding failed:', telegramErrorSummary(err));
+                  bot.sendMessage(chatId, '✅ Подписка подтверждена. Нажми /start для активации кнопок.').catch(() => {});
+                });
               });
             } else {
               let errorMsg = '❌ Вы не подписаны на:\n';
@@ -2208,6 +2301,29 @@ ${withdrawal.check_message || ''}`;
 
   // Обработка неизвестных callback
   bot.answerCallbackQuery(query.id);
+});
+
+// Восстановление reply-клавиатуры (если после регистрации кнопки не появились)
+bot.onText(/\/keyboard/, (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  if (msg.chat.type !== 'private') {
+    return;
+  }
+
+  db.get('SELECT application_approved FROM users WHERE user_id = ?', [userId], (err, user) => {
+    if (err || !isApplicationApproved(user)) {
+      bot.sendMessage(chatId, '⌨️ Кнопки «Меню» и «Информация» доступны после завершения регистрации (правила и подписка).');
+      return;
+    }
+
+    deliverMainKeyboard(chatId, { disableNotification: true })
+      .catch((err) => {
+        console.error('/keyboard failed:', telegramErrorSummary(err));
+        bot.sendMessage(chatId, '❌ Не удалось показать кнопки. Напиши /start или обратись к администратору.');
+      });
+  });
 });
 
 // Команда /me
@@ -2736,8 +2852,6 @@ bot.on('chat_join_request', async (chatJoinRequest) => {
     await bot.approveChatJoinRequest(chatId, userId);
     console.log(`✅ Автоматически одобрен запрос на вступление от @${username} (ID: ${userId}) в чат ${chatId}`);
 
-    // Отправляем приветственное сообщение с клавиатурой в личку (пустой текст API не принимает)
-    await sendMainKeyboard(userId, { disableNotification: true });
   } catch (error) {
     console.error('❌ Ошибка одобрения запроса на вступление:', error);
   }
