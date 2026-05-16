@@ -371,7 +371,7 @@ function isSubscribedChatMember(member) {
   return false;
 }
 
-const WELCOME_KEYBOARD_TEXT = '🦋 Добро пожаловать в <b>AXE TEAM</b>!';
+const WELCOME_KEYBOARD_TEXT = '🦋 <b>Добро пожаловать в AXE TEAM</b>!';
 
 // Панель «Информация» — текст AXE TEAM и 4 inline-кнопки (без reply-клавиатуры).
 async function sendInfoPanel(chatId, options = {}) {
