@@ -1456,6 +1456,11 @@ bot.on('callback_query', (query) => {
 
       utils.updateProjectStats(profit.amount, (err) => {
         if (err) console.error('Error updating project stats:', err);
+        else {
+          updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((pinErr) =>
+            console.error('Error updating pinned after profit:', pinErr)
+          );
+        }
       });
 
       if (profit.isRegistered && profit.userId !== 0) {
@@ -1589,6 +1594,10 @@ bot.on('callback_query', (query) => {
       bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML' }).catch((err) => {
         console.error('Error sending to general chat:', err);
       });
+
+      updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((err) =>
+        console.error('Error updating pinned after send_all:', err)
+      );
 
       // Удаляем данные профита
       delete profitData[profitId];

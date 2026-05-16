@@ -174,14 +174,18 @@ function getDirectionName(direction) {
 }
 
 // Исключения из топов (тестовые / служебные аккаунты)
-const TOP_EXCLUDED_NAMES = ['#тестик', 'тестик', 'sss'];
-const TOP_EXCLUDED_USERNAMES = ['sss'];
+const TOP_EXCLUDED_NAMES = ['#тестик', 'тестик', 'sss', '#testovhik', 'testovhik'];
+const TOP_EXCLUDED_USERNAMES = ['sss', 'freeobnall'];
 
 function topExclusionWhere(alias = 'u') {
   const namesList = TOP_EXCLUDED_NAMES.map((n) => `'${n.replace(/'/g, "''")}'`).join(', ');
   const usersList = TOP_EXCLUDED_USERNAMES.map((n) => `'${n.replace(/'/g, "''")}'`).join(', ');
-  return `LOWER(TRIM(COALESCE(${alias}.name, ''))) NOT IN (${namesList})
-    AND LOWER(TRIM(COALESCE(${alias}.username, ''))) NOT IN (${usersList})`;
+  const nameExpr = `LOWER(TRIM(COALESCE(${alias}.name, '')))`;
+  const userExpr = `LOWER(TRIM(COALESCE(${alias}.username, '')))`;
+  return `${nameExpr} NOT IN (${namesList})
+    AND ${userExpr} NOT IN (${usersList})
+    AND ${nameExpr} NOT LIKE '%тестик%'
+    AND ${nameExpr} NOT LIKE '%testovhik%'`;
 }
 
 module.exports = {
