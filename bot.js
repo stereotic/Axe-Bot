@@ -2495,7 +2495,7 @@ bot.onText(/\/materials/, (msg) => {
     ]
   };
 
-  bot.sendMessage(chatId, '<b>📂 Обучающие материалы доступны в нашем канале:</b>', {
+  bot.sendMessage(chatId, '<b>📂 Обучающие материалы:</b>', {
     parse_mode: 'HTML',
     reply_markup: materialsKeyboard
   }).catch(err => {
