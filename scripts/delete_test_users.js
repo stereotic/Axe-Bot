@@ -1,7 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-const ids = [5861326895, 8409742174];
+const ids = [5861326895, 8409742174, 7599626121];
 const dbPath = path.join(__dirname, '..', 'database.db');
 const db = new sqlite3.Database(dbPath);
 const placeholders = ids.map(() => '?').join(',');

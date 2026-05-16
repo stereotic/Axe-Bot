@@ -24,6 +24,20 @@ db.serialize(() => {
       console.error('Error adding profit_count column:', err);
     }
   });
+  db.run(`ALTER TABLE users ADD COLUMN welcome_keyboard_sent INTEGER DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding welcome_keyboard_sent column:', err);
+    }
+    // Уже принятые до появления флага — не заставлять подавать заявку заново
+    db.run(
+      `UPDATE users SET welcome_keyboard_sent = 1 WHERE application_approved = 1 AND COALESCE(welcome_keyboard_sent, 0) = 0`,
+      (migrateErr) => {
+        if (migrateErr) {
+          console.error('Error migrating welcome_keyboard_sent:', migrateErr);
+        }
+      }
+    );
+  });
   db.run(`CREATE TABLE IF NOT EXISTS profits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,

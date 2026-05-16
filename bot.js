@@ -218,7 +218,7 @@ function getTopWorkerToday(callback) {
   });
 }
 
-// Запуск автоматического обновления закрепленного сообщения каждые 10 минут
+// Закреп: касса/топ за сутки из БД (обновление каждые 10 мин, сутки по localtime)
 setInterval(() => updatePinnedMessage(bot, GENERAL_CHAT_ID), 10 * 60 * 1000);
 
 // Первое обновление через 5 секунд после запуска (с загрузкой ID из базы)
@@ -2383,6 +2383,7 @@ bot.onText(/\/top$/, (msg) => {
           FROM users u
           JOIN profits p ON u.user_id = p.user_id
           WHERE u.profile_hidden = 0
+            AND ${utils.topExclusionWhere('u')}
           GROUP BY u.user_id
           HAVING total_profit > 0
           ORDER BY total_profit DESC, u.user_id ASC
@@ -2416,7 +2417,8 @@ bot.onText(/\/topd$/, (msg) => {
   db.all(`SELECT u.user_id, u.username, u.name, u.profile_hidden, SUM(p.amount) as daily_total
           FROM profits p
           JOIN users u ON p.user_id = u.user_id
-          WHERE DATE(p.created_at) = DATE('now')
+          WHERE DATE(p.created_at, 'localtime') = DATE('now', 'localtime')
+            AND ${utils.topExclusionWhere('u')}
           GROUP BY p.user_id
           ORDER BY daily_total DESC
           LIMIT 10`, (err, results) => {
@@ -2454,7 +2456,8 @@ bot.onText(/\/topm$/, (msg) => {
   db.all(`SELECT u.user_id, u.username, u.name, u.profile_hidden, SUM(p.amount) as monthly_total
           FROM profits p
           JOIN users u ON p.user_id = u.user_id
-          WHERE strftime('%Y-%m', p.created_at) = strftime('%Y-%m', 'now')
+          WHERE strftime('%Y-%m', p.created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime')
+            AND ${utils.topExclusionWhere('u')}
           GROUP BY p.user_id
           ORDER BY monthly_total DESC
           LIMIT 10`, (err, results) => {

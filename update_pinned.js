@@ -1,6 +1,9 @@
 const db = require('./database');
+const { topExclusionWhere } = require('./utils');
 
 let pinnedMessageId = null;
+
+const DAILY_DATE_SQL = `DATE('now', 'localtime')`;
 
 function dbGet(sql, params = []) {
   return new Promise((resolve, reject) => {
@@ -64,37 +67,48 @@ async function getUsdRate() {
   }
 }
 
+async function getDailyStats() {
+  const dailyRow = await dbGet(`
+    SELECT COALESCE(SUM(p.amount), 0) AS daily_total
+    FROM profits p
+    WHERE DATE(p.created_at, 'localtime') = ${DAILY_DATE_SQL}
+  `);
+
+  const topWorker = await dbGet(`
+    SELECT u.username, u.name, SUM(p.amount) AS total_earned
+    FROM users u
+    JOIN profits p ON u.user_id = p.user_id
+    WHERE DATE(p.created_at, 'localtime') = ${DAILY_DATE_SQL}
+      AND ${topExclusionWhere('u')}
+    GROUP BY u.user_id
+    HAVING total_earned > 0
+    ORDER BY total_earned DESC
+    LIMIT 1
+  `);
+
+  return {
+    dailyTotal: Number(dailyRow?.daily_total || 0),
+    topWorker
+  };
+}
+
 async function createPinnedMessageText() {
   const balanceRow = await dbGet('SELECT value FROM stats WHERE key = ?', ['project_balance']);
   const projectBalance = parseInt(balanceRow?.value || '0', 10);
-  const dailyTotal = 13700;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayTimestamp = today.getTime();
-
-  const topWorker = await dbGet(`
-    SELECT u.username, u.name, SUM(p.amount) as total_earned
-    FROM users u
-    JOIN profits p ON u.user_id = p.user_id
-    WHERE p.created_at >= ?
-    GROUP BY u.user_id
-    ORDER BY total_earned DESC
-    LIMIT 1
-  `, [todayTimestamp]);
+  const { dailyTotal, topWorker } = await getDailyStats();
 
   const usdRate = await getUsdRate();
-  let topWorkerText = 'Никто не заработал';
+  let topWorkerText = '';
 
-  if (topWorker && topWorker.total_earned > 0) {
+  if (topWorker && Number(topWorker.total_earned) > 0) {
     const name = topWorker.name && topWorker.name !== '#' ? topWorker.name : `@${topWorker.username}`;
-    topWorkerText = `${name} - ${Number(topWorker.total_earned).toLocaleString()}₽`;
+    topWorkerText = `${name} - ${Number(topWorker.total_earned).toLocaleString('ru-RU')}₽`;
   }
 
   return `<b>🌸AXE TEAM🌸</b>
 
-<b>🏦Касса проекта -</b> <i>${projectBalance.toLocaleString()}₽</i>
-<b>☀️Касса за сутки -</b> <i>${dailyTotal.toLocaleString()}₽</i>
+<b>🏦Касса проекта -</b> <i>${projectBalance.toLocaleString('ru-RU')}₽</i>
+<b>☀️Касса за сутки -</b> <i>${dailyTotal.toLocaleString('ru-RU')}₽</i>
 📊<b>Курс USD/RUB:</b> ${usdRate}₽
 
 <b>🌶ТОП 1 ЗА СУТКИ</b> - ${topWorkerText}

@@ -173,6 +173,17 @@ function getDirectionName(direction) {
   return direction === 1 ? 'Кардинг' : '💳 Прямой перевод';
 }
 
+// Исключения из топов (тестовые / служебные аккаунты)
+const TOP_EXCLUDED_NAMES = ['#тестик', 'тестик', 'sss'];
+const TOP_EXCLUDED_USERNAMES = ['sss'];
+
+function topExclusionWhere(alias = 'u') {
+  const namesList = TOP_EXCLUDED_NAMES.map((n) => `'${n.replace(/'/g, "''")}'`).join(', ');
+  const usersList = TOP_EXCLUDED_USERNAMES.map((n) => `'${n.replace(/'/g, "''")}'`).join(', ');
+  return `LOWER(TRIM(COALESCE(${alias}.name, ''))) NOT IN (${namesList})
+    AND LOWER(TRIM(COALESCE(${alias}.username, ''))) NOT IN (${usersList})`;
+}
+
 module.exports = {
   STATUS_THRESHOLDS,
   DIRECTION_PERCENTAGES,
@@ -185,5 +196,6 @@ module.exports = {
   generateWorkerNumber,
   validateWorkerName,
   updateProjectStats,
-  getDirectionName
+  getDirectionName,
+  topExclusionWhere
 };
