@@ -5,7 +5,7 @@ const keyboards = require('./keyboards');
 const utils = require('./utils');
 const cardSystem = require('./card_system');
 const { setupCardHandlers } = require('./card_handlers');
-const { setupCardViewHandlers, openCardView, startCardRequestInPrivate } = require('./card_view_handlers');
+const { setupCardViewHandlers, openCardView, startCardRequestInPrivate, startCardCheckInPrivate } = require('./card_view_handlers');
 const { setupCardRequestHandlers } = require('./card_request_handlers');
 const { setupCheckHandlers } = require('./check_handlers');
 const fs = require('fs');
@@ -1125,6 +1125,13 @@ bot.onText(/\/start/, (msg) => {
   if (startParam === 'card_request' && msg.chat.type === 'private') {
     startCardRequestInPrivate(bot, userId).catch((err) => {
       console.error('Error starting card request from deep link:', err);
+    });
+    return;
+  }
+
+  if (startParam === 'card_check' && msg.chat.type === 'private') {
+    startCardCheckInPrivate(bot, userId).catch((err) => {
+      console.error('Error starting card check from deep link:', err);
     });
     return;
   }
@@ -2364,8 +2371,8 @@ bot.onText(/\/staff/, (msg) => {
   const chatId = msg.chat.id;
   const staffText = `🦺<b>Personnel - AXE TEAM</b>
 
-👮‍♂️<b>Администратор</b>
-┗@Nedovolen_AXE
+🗣<b>Feedback</b>
+┗@FeedbackAXEbot
 
 🕵‍♂️<b>Саппорт</b>
 ┗ @Deryl_AXE
@@ -2374,10 +2381,7 @@ bot.onText(/\/staff/, (msg) => {
 ┗ @Henry_AXE
 
 👁<b>Модератор</b>
-┗ @Aether_AXE
-
-🗣<b>Feedback</b>
-┗@FeedbackAXEbot`;
+┗ @Aether_AXE`;
 
   bot.sendMessage(chatId, staffText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
     console.error('Error sending staff message:', err);
