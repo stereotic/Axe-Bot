@@ -40,7 +40,7 @@ function setupCardHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, C
       cardSystem.cardCreationState[userId].gender = gender;
       cardSystem.cardCreationState[userId].step = 'percent';
 
-      bot.sendMessage(chatId, '💰 <b>Введите процент карты:</b>\n\nНапример: 75', {
+      bot.sendMessage(chatId, '💰 <b>Введите процент карты:</b>\n\n', {
         parse_mode: 'HTML'
       });
     }
@@ -298,7 +298,7 @@ ${cardSystem.formatCardRequisite(card)}`;
 
         state.percent = percent;
         state.step = 'min_limit';
-        bot.sendMessage(chatId, '📉 <b>Введите минимальный лимит:</b>\n\nНапример: 1000', {
+        bot.sendMessage(chatId, '📉 <b>Введите минимальный лимит:</b>', {
           parse_mode: 'HTML'
         });
         break;
@@ -312,7 +312,7 @@ ${cardSystem.formatCardRequisite(card)}`;
 
         state.min_limit = minLimit;
         state.step = 'max_limit';
-        bot.sendMessage(chatId, '📈 <b>Введите максимальный лимит:</b>\n\nНапример: 15000', {
+        bot.sendMessage(chatId, '📈 <b>Введите максимальный лимит:</b>', {
           parse_mode: 'HTML'
         });
         break;
@@ -326,7 +326,7 @@ ${cardSystem.formatCardRequisite(card)}`;
 
         state.max_limit = maxLimit;
         state.step = 'card_number';
-        bot.sendMessage(chatId, '💳 <b>Введите номер карты:</b>\n\nНапример: 1234567891229', {
+        bot.sendMessage(chatId, '💳 <b>Введите номер карты:</b>', {
           parse_mode: 'HTML'
         });
         break;
@@ -334,7 +334,7 @@ ${cardSystem.formatCardRequisite(card)}`;
       case 'card_number':
         state.card_number = text.trim();
         state.step = 'bank';
-        bot.sendMessage(chatId, '🏦 <b>Введите название банка:</b>\n\nНапример: СберБанк', {
+        bot.sendMessage(chatId, '🏦 <b>Введите название банка:</b>', {
           parse_mode: 'HTML'
         });
         break;
@@ -342,7 +342,7 @@ ${cardSystem.formatCardRequisite(card)}`;
       case 'bank':
         state.bank = text.trim();
         state.step = 'full_name';
-        bot.sendMessage(chatId, '📝 <b>Введите ФИО:</b>\n\nНапример: Иванов Иван Иванович', {
+        bot.sendMessage(chatId, '📝 <b>Введите ФИО:</b>', {
           parse_mode: 'HTML'
         });
         break;
@@ -357,7 +357,7 @@ ${cardSystem.formatCardRequisite(card)}`;
           ]
         };
 
-        bot.sendMessage(chatId, '📋 <b>Добавьте примечания:</b>\n\nИли нажмите "Пропустить"', {
+        bot.sendMessage(chatId, '📋 <b>Добавьте примечания:</b>', {
           parse_mode: 'HTML',
           reply_markup: keyboard
         });

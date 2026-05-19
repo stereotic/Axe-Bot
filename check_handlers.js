@@ -165,7 +165,53 @@ function setupCheckHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, 
 
       state.amount = amount;
 
-      // Получаем информацию о карте
+      // Получаем информацию о карте (если есть)
+      if (!state.card_id) {
+        // Нет карты - отправляем без информации о реквизите
+        const workerText = `📋 <b>Ваш чек:</b>
+
+Сумма: ${amount.toLocaleString()}₽
+Реквизиты: не указаны`;
+
+        const workerKeyboard = {
+          inline_keyboard: [
+            [{ text: '🕘 Отправлено', callback_data: 'check_status_sent' }]
+          ]
+        };
+
+        let sendPromise;
+        if (state.file_type === 'photo') {
+          sendPromise = bot.sendPhoto(chatId, state.file_id, {
+            caption: workerText,
+            parse_mode: 'HTML',
+            reply_markup: workerKeyboard
+          });
+        } else {
+          sendPromise = bot.sendDocument(chatId, state.file_id, {
+            caption: workerText,
+            parse_mode: 'HTML',
+            reply_markup: workerKeyboard
+          });
+        }
+
+        sendPromise.then(() => {
+          cardSystem.createCheck({
+            user_id: userId,
+            card_id: null,
+            request_id: null,
+            file_id: state.file_id,
+            file_type: state.file_type,
+            amount: amount,
+            user_message_id: null
+          }, (err) => {
+            if (err) console.error('Error creating check:', err);
+          });
+        });
+
+        delete cardSystem.checkSubmissionState[userId];
+        return;
+      }
+
       cardSystem.getCardById(state.card_id, (err, card) => {
         if (err || !card) {
           bot.sendMessage(chatId, '❌ Реквизит не найден');
@@ -371,7 +417,7 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
         let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸
 
 🏠Сервис: ${directionName}
-┣👤Воркер: ${user.name}`;
+┣👤Воркер: #${user.name}`;
 
         // Добавляем куратора, если он есть и направление = 1 (Кардинг)
         if (direction === 1 && user.curator) {

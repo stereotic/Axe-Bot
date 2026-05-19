@@ -31,6 +31,17 @@ function createRequestButton(chatType) {
   return { text: '💳 Запросить реквизит', callback_data: 'card_request' };
 }
 
+function createCheckButton(chatType) {
+  const isGroup = chatType && chatType !== 'private';
+  if (isGroup) {
+    return {
+      text: '🔍 Проверить чек',
+      url: `https://t.me/${getBotUsername()}?start=card_check`
+    };
+  }
+  return { text: '🔍 Проверить чек', callback_data: 'card_check_status' };
+}
+
 function openCardView(bot, chatId, userId, options = {}) {
   const { deleteMessageId, showBackToMenu = false, chatType = 'private' } = options;
   const viewOptions = { showBackToMenu, chatType };
@@ -66,6 +77,13 @@ function openCardView(bot, chatId, userId, options = {}) {
 function startCardRequestInPrivate(bot, userId) {
   cardSystem.cardRequestState[userId] = { step: 'amount', chatId: userId };
   return bot.sendMessage(userId, '💰 <b>Введите сумму депозита:</b>', {
+    parse_mode: 'HTML'
+  });
+}
+
+function startCardCheckInPrivate(bot, userId) {
+  cardSystem.checkSubmissionState[userId] = { step: 'file', card_id: null };
+  return bot.sendMessage(userId, '📸 <b>Отправьте фото чека или файл в формате PDF:</b>', {
     parse_mode: 'HTML'
   });
 }
@@ -149,6 +167,24 @@ function setupCardViewHandlers(bot) {
     }
 
     if (data === 'card_check_status') {
+      if (chatType !== 'private') {
+        const botUsername = getBotUsername();
+        startCardCheckInPrivate(bot, userId)
+          .then(() => {
+            bot.answerCallbackQuery(query.id, {
+              text: 'Продолжите проверку в личке с ботом',
+              show_alert: false
+            }).catch(() => {});
+          })
+          .catch(() => {
+            bot.answerCallbackQuery(query.id, {
+              text: `Сначала напишите боту @${botUsername} /start`,
+              show_alert: true
+            }).catch(() => {});
+          });
+        return;
+      }
+
       bot.answerCallbackQuery(query.id);
 
       cardSystem.getAllCards((err, cards) => {
@@ -234,9 +270,11 @@ function createCardKeyboard(card, currentIndex, totalCards, options = {}) {
   const countryFlag = cardSystem.getCountryFlag(card.country);
   const requestButton = createRequestButton(chatType);
 
+  const checkButton = createCheckButton(chatType);
+
   const rows = [
     [{ text: '🔔 Уведомления', callback_data: 'card_notifications' }],
-    [{ text: '🔍 Проверить чек', callback_data: 'card_check_status' }],
+    [checkButton],
     [requestButton],
     [
       { text: '◀️', callback_data: 'card_nav_left' },
@@ -305,5 +343,6 @@ module.exports = {
   setupCardViewHandlers,
   openCardView,
   startCardRequestInPrivate,
+  startCardCheckInPrivate,
   userCardIndex
 };

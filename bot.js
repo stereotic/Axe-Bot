@@ -261,7 +261,7 @@ function updateUsername(userId, username) {
 // Функция форматирования профиля
 function formatProfile(user, topPosition) {
   return `👤<b>Воркер:</b> @${user.username || 'unknown'}
-🪪<b>Name:</b> ${user.name}
+🪪<b>Name:</b> #${user.name}
 ┗ <b>Статус:</b> ${user.status}
 
 💼<b>Кошелек</b>
@@ -1070,7 +1070,7 @@ function handleProtectedCallback(query, data, chatId, userId) {
               // Отправляем заявку админу
               const adminText = `✅Новая заявка на выплату!
 🌶Воркер: @${user.username || 'unknown'}
-🪪Никнейм: ${user.name}
+🪪Никнейм: #${user.name}
 💌Сумма выплаты: ${amount.toLocaleString()}₽`;
 
               const adminKeyboard = {
@@ -1994,7 +1994,7 @@ bot.on('callback_query', (query) => {
           // Отправляем заявку админу
           const adminText = `✅Новая заявка на выплату!
 🌶Воркер: @${user.username || 'unknown'}
-🪪Никнейм: ${user.name}
+🪪Никнейм: #${user.name}
 💌Сумма выплаты: ${amount.toLocaleString()}₽`;
 
           const adminKeyboard = {
@@ -2414,7 +2414,7 @@ bot.onText(/\/top$/, (msg) => {
     users.forEach((user, index) => {
       const medal = medals[index];
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
-      topText += `${medal}: <a href="${profileLink}">${user.name}</a> - ${user.total_profit.toLocaleString()}₽\n`;
+      topText += `${medal}: <a href="${profileLink}">#${user.name}</a> - ${user.total_profit.toLocaleString()}₽\n`;
     });
 
     bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
@@ -2450,9 +2450,9 @@ bot.onText(/\/topd$/, (msg) => {
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
 
       if (user.profile_hidden) {
-        topText += `${medal}: ${user.name} - ${user.daily_total.toLocaleString()}₽\n`;
+        topText += `${medal}: #${user.name} - ${user.daily_total.toLocaleString()}₽\n`;
       } else {
-        topText += `${medal}: <a href="${profileLink}">${user.name}</a> - ${user.daily_total.toLocaleString()}₽\n`;
+        topText += `${medal}: <a href="${profileLink}">#${user.name}</a> - ${user.daily_total.toLocaleString()}₽\n`;
       }
     });
 
@@ -2489,9 +2489,9 @@ bot.onText(/\/topm$/, (msg) => {
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
 
       if (user.profile_hidden) {
-        topText += `${medal}: ${user.name} - ${user.monthly_total.toLocaleString()}₽\n`;
+        topText += `${medal}: #${user.name} - ${user.monthly_total.toLocaleString()}₽\n`;
       } else {
-        topText += `${medal}: <a href="${profileLink}">${user.name}</a> - ${user.monthly_total.toLocaleString()}₽\n`;
+        topText += `${medal}: <a href="${profileLink}">#${user.name}</a> - ${user.monthly_total.toLocaleString()}₽\n`;
       }
     });
 
