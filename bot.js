@@ -2804,6 +2804,7 @@ bot.onText(/\/broadcast/, (msg) => {
 bot.onText(/\/cancel/, (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
+  const chatType = msg.chat.type;
 
   if (broadcastMode[userId]) {
     delete broadcastMode[userId];
@@ -2815,6 +2816,8 @@ bot.onText(/\/cancel/, (msg) => {
     delete cardSystem.cardCreationState[userId];
     bot.sendMessage(chatId, '❌ Создание реквизита отменено');
   }
+
+  if (chatType !== 'private') return;
 
   // Отмена запроса реквизита
   if (cardSystem.cardRequestState[userId]) {

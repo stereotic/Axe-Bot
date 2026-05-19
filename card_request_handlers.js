@@ -8,8 +8,10 @@ function setupCardRequestHandlers(bot, adminIds) {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const text = msg.text;
+    const chatType = msg.chat.type;
 
     if (!text || text.startsWith('/')) return;
+    if (chatType !== 'private') return;
 
     const state = cardSystem.cardRequestState[userId];
     if (!state) return;

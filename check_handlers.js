@@ -124,6 +124,9 @@ function setupCheckHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, 
   bot.on('message', (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
+    const chatType = msg.chat.type;
+
+    if (chatType !== 'private') return;
 
     const state = cardSystem.checkSubmissionState[userId];
     if (!state) return;
