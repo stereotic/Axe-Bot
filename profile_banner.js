@@ -236,7 +236,7 @@ function buildProfileCaption(user, topPosition) {
   const level = getLevel(user.total_earned);
 
   return `👤<b>Воркер:</b> @${user.username || 'unknown'}
-🪪<b>Name:</b> #${user.name}
+🪪<b>Name:</b> ${user.name}
 └ <b>Статус:</b> ${level.current.name}
 
 💼<b>Кошелек</b>
