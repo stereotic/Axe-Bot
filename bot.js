@@ -1326,6 +1326,64 @@ bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])$/, (msg, match) => {
   return true; // Предотвращаем дальнейшую обработку
 });
 
+// Команда для отправки профита в личку: /name сумма кол-во (например /richvladwork 5000 1)
+bot.onText(/^\/([^\s]+)\s+(\d+)\s+(\d+)$/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  const workerName = match[1];
+  const amount = parseInt(match[2]);
+  const profitCount = parseInt(match[3]);
+
+  if (!workerName || !amount || !profitCount) {
+    bot.sendMessage(chatId, '❌ Неверный формат. Используйте: /name сумма кол-во\nПример: /richvladwork 5000 1');
+    return;
+  }
+
+  const searchUsername = workerName.toLowerCase();
+
+  db.get('SELECT * FROM users WHERE LOWER(username) = ?', [searchUsername], (err, user) => {
+    if (err || !user) {
+      bot.sendMessage(chatId, `❌ Пользователь @${workerName} не найден`);
+      return;
+    }
+
+    const currentStatus = user.status || 'NEW';
+    const currentTotal = user.total_earned || 0;
+
+    const nextThreshold = utils.STATUS_THRESHOLDS.find(t => t.threshold > currentTotal);
+    const nextLevelAmount = nextThreshold ? nextThreshold.threshold : null;
+
+    let nextLevelText = '';
+    if (nextLevelAmount) {
+      const remaining = nextLevelAmount - currentTotal;
+      nextLevelText = `До нового уровня ${nextLevelAmount.toLocaleString()}₽`;
+    } else {
+      nextLevelText = 'Максимальный уровень достигнут';
+    }
+
+    const profitMessage = `🎉<b>Успешный профит </b>🎉
+
+┏ 🏠<b>Сервис: Кардинг
+</b>┣ 🏦<b>На сумму: ${amount.toLocaleString()}₽
+┣ 🔥Кол-во профитов: ${profitCount}
+┣ 💼Твой статус: ${currentStatus}
+┗ 🍾${nextLevelText} </b>
+
+⚠️<i>Подать заявку на выплату можно в профиле. Напоминаем период выплаты каждые 3 часа.</i>`;
+
+    bot.sendMessage(user.user_id, profitMessage, { parse_mode: 'HTML' })
+      .then(() => {
+        bot.sendMessage(chatId, `✅ Профит отправлен пользователю ${user.name}!\n💸 Сумма: ${amount.toLocaleString()}₽\n🔥 Кол-во профитов: ${profitCount}`);
+      })
+      .catch((err) => {
+        console.error('Error sending profit to user:', err);
+        bot.sendMessage(chatId, `❌ Не удалось отправить сообщение пользователю. Возможно, он не начинал диалог с ботом.`);
+      });
+  });
+  return true;
+});
+
 // Обработка кнопок клавиатуры
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
