@@ -92,9 +92,14 @@ async function getDailyStats() {
   };
 }
 
+const EXCLUDED_NAMES = ['#sss', '#Testovhik', '#тестик', 'тестик', '#testovhik', 'testovhik'];
+const EXCLUDED_USERNAMES = ['sss', 'freeobnall'];
+
 async function createPinnedMessageText() {
-  const balanceRow = await dbGet('SELECT value FROM stats WHERE key = ?', ['project_balance']);
-  const projectBalance = parseInt(balanceRow?.value || '0', 10);
+  const excludedNameList = EXCLUDED_NAMES.map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+  const excludedUserList = EXCLUDED_USERNAMES.map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+  const balanceRow = await dbGet(`SELECT SUM(amount) as total FROM profits p JOIN users u ON p.user_id = u.user_id WHERE LOWER(TRIM(COALESCE(u.name, ''))) NOT IN (${excludedNameList}) AND LOWER(TRIM(COALESCE(u.username, ''))) NOT IN (${excludedUserList})`);
+  const projectBalance = parseInt(balanceRow?.total || '0', 10);
   const { dailyTotal, topWorker } = await getDailyStats();
 
   const usdRate = await getUsdRate();

@@ -61,7 +61,7 @@ const REQUIRED_CHANNEL_ID = '-1003772027635'; // AXE | NEWS (https://t.me/+BO1F4
 const telegramProxy = process.env.TELEGRAM_PROXY?.trim();
 const botOptions = {
   polling: {
-    interval: 300,
+    interval: 100,
     autoStart: true,
     params: {
       timeout: 30
@@ -123,23 +123,38 @@ process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
 });
 
-// Баннеры
+// Баннеры с кешированием
+let infoBannerCache = { text: null, timestamp: 0 };
+const INFO_BANNER_CACHE_TTL = 60000;
+
+const EXCLUDED_NAMES = ['#sss', '#Testovhik', '#тестик', 'тестик', '#testovhik', 'testovhik'];
+const EXCLUDED_USERNAMES = ['sss', 'freeobnall'];
+
 const INFO_BANNER = () => {
   return new Promise((resolve, reject) => {
-    db.get('SELECT value FROM stats WHERE key = ?', ['project_balance'], (err, balanceRow) => {
+    const now = Date.now();
+    if (infoBannerCache.text && (now - infoBannerCache.timestamp) < INFO_BANNER_CACHE_TTL) {
+      resolve(infoBannerCache.text);
+      return;
+    }
+
+    const excludedNameList = EXCLUDED_NAMES.map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+    const excludedUserList = EXCLUDED_USERNAMES.map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+
+    db.get(`SELECT SUM(amount) as total FROM profits p JOIN users u ON p.user_id = u.user_id WHERE LOWER(TRIM(COALESCE(u.name, ''))) NOT IN (${excludedNameList}) AND LOWER(TRIM(COALESCE(u.username, ''))) NOT IN (${excludedUserList})`, (err, profitRow) => {
       if (err) {
         reject(err);
         return;
       }
 
-      db.get('SELECT value FROM stats WHERE key = ?', ['total_profits'], (err, profitsRow) => {
+      db.get(`SELECT COUNT(*) as count FROM profits p JOIN users u ON p.user_id = u.user_id WHERE LOWER(TRIM(COALESCE(u.name, ''))) NOT IN (${excludedNameList}) AND LOWER(TRIM(COALESCE(u.username, ''))) NOT IN (${excludedUserList})`, (err, countRow) => {
         if (err) {
           reject(err);
           return;
         }
 
-        const projectBalance = parseInt(balanceRow?.value || '2000000');
-        const totalProfits = parseInt(profitsRow?.value || '120');
+        const projectBalance = parseInt(profitRow?.total || '0');
+        const totalProfits = parseInt(countRow?.count || '0');
 
         const banner = `<b>AXE TEAM - Информация 💎</b>
 
@@ -155,6 +170,7 @@ const INFO_BANNER = () => {
 
 <b>📆Дата открытия проекта 03.03.2026.</b>`;
 
+        infoBannerCache = { text: banner, timestamp: now };
         resolve(banner);
       });
     });
@@ -1470,9 +1486,9 @@ bot.on('callback_query', (query) => {
         }
       });
 
-      if (profit.isRegistered && profit.userId !== 0) {
+      const saveProfitAndUpdateUser = (targetUserId) => {
         db.run('INSERT INTO profits (user_id, amount, amount_to_pay, direction) VALUES (?, ?, ?, ?)',
-          [profit.userId, profit.amount, profit.workerPayout, profit.direction],
+          [targetUserId, profit.amount, profit.workerPayout, profit.direction],
           function(err) {
             if (err) {
               console.error('Error saving profit:', err);
@@ -1509,6 +1525,35 @@ bot.on('callback_query', (query) => {
             );
           }
         );
+      };
+
+      if (profit.isRegistered && profit.userId !== 0) {
+        saveProfitAndUpdateUser(profit.userId);
+      } else {
+        db.get('SELECT user_id FROM users WHERE username = ?', [profit.username], (err, existingUser) => {
+          if (existingUser) {
+            saveProfitAndUpdateUser(existingUser.user_id);
+          } else {
+            utils.generateWorkerNumber((err, workerNumber) => {
+              if (err) {
+                console.error('Error generating worker number:', err);
+                return;
+              }
+              const newUserId = Date.now() + Math.floor(Math.random() * 10000);
+              db.run(
+                'INSERT INTO users (user_id, username, name, worker_number, application_approved, balance, total_earned, profit_count) VALUES (?, ?, ?, ?, 1, 0, 0, 0)',
+                [newUserId, profit.username, profit.name, workerNumber],
+                function(err) {
+                  if (err) {
+                    console.error('Error creating user:', err);
+                    return;
+                  }
+                  saveProfitAndUpdateUser(newUserId);
+                }
+              );
+            });
+          }
+        });
       }
 
       let combinedText = `<b>📊 БУХГАЛТЕРИЯ:</b>
@@ -2389,7 +2434,7 @@ bot.onText(/\/staff/, (msg) => {
 });
 
 // Команда /top - Топ 10 за все время
-bot.onText(/\/top$/, (msg) => {
+bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
   const chatId = msg.chat.id;
 
   db.all(`SELECT u.*, SUM(p.amount) as total_profit
@@ -2424,7 +2469,7 @@ bot.onText(/\/top$/, (msg) => {
 });
 
 // Команда /topd - Топ 10 за сутки
-bot.onText(/\/topd$/, (msg) => {
+bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
   const chatId = msg.chat.id;
 
   db.all(`SELECT u.user_id, u.username, u.name, u.profile_hidden, SUM(p.amount) as daily_total
@@ -2463,7 +2508,7 @@ bot.onText(/\/topd$/, (msg) => {
 });
 
 // Команда /topm - Топ 10 за месяц
-bot.onText(/\/topm$/, (msg) => {
+bot.onText(/\/(topm|топм)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
   const chatId = msg.chat.id;
 
   db.all(`SELECT u.user_id, u.username, u.name, u.profile_hidden, SUM(p.amount) as monthly_total

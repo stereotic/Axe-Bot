@@ -184,7 +184,7 @@ async function fetchBuffer(url, attempts = 2) {
     try {
       const response = await axios.get(url, {
         responseType: 'arraybuffer',
-        timeout: 8000,
+        timeout: 5000,
         validateStatus: (status) => status >= 200 && status < 300
       });
 
@@ -197,18 +197,32 @@ async function fetchBuffer(url, attempts = 2) {
   throw lastError;
 }
 
+const avatarCache = new Map();
+const AVATAR_CACHE_TTL = 300000;
+
 async function getTelegramAvatarBuffer(bot, userId) {
   if (!bot || !userId) return null;
+
+  const cached = avatarCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < AVATAR_CACHE_TTL) {
+    return cached.buffer;
+  }
 
   try {
     const photos = await bot.getUserProfilePhotos(userId, { limit: 1 });
     const photoSizes = photos.photos?.[0];
-    if (!photoSizes || photoSizes.length === 0) return null;
+    if (!photoSizes || photoSizes.length === 0) {
+      avatarCache.set(userId, { buffer: null, timestamp: Date.now() });
+      return null;
+    }
 
     const fileUrl = await bot.getFileLink(photoSizes[photoSizes.length - 1].file_id);
-    return await fetchBuffer(fileUrl);
+    const buffer = await fetchBuffer(fileUrl);
+    avatarCache.set(userId, { buffer, timestamp: Date.now() });
+    return buffer;
   } catch (error) {
     console.error(`Avatar loading failed for user ${userId}:`, error.message);
+    avatarCache.set(userId, { buffer: null, timestamp: Date.now() });
     return null;
   }
 }
