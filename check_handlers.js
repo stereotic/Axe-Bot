@@ -1,5 +1,6 @@
 const cardSystem = require('./card_system');
 const utils = require('./utils');
+const { updatePinnedMessage } = require('./update_pinned');
 
 // Обработчики системы проверки чеков
 function setupCheckHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, CASH_CHANNEL_ID) {
@@ -403,12 +404,12 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
         // Отправляем в бухгалтерию
         const accountingText = `<b>🚀${directionName}
 👤Воркер: @${user.username}
-💸Сумма профита: ${amount.toLocaleString()}₽
-💼К выплате: ${workerPayout.toLocaleString()}₽
-👑Владелец: ${shares.owner.toLocaleString()}₽
-👔Администратор: ${shares.admin.toLocaleString()}₽
-🍌Инвестор: ${shares.investor.toLocaleString()}₽
-🧑‍💻Кодер: ${shares.coder.toLocaleString()}₽
+💸Сумма профита: ${utils.formatAmount(amount)}₽
+💼К выплате: ${utils.formatAmount(workerPayout)}₽
+👑Владелец: ${utils.formatAmount(shares.owner)}₽
+👔Администратор: ${utils.formatAmount(shares.admin)}₽
+🍌Инвестор: ${utils.formatAmount(shares.investor)}₽
+🧑‍💻Кодер: ${utils.formatAmount(shares.coder)}₽
 
 <i>✅ Автоматический профит из чека</i></b>`;
 
@@ -424,9 +425,9 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
 
         // Добавляем куратора, если он есть и направление = 1 (Кардинг)
         if (direction === 1 && user.curator) {
-          publicText += `\n┣💸Сумма: ${amount.toLocaleString()}₽\n┗👨‍🏫Куратор: @${user.curator}</b>`;
+          publicText += `\n┣💸Сумма: ${utils.formatAmount(amount)}₽\n┗👨‍🏫Куратор: @${user.curator}</b>`;
         } else {
-          publicText += `\n┗💸Сумма: ${amount.toLocaleString()}₽</b>`;
+          publicText += `\n┗💸Сумма: ${utils.formatAmount(amount)}₽</b>`;
         }
 
         bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML' }).catch(err => {
@@ -436,6 +437,9 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
         bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML' }).catch(err => {
           console.error('Error sending to general chat:', err);
         });
+
+        // Обновляем закрепленное сообщение
+        updatePinnedMessage(bot, GENERAL_CHAT_ID).catch(err => console.error('Error updating pinned message:', err));
       }
     );
   });

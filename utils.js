@@ -188,6 +188,10 @@ function topExclusionWhere(alias = 'u') {
     AND ${nameExpr} NOT LIKE '%testovhik%'`;
 }
 
+function formatAmount(amount) {
+  return amount.toLocaleString('ru-RU').replace(/,/g, '.');
+}
+
 module.exports = {
   STATUS_THRESHOLDS,
   DIRECTION_PERCENTAGES,
@@ -201,5 +205,6 @@ module.exports = {
   validateWorkerName,
   updateProjectStats,
   getDirectionName,
-  topExclusionWhere
+  topExclusionWhere,
+  formatAmount
 };

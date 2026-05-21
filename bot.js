@@ -1633,9 +1633,9 @@ bot.on('callback_query', (query) => {
 ┣👤Воркер: ${profit.name}`;
 
       if (profit.direction === 1 && profit.curator) {
-        combinedText += `\n┣💸Сумма: ${profit.amount.toLocaleString()}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
+        combinedText += `\n┣💸Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
       } else {
-        combinedText += `\n┗💸Сумма: ${profit.amount.toLocaleString()}₽</b>`;
+        combinedText += `\n┗💸Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
       }
 
       const combinedKeyboard = {
@@ -1692,9 +1692,9 @@ bot.on('callback_query', (query) => {
 
       // Добавляем куратора, если он есть и направление = 1 (Кардинг)
       if (profit.direction === 1 && profit.curator) {
-        publicText += `\n┣💸Сумма: ${profit.amount.toLocaleString()}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
+        publicText += `\n┣💸Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
       } else {
-        publicText += `\n┗💸Сумма: ${profit.amount.toLocaleString()}₽</b>`;
+        publicText += `\n┗💸Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
       }
 
       bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML' }).catch((err) => {
@@ -1765,9 +1765,9 @@ bot.on('callback_query', (query) => {
 
       // Добавляем куратора, если он есть и направление = 1 (Кардинг)
       if (profit.direction === 1 && profit.curator) {
-        publicText += `\n┣💸Сумма: ${profit.amount.toLocaleString()}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
+        publicText += `\n┣💸Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
       } else {
-        publicText += `\n┗💸Сумма: ${profit.amount.toLocaleString()}₽</b>`;
+        publicText += `\n┗💸Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
       }
 
       // Отправляем в общую кассу
@@ -1779,6 +1779,11 @@ bot.on('callback_query', (query) => {
       bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML' }).catch((err) => {
         console.error('Error sending to general chat:', err);
       });
+
+      // Обновляем закрепленное сообщение
+      updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((err) =>
+        console.error('Error updating pinned after send_public:', err)
+      );
 
       // Удаляем данные профита
       delete profitData[profitId];

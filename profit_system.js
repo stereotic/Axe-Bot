@@ -60,12 +60,12 @@ bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])$/, (msg, match) => {
     // Формируем сообщение для бухгалтерии
     const accountingText = `🚀${directionName}
 👤Воркер: @${user.username}
-💸Сумма профита: ${amount.toLocaleString()}₽
-💼К выплате: ${workerPayout.toLocaleString()}₽ (${directionPercent}%)
-👑Владелец: ${utils.PROFIT_SHARES.owner}% - ${shares.owner.toLocaleString()}₽
-👔Администратор: ${utils.PROFIT_SHARES.admin}% - ${shares.admin.toLocaleString()}₽
-🍌Инвестор: ${utils.PROFIT_SHARES.investor}% - ${shares.investor.toLocaleString()}₽
-🧑‍💻Кодер: ${utils.PROFIT_SHARES.coder}% - ${shares.coder.toLocaleString()}₽`;
+💸Сумма профита: ${utils.formatAmount(amount)}₽
+💼К выплате: ${utils.formatAmount(workerPayout)}₽ (${directionPercent}%)
+👑Владелец: ${utils.PROFIT_SHARES.owner}% - ${utils.formatAmount(shares.owner)}₽
+👔Администратор: ${utils.PROFIT_SHARES.admin}% - ${utils.formatAmount(shares.admin)}₽
+🍌Инвестор: ${utils.PROFIT_SHARES.investor}% - ${utils.formatAmount(shares.investor)}₽
+🧑‍💻Кодер: ${utils.PROFIT_SHARES.coder}% - ${utils.formatAmount(shares.coder)}₽`;
 
     const keyboard = {
       inline_keyboard: [
@@ -146,12 +146,12 @@ bot.on('callback_query', (query) => {
         // Отправляем в бухгалтерию
         const accountingText = `🚀${profit.directionName}
 👤Воркер: @${profit.username}
-💸Сумма профита: ${profit.amount.toLocaleString()}₽
-💼К выплате: ${profit.workerPayout.toLocaleString()}₽
-👑Владелец: ${utils.PROFIT_SHARES.owner}% - ${profit.shares.owner.toLocaleString()}₽
-👔Администратор: ${utils.PROFIT_SHARES.admin}% - ${profit.shares.admin.toLocaleString()}₽
-🍌Инвестор: ${utils.PROFIT_SHARES.investor}% - ${profit.shares.investor.toLocaleString()}₽
-🧑‍💻Кодер: ${utils.PROFIT_SHARES.coder}% - ${profit.shares.coder.toLocaleString()}₽`;
+💸Сумма профита: ${utils.formatAmount(profit.amount)}₽
+💼К выплате: ${utils.formatAmount(profit.workerPayout)}₽
+👑Владелец: ${utils.PROFIT_SHARES.owner}% - ${utils.formatAmount(profit.shares.owner)}₽
+👔Администратор: ${utils.PROFIT_SHARES.admin}% - ${utils.formatAmount(profit.shares.admin)}₽
+🍌Инвестор: ${utils.PROFIT_SHARES.investor}% - ${utils.formatAmount(profit.shares.investor)}₽
+🧑‍💻Кодер: ${utils.PROFIT_SHARES.coder}% - ${utils.formatAmount(profit.shares.coder)}₽`;
 
         bot.sendMessage(ACCOUNTING_CHAT_ID, accountingText).catch((err) => {
           console.error('Error sending to accounting:', err);
@@ -162,7 +162,7 @@ bot.on('callback_query', (query) => {
 
 🏠Сервис: ${profit.directionName}
 ┣👤Воркер: ${profit.name}
-┗💸Сумма: ${profit.amount.toLocaleString()}₽`;
+┗💸Сумма: ${utils.formatAmount(profit.amount)}₽`;
 
         const publicKeyboard = {
           inline_keyboard: [
@@ -193,7 +193,7 @@ bot.on('callback_query', (query) => {
 
 🏠Сервис: ${profit.directionName}
 ┣👤Воркер: ${profit.name}
-┗💸Сумма: ${profit.amount.toLocaleString()}₽`;
+┗💸Сумма: ${utils.formatAmount(profit.amount)}₽`;
 
     // Отправляем в общую кассу
     bot.sendMessage(CASH_CHANNEL_ID, publicText).catch((err) => {
@@ -204,6 +204,9 @@ bot.on('callback_query', (query) => {
     bot.sendMessage(GENERAL_CHAT_ID, publicText).catch((err) => {
       console.error('Error sending to general chat:', err);
     });
+
+    // Обновляем закрепленное сообщение
+    updatePinnedMessage(bot, GENERAL_CHAT_ID).catch(err => console.error('Error updating pinned message:', err));
 
     bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
     bot.sendMessage(chatId, '✅ Профит успешно опубликован!');
