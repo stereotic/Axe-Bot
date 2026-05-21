@@ -10,7 +10,7 @@ const bot = new TelegramBot(token, { polling: true });
 // ID каналов
 const ACCOUNTING_CHAT_ID = '-1002394699502'; // Бухгалтерия
 const CASH_CHANNEL_ID = '-1002359068457'; // Общая касса
-const GENERAL_CHAT_ID = '-1002476088150'; // Общий чат
+const GENERAL_CHAT_ID = '-1003986505552'; // Общий чат
 
 // Временное хранилище для данных профита
 const profitData = {};

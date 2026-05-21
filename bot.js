@@ -1535,15 +1535,6 @@ bot.on('callback_query', (query) => {
 
       bot.answerCallbackQuery(query.id);
 
-      utils.updateProjectStats(profit.amount, (err) => {
-        if (err) console.error('Error updating project stats:', err);
-        else {
-          updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((pinErr) =>
-            console.error('Error updating pinned after profit:', pinErr)
-          );
-        }
-      });
-
       const saveProfitAndUpdateUser = (targetUserId) => {
         db.run('INSERT INTO profits (user_id, amount, amount_to_pay, direction) VALUES (?, ?, ?, ?)',
           [targetUserId, profit.amount, profit.workerPayout, profit.direction],
@@ -1581,6 +1572,16 @@ bot.on('callback_query', (query) => {
                 }
               }
             );
+
+            // Обновляем статистику проекта и закреп после сохранения профита в БД
+            utils.updateProjectStats(profit.amount, (err) => {
+              if (err) console.error('Error updating project stats:', err);
+              else {
+                updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((pinErr) =>
+                  console.error('Error updating pinned after profit:', pinErr)
+                );
+              }
+            });
           }
         );
       };
