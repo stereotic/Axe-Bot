@@ -1348,6 +1348,56 @@ bot.onText(/^\/([^\s]+)\s+(\d+)\s+(\d+)$/, (msg, match) => {
       return;
     }
 
+    const direction = 1;
+    const workerPayout = utils.calculateWorkerPayout(amount, direction);
+    const shares = utils.calculateProfitShares(amount);
+
+    // Сохраняем профит в БД
+    db.run('INSERT INTO profits (user_id, amount, amount_to_pay, direction) VALUES (?, ?, ?, ?)',
+      [user.user_id, amount, workerPayout, direction],
+      function(err) {
+        if (err) {
+          console.error('Error saving profit:', err);
+          bot.sendMessage(chatId, '❌ Ошибка сохранения профита');
+          return;
+        }
+
+        const dbProfitId = this.lastID;
+
+        for (const [role, shareAmount] of Object.entries(shares)) {
+          db.run('INSERT OR IGNORE INTO profit_shares (profit_id, role, percentage, amount) VALUES (?, ?, ?, ?)',
+            [dbProfitId, role, utils.PROFIT_SHARES[role], shareAmount]
+          );
+        }
+
+        db.run(`UPDATE users SET
+          balance = balance + ?,
+          total_earned = total_earned + ?,
+          profit_count = profit_count + 1
+          WHERE user_id = ?`,
+          [workerPayout, amount, user.user_id],
+          (err) => {
+            if (err) {
+              console.error('Error updating user:', err);
+            } else {
+              utils.updateWorkerStatus(user.user_id, (err) => {
+                if (err) console.error('Error updating status:', err);
+              });
+            }
+          }
+        );
+
+        utils.updateProjectStats(amount, (err) => {
+          if (err) console.error('Error updating project stats:', err);
+          else {
+            updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((pinErr) =>
+              console.error('Error updating pinned after profit:', pinErr)
+            );
+          }
+        });
+      }
+    );
+
     const currentStatus = user.status || 'NEW';
     const currentTotal = user.total_earned || 0;
 
