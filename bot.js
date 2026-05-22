@@ -1284,6 +1284,11 @@ bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])$/, (msg, match) => {
       workerData = user;
     }
 
+    // Normalize name — ensure # prefix
+    const displayName = workerData.name && workerData.name.startsWith('#')
+      ? workerData.name
+      : '#' + (workerData.name || workerData.username);
+
     // Рассчитываем суммы
     const workerPayout = utils.calculateWorkerPayout(amount, direction);
     const shares = utils.calculateProfitShares(amount);
@@ -1295,7 +1300,7 @@ bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])$/, (msg, match) => {
     profitData[profitId] = {
       userId: workerData.user_id,
       username: workerData.username,
-      name: workerData.name,
+      name: displayName,
       amount: amount,
       workerPayout: workerPayout,
       direction: direction,
@@ -1423,7 +1428,8 @@ bot.onText(/^\/([^\s]+)\s+(\d+)\s+(\d+)$/, (msg, match) => {
 
     bot.sendMessage(user.user_id, profitMessage, { parse_mode: 'HTML' })
       .then(() => {
-        bot.sendMessage(chatId, `✅ Профит отправлен пользователю ${user.name}!\n💸 Сумма: ${amount.toLocaleString()}₽\n🔥 Кол-во профитов: ${profitCount}`);
+        const profitUserName = user.name && user.name.startsWith('#') ? user.name : '#' + (user.name || user.username);
+        bot.sendMessage(chatId, `✅ Профит отправлен пользователю ${profitUserName}!\n💸 Сумма: ${amount.toLocaleString()}₽\n🔥 Кол-во профитов: ${profitCount}`);
       })
       .catch((err) => {
         console.error('Error sending profit to user:', err);

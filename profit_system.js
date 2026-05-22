@@ -46,10 +46,11 @@ bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])$/, (msg, match) => {
 
     // Сохраняем данные для подтверждения
     const profitId = `${user.user_id}_${Date.now()}`;
+    const displayName = user.name && user.name.startsWith('#') ? user.name : '#' + (user.name || user.username);
     profitData[profitId] = {
       userId: user.user_id,
       username: user.username,
-      name: user.name,
+      name: displayName,
       amount: amount,
       workerPayout: workerPayout,
       direction: direction,

@@ -421,7 +421,7 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
         let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸
 
 🏠Сервис: ${directionName}
-┣👤Воркер: ${user.name}`;
+┣👤Воркер: ${user.name && user.name.startsWith('#') ? user.name : '#' + user.name}`;
 
         // Добавляем куратора, если он есть и направление = 1 (Кардинг)
         if (direction === 1 && user.curator) {
