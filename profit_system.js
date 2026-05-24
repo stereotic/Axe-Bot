@@ -17,7 +17,7 @@ const profitData = {};
 
 // Команда для публикации профита: username сумма направление
 // Пример: @username 10000 1
-bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])$/, (msg, match) => {
+bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
 
@@ -25,6 +25,7 @@ bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])$/, (msg, match) => {
   const workerUsername = match[1].replace('@', '');
   const amount = parseInt(match[2]);
   const direction = parseInt(match[3]);
+  const mammothCount = match[4] ? parseInt(match[4]) : null;
 
   if (!workerUsername || !amount || ![1, 2].includes(direction)) {
     bot.sendMessage(chatId, '❌ Неверный формат. Используйте: username сумма направление\nПример: username 10000 1');
@@ -55,7 +56,8 @@ bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])$/, (msg, match) => {
       workerPayout: workerPayout,
       direction: direction,
       directionName: directionName,
-      shares: shares
+      shares: shares,
+      mammothCount: mammothCount
     };
 
     // Формируем сообщение для бухгалтерии
@@ -159,7 +161,7 @@ bot.on('callback_query', (query) => {
         });
 
         // Формируем сообщение для общей кассы и чата
-        const publicText = `🌸УСПЕШНЫЙ ПРОФИТ🌸
+        const publicText = `🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
 ┣👤Воркер: ${profit.name}
@@ -190,7 +192,7 @@ bot.on('callback_query', (query) => {
 
     bot.answerCallbackQuery(query.id);
 
-    const publicText = `🌸УСПЕШНЫЙ ПРОФИТ🌸
+    const publicText = `🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
 ┣👤Воркер: ${profit.name}

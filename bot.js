@@ -1259,13 +1259,14 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // Команда для публикации профита: username сумма направление (для всех пользователей)
-bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])$/, (msg, match) => {
+bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
 
   const workerUsername = match[1].replace(/^\/+/, '').replace(/@.+$/, '');
   const amount = parseInt(match[2]);
   const direction = parseInt(match[3]);
+  const mammothCount = match[4] ? parseInt(match[4]) : null;
 
   if (!workerUsername || !amount || ![1, 2].includes(direction)) {
     bot.sendMessage(chatId, '❌ Неверный формат. Используйте: username сумма направление\nПример: richvladwork 10000 1');
@@ -1310,7 +1311,8 @@ bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])$/, (msg, match) => {
       directionName: directionName,
       shares: shares,
       curator: user ? user.curator : null, // Добавляем куратора
-      isRegistered: !!user // Флаг - зарегистрирован ли воркер
+      isRegistered: !!user, // Флаг - зарегистрирован ли воркер
+      mammothCount: mammothCount
     };
 
     // Формируем сообщение для бухгалтерии
@@ -1685,7 +1687,7 @@ bot.on('callback_query', (query) => {
 ━━━━━━━━━━━━━━━━━━━━
 
 <b>🌸 КАССА/ЧАТ:</b>
-<b>🌸УСПЕШНЫЙ ПРОФИТ🌸
+<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
 ┣👤Воркер: ${profit.name}`;
@@ -1743,7 +1745,7 @@ bot.on('callback_query', (query) => {
       });
 
       // Отправляем в общую кассу и чат
-      let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸
+      let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
 ┣👤Воркер: ${profit.name}`;
@@ -1766,7 +1768,7 @@ bot.on('callback_query', (query) => {
       updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((err) =>
         console.error('Error updating pinned after send_all:', err)
       );
-
+      
       // Удаляем данные профита
       delete profitData[profitId];
 
@@ -1816,7 +1818,7 @@ bot.on('callback_query', (query) => {
 
       bot.answerCallbackQuery(query.id);
 
-      let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸
+      let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
 ┣👤Воркер: ${profit.name}`;
