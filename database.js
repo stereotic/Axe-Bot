@@ -61,6 +61,20 @@ db.serialize(() => {
       console.error('Error adding direction column:', err);
     }
   });
+
+  // Добавляем колонку worker_number если её нет
+  db.run(`ALTER TABLE users ADD COLUMN worker_number INTEGER`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding worker_number column:', err);
+    }
+  });
+
+  // Добавляем колонку created_at в profits если её нет (для старых БД)
+  db.run(`ALTER TABLE profits ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding created_at column to profits:', err);
+    }
+  });
   db.run(`CREATE TABLE IF NOT EXISTS profit_shares (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profit_id INTEGER,
