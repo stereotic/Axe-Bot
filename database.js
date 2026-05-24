@@ -75,6 +75,15 @@ db.serialize(() => {
       console.error('Error adding created_at column to profits:', err);
     }
   });
+
+  // Проставляем created_at для старых записей где его нет
+  db.run(`UPDATE profits SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL`, (err) => {
+    if (err) {
+      console.error('Error backfilling created_at:', err);
+    } else {
+      console.log('✅ Backfilled NULL created_at in profits');
+    }
+  });
   db.run(`CREATE TABLE IF NOT EXISTS profit_shares (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profit_id INTEGER,
