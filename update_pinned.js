@@ -3,8 +3,6 @@ const { topExclusionWhere } = require('./utils');
 
 let pinnedMessageId = null;
 
-const DAILY_DATE_SQL = `DATE('now', 'localtime')`;
-
 function dbGet(sql, params = []) {
   return new Promise((resolve, reject) => {
     db.get(sql, params, (err, row) => {
@@ -68,23 +66,29 @@ async function getUsdRate() {
 }
 
 async function getDailyStats() {
+  const now = new Date();
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const startStr = dayStart.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const endStr = dayEnd.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+
   const dailyRow = await dbGet(`
     SELECT COALESCE(SUM(p.amount), 0) AS daily_total
     FROM profits p
-    WHERE DATE(p.created_at, 'localtime') = ${DAILY_DATE_SQL}
-  `);
+    WHERE p.created_at >= ? AND p.created_at < ?
+  `, [startStr, endStr]);
 
   const topWorker = await dbGet(`
     SELECT u.username, u.name, SUM(p.amount) AS total_earned
     FROM users u
     JOIN profits p ON u.user_id = p.user_id
-    WHERE DATE(p.created_at, 'localtime') = ${DAILY_DATE_SQL}
+    WHERE p.created_at >= ? AND p.created_at < ?
       AND ${topExclusionWhere('u')}
     GROUP BY u.user_id
     HAVING total_earned > 0
     ORDER BY total_earned DESC
     LIMIT 1
-  `);
+  `, [startStr, endStr]);
 
   return {
     dailyTotal: Number(dailyRow?.daily_total || 0),

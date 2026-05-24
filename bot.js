@@ -2582,7 +2582,7 @@ bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
     users.forEach((user, index) => {
       const medal = medals[index];
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
-      topText += `${medal}: <a href="${profileLink}">${user.name.startsWith('#') ? user.name : '#' + user.name}</a> - ${user.total_profit.toLocaleString('de-DE')}₽\n`;
+      topText += `${medal}: <a href="${profileLink}">${user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username)}</a> - ${user.total_profit.toLocaleString('de-DE')}₽\n`;
     });
 
     bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
@@ -2595,15 +2595,23 @@ bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
 bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
   const chatId = msg.chat.id;
 
-  db.all(`SELECT u.user_id, u.username, u.name, u.profile_hidden, SUM(p.amount) as daily_total
+  const now = new Date();
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const startStr = dayStart.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const endStr = dayEnd.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+
+  db.all(`SELECT u.user_id, u.username, u.name, u.profile_hidden, COALESCE(SUM(p.amount), 0) as daily_total
           FROM profits p
           JOIN users u ON p.user_id = u.user_id
-          WHERE DATE(p.created_at, 'localtime') = DATE('now', 'localtime')
+          WHERE p.created_at >= ? AND p.created_at < ?
             AND ${utils.topExclusionWhere('u')}
-          GROUP BY p.user_id
+          GROUP BY u.user_id
+          HAVING daily_total > 0
           ORDER BY daily_total DESC
-          LIMIT 10`, (err, results) => {
+          LIMIT 10`, [startStr, endStr], (err, results) => {
     if (err || !results || results.length === 0) {
+      if (err) console.error('Error in topd query:', err);
       bot.sendMessage(chatId, '📊 Топ дня пуст').catch(err => {
         console.error('Error sending topd message:', err);
       });
@@ -2618,9 +2626,9 @@ bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
 
       if (user.profile_hidden) {
-        topText += `${medal}: ${user.name.startsWith('#') ? user.name : '#' + user.name} - ${user.daily_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: ${user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username)} - ${user.daily_total.toLocaleString('de-DE')}₽\n`;
       } else {
-        topText += `${medal}: <a href="${profileLink}">${user.name.startsWith('#') ? user.name : '#' + user.name}</a> - ${user.daily_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: <a href="${profileLink}">${user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username)}</a> - ${user.daily_total.toLocaleString('de-DE')}₽\n`;
       }
     });
 
@@ -2634,15 +2642,23 @@ bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
 bot.onText(/\/(topm|топм)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
   const chatId = msg.chat.id;
 
-  db.all(`SELECT u.user_id, u.username, u.name, u.profile_hidden, SUM(p.amount) as monthly_total
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const startStr = monthStart.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const endStr = monthEnd.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+
+  db.all(`SELECT u.user_id, u.username, u.name, u.profile_hidden, COALESCE(SUM(p.amount), 0) as monthly_total
           FROM profits p
           JOIN users u ON p.user_id = u.user_id
-          WHERE strftime('%Y-%m', p.created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime')
+          WHERE p.created_at >= ? AND p.created_at < ?
             AND ${utils.topExclusionWhere('u')}
-          GROUP BY p.user_id
+          GROUP BY u.user_id
+          HAVING monthly_total > 0
           ORDER BY monthly_total DESC
-          LIMIT 10`, (err, results) => {
+          LIMIT 10`, [startStr, endStr], (err, results) => {
     if (err || !results || results.length === 0) {
+      if (err) console.error('Error in topm query:', err);
       bot.sendMessage(chatId, '📊 Топ месяца пуст').catch(err => {
         console.error('Error sending topm message:', err);
       });
@@ -2657,9 +2673,9 @@ bot.onText(/\/(topm|топм)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
 
       if (user.profile_hidden) {
-        topText += `${medal}: ${user.name.startsWith('#') ? user.name : '#' + user.name} - ${user.monthly_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: ${user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username)} - ${user.monthly_total.toLocaleString('de-DE')}₽\n`;
       } else {
-        topText += `${medal}: <a href="${profileLink}">${user.name.startsWith('#') ? user.name : '#' + user.name}</a> - ${user.monthly_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: <a href="${profileLink}">${user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username)}</a> - ${user.monthly_total.toLocaleString('de-DE')}₽\n`;
       }
     });
 
