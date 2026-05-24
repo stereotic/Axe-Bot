@@ -2580,7 +2580,7 @@ bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
     users.forEach((user, index) => {
       const medal = medals[index];
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
-      topText += `${medal}: <a href="${profileLink}">#${user.name}</a> - ${user.total_profit.toLocaleString('de-DE')}₽\n`;
+      topText += `${medal}: <a href="${profileLink}">${user.name.startsWith('#') ? user.name : '#' + user.name}</a> - ${user.total_profit.toLocaleString('de-DE')}₽\n`;
     });
 
     bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
@@ -2616,9 +2616,9 @@ bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
 
       if (user.profile_hidden) {
-        topText += `${medal}: #${user.name} - ${user.daily_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: ${user.name.startsWith('#') ? user.name : '#' + user.name} - ${user.daily_total.toLocaleString('de-DE')}₽\n`;
       } else {
-        topText += `${medal}: <a href="${profileLink}">#${user.name}</a> - ${user.daily_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: <a href="${profileLink}">${user.name.startsWith('#') ? user.name : '#' + user.name}</a> - ${user.daily_total.toLocaleString('de-DE')}₽\n`;
       }
     });
 
@@ -2655,9 +2655,9 @@ bot.onText(/\/(topm|топм)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
 
       if (user.profile_hidden) {
-        topText += `${medal}: #${user.name} - ${user.monthly_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: ${user.name.startsWith('#') ? user.name : '#' + user.name} - ${user.monthly_total.toLocaleString('de-DE')}₽\n`;
       } else {
-        topText += `${medal}: <a href="${profileLink}">#${user.name}</a> - ${user.monthly_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: <a href="${profileLink}">${user.name.startsWith('#') ? user.name : '#' + user.name}</a> - ${user.monthly_total.toLocaleString('de-DE')}₽\n`;
       }
     });
 
