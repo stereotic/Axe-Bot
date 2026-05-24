@@ -161,10 +161,11 @@ bot.on('callback_query', (query) => {
         });
 
         // Формируем сообщение для общей кассы и чата
+        const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
         const publicText = `🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
-┣👤Воркер: ${profit.name}
+┣👤Воркер: <a href="${profileLink}">${profit.name}</a>
 ┗💸Сумма: ${utils.formatAmount(profit.amount)}₽`;
 
         const publicKeyboard = {
@@ -173,7 +174,7 @@ bot.on('callback_query', (query) => {
           ]
         };
 
-        bot.sendMessage(chatId, publicText, { reply_markup: publicKeyboard });
+        bot.sendMessage(chatId, publicText, { parse_mode: 'HTML', reply_markup: publicKeyboard });
 
         // Удаляем предыдущее сообщение
         bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
@@ -192,19 +193,20 @@ bot.on('callback_query', (query) => {
 
     bot.answerCallbackQuery(query.id);
 
+    const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
     const publicText = `🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
-┣👤Воркер: ${profit.name}
+┣👤Воркер: <a href="${profileLink}">${profit.name}</a>
 ┗💸Сумма: ${utils.formatAmount(profit.amount)}₽`;
 
     // Отправляем в общую кассу
-    bot.sendMessage(CASH_CHANNEL_ID, publicText).catch((err) => {
+    bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML' }).catch((err) => {
       console.error('Error sending to cash channel:', err);
     });
 
     // Отправляем в общий чат
-    bot.sendMessage(GENERAL_CHAT_ID, publicText).catch((err) => {
+    bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML' }).catch((err) => {
       console.error('Error sending to general chat:', err);
     });
 

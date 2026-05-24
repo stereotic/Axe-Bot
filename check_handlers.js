@@ -418,10 +418,12 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
         });
 
         // Отправляем в общую кассу и чат
+        const workerName = user.name && user.name.startsWith('#') ? user.name : '#' + (user.name || user.username);
+        const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
         let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸
 
 🏠Сервис: ${directionName}
-┣👤Воркер: ${user.name && user.name.startsWith('#') ? user.name : '#' + user.name}`;
+┣👤Воркер: <a href="${profileLink}">${workerName}</a>`;
 
         // Добавляем куратора, если он есть и направление = 1 (Кардинг)
         if (direction === 1 && user.curator) {

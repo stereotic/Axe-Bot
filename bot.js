@@ -1690,7 +1690,7 @@ bot.on('callback_query', (query) => {
 <b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
-┣👤Воркер: ${profit.name}`;
+┣👤Воркер: <a href="https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}">${profit.name}</a>`;
 
       if (profit.direction === 1 && profit.curator) {
         combinedText += `\n┣💸Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
@@ -1745,10 +1745,11 @@ bot.on('callback_query', (query) => {
       });
 
       // Отправляем в общую кассу и чат
+      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
       let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
-┣👤Воркер: ${profit.name}`;
+┣👤Воркер: <a href="${profileLink}">${profit.name}</a>`;
 
       // Добавляем куратора, если он есть и направление = 1 (Кардинг)
       if (profit.direction === 1 && profit.curator) {
@@ -1818,10 +1819,11 @@ bot.on('callback_query', (query) => {
 
       bot.answerCallbackQuery(query.id);
 
+      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
       let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
-┣👤Воркер: ${profit.name}`;
+┣👤Воркер: <a href="${profileLink}">${profit.name}</a>`;
 
       // Добавляем куратора, если он есть и направление = 1 (Кардинг)
       if (profit.direction === 1 && profit.curator) {
