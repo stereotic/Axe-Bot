@@ -362,6 +362,64 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;');
 }
 
+function entitiesToHtml(text, entities) {
+  if (!text) return '';
+  if (!entities || !entities.length) return escapeHtml(text);
+
+  const tagAtPos = [];
+
+  for (const entity of entities) {
+    const offset = entity.offset;
+    const length = entity.length;
+    let openTag, closeTag;
+
+    switch (entity.type) {
+      case 'bold':
+        openTag = '<b>'; closeTag = '</b>'; break;
+      case 'italic':
+        openTag = '<i>'; closeTag = '</i>'; break;
+      case 'underline':
+        openTag = '<u>'; closeTag = '</u>'; break;
+      case 'strikethrough':
+        openTag = '<s>'; closeTag = '</s>'; break;
+      case 'code':
+        openTag = '<code>'; closeTag = '</code>'; break;
+      case 'pre':
+        openTag = '<pre>'; closeTag = '</pre>'; break;
+      case 'spoiler':
+        openTag = '<tg-spoiler>'; closeTag = '</tg-spoiler>'; break;
+      case 'text_link':
+        openTag = `<a href="${escapeHtml(entity.url)}">`; closeTag = '</a>'; break;
+      case 'text_mention':
+        openTag = `<a href="tg://user?id=${entity.user.id}">`; closeTag = '</a>'; break;
+      default:
+        continue;
+    }
+
+    tagAtPos.push({ pos: offset, tag: openTag, order: 0 });
+    tagAtPos.push({ pos: offset + length, tag: closeTag, order: 1 });
+  }
+
+  tagAtPos.sort((a, b) => a.pos - b.pos || a.order - b.order);
+
+  let result = '';
+  let lastPos = 0;
+
+  for (const t of tagAtPos) {
+    if (t.pos > lastPos) {
+      result += escapeHtml(text.slice(lastPos, t.pos));
+    }
+    result += t.tag;
+    lastPos = t.pos;
+  }
+
+  if (lastPos < text.length) {
+    result += escapeHtml(text.slice(lastPos));
+  }
+
+  return result;
+}
+
 function isApplicationApproved(user) {
   return Boolean(user && Number(user.application_approved) === 1);
 }
@@ -1490,15 +1548,15 @@ bot.on('message', async (msg) => {
               // Определяем тип сообщения и отправляем соответствующим методом
               if (msg.photo) {
                 const photo = msg.photo[msg.photo.length - 1].file_id;
-                await bot.sendPhoto(user.user_id, photo, { caption: msg.caption, parse_mode: 'HTML' });
+                await bot.sendPhoto(user.user_id, photo, { caption: entitiesToHtml(msg.caption, msg.caption_entities), parse_mode: 'HTML' });
               } else if (msg.video) {
-                await bot.sendVideo(user.user_id, msg.video.file_id, { caption: msg.caption, parse_mode: 'HTML' });
+                await bot.sendVideo(user.user_id, msg.video.file_id, { caption: entitiesToHtml(msg.caption, msg.caption_entities), parse_mode: 'HTML' });
               } else if (msg.document) {
-                await bot.sendDocument(user.user_id, msg.document.file_id, { caption: msg.caption, parse_mode: 'HTML' });
+                await bot.sendDocument(user.user_id, msg.document.file_id, { caption: entitiesToHtml(msg.caption, msg.caption_entities), parse_mode: 'HTML' });
               } else if (msg.sticker) {
                 await bot.sendSticker(user.user_id, msg.sticker.file_id);
               } else if (msg.text) {
-                await bot.sendMessage(user.user_id, msg.text, { parse_mode: 'HTML' });
+                await bot.sendMessage(user.user_id, entitiesToHtml(msg.text, msg.entities), { parse_mode: 'HTML' });
               }
               successCount++;
             } catch (error) {
@@ -1758,11 +1816,11 @@ bot.on('callback_query', (query) => {
         publicText += `\n┗💸Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
       }
 
-      bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML' }).catch((err) => {
+      bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) => {
         console.error('Error sending to cash channel:', err);
       });
 
-      bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML' }).catch((err) => {
+      bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) => {
         console.error('Error sending to general chat:', err);
       });
 
@@ -1833,12 +1891,12 @@ bot.on('callback_query', (query) => {
       }
 
       // Отправляем в общую кассу
-      bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML' }).catch((err) => {
+      bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) => {
         console.error('Error sending to cash channel:', err);
       });
 
       // Отправляем в общий чат
-      bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML' }).catch((err) => {
+      bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) => {
         console.error('Error sending to general chat:', err);
       });
 

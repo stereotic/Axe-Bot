@@ -201,12 +201,12 @@ bot.on('callback_query', (query) => {
 ┗💸Сумма: ${utils.formatAmount(profit.amount)}₽`;
 
     // Отправляем в общую кассу
-    bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML' }).catch((err) => {
+    bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) => {
       console.error('Error sending to cash channel:', err);
     });
 
     // Отправляем в общий чат
-    bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML' }).catch((err) => {
+    bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) => {
       console.error('Error sending to general chat:', err);
     });
 

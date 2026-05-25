@@ -79,7 +79,7 @@ async function getDailyStats() {
   `, [startStr, endStr]);
 
   const topWorker = await dbGet(`
-    SELECT u.username, u.name, SUM(p.amount) AS total_earned
+    SELECT u.user_id, u.username, u.name, SUM(p.amount) AS total_earned
     FROM users u
     JOIN profits p ON u.user_id = p.user_id
     WHERE p.created_at >= ? AND p.created_at < ?
@@ -107,11 +107,13 @@ async function createPinnedMessageText() {
   const { dailyTotal, topWorker } = await getDailyStats();
 
   const usdRate = await getUsdRate();
+  const botUsername = process.env.BOT_USERNAME || 'AXE_xBOT';
   let topWorkerText = '';
 
   if (topWorker && Number(topWorker.total_earned) > 0) {
     const name = topWorker.name && topWorker.name !== '#' ? topWorker.name : `@${topWorker.username}`;
-    topWorkerText = `${name} - ${Number(topWorker.total_earned).toLocaleString('ru-RU')}₽`;
+    const profileLink = `https://t.me/${botUsername}?start=profile_${topWorker.user_id}`;
+    topWorkerText = `<a href="${profileLink}">${name}</a> - ${Number(topWorker.total_earned).toLocaleString('ru-RU')}₽`;
   }
 
   return `<b>🌸AXE TEAM🌸</b>
