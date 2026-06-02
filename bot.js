@@ -1216,8 +1216,15 @@ bot.onText(/\/start/, (msg) => {
   if (match) {
     const targetUserId = parseInt(match[1]);
 
-    db.get('SELECT * FROM users WHERE user_id = ?', [targetUserId], (err, user) => {
+    db.get('SELECT * FROM users WHERE user_id = ?', [targetUserId], async (err, user) => {
       if (err || !user || user.profile_hidden) {
+        bot.sendMessage(chatId, '❌ Пользователь скрыл профиль');
+        return;
+      }
+
+      try {
+        await bot.getChat(targetUserId);
+      } catch (e) {
         bot.sendMessage(chatId, '❌ Пользователь скрыл профиль');
         return;
       }
