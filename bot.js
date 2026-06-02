@@ -168,7 +168,7 @@ const INFO_BANNER = () => {
 <b>🏦Касса проекта:</b> <i>${projectBalance.toLocaleString()}₽</i>
 ┗<b>Кол-во профитов:</b> <b><i>${totalProfits} шт</i></b>
 
-<b>📆Дата открытия проекта 03.03.2026.</b>`;
+<b>📆Дата открытия проекта 05.05.2026.</b>`;
 
         infoBannerCache = { text: banner, timestamp: now };
         resolve(banner);
@@ -1217,13 +1217,8 @@ bot.onText(/\/start/, (msg) => {
     const targetUserId = parseInt(match[1]);
 
     db.get('SELECT * FROM users WHERE user_id = ?', [targetUserId], (err, user) => {
-      if (err || !user) {
-        bot.sendMessage(chatId, '❌ Профиль не найден');
-        return;
-      }
-
-      if (user.profile_hidden) {
-        bot.sendMessage(chatId, '❌Пользователь скрыл профиль');
+      if (err || !user || user.profile_hidden) {
+        bot.sendMessage(chatId, '❌ Пользователь скрыл профиль');
         return;
       }
 
