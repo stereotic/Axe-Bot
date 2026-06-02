@@ -1218,14 +1218,14 @@ bot.onText(/\/start/, (msg) => {
 
     db.get('SELECT * FROM users WHERE user_id = ?', [targetUserId], async (err, user) => {
       if (err || !user || user.profile_hidden) {
-        bot.sendMessage(chatId, '🚫 <b>Пользователь ограничил доступ к своему профилю</b>', { parse_mode: 'HTML' });
+        bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' });
         return;
       }
 
       try {
         await bot.getChat(targetUserId);
       } catch (e) {
-        bot.sendMessage(chatId, '🚫 <b>Пользователь ограничил доступ к своему профилю</b>', { parse_mode: 'HTML' });
+        bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' });
         return;
       }
 
