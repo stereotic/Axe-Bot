@@ -2645,7 +2645,7 @@ bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       const medal = medals[index];
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
       const nameForTop = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
-      topText += `${medal}: <a href="${profileLink}"><b>${nameForTop}</b></a> - ${user.total_profit.toLocaleString('de-DE')}₽\n`;
+      topText += `${medal}: <a href="${profileLink}"><b>${nameForTop}</b></a> - <b>${user.total_profit.toLocaleString('de-DE')}₽</b>\n`;
     });
 
     bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
@@ -2690,9 +2690,9 @@ bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
 
       const nameForTopd = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
       if (user.profile_hidden) {
-        topText += `${medal}: <b>${nameForTopd}</b> - ${user.daily_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: <b>${nameForTopd}</b> - <b>${user.daily_total.toLocaleString('de-DE')}₽</b>\n`;
       } else {
-        topText += `${medal}: <a href="${profileLink}"><b>${nameForTopd}</b></a> - ${user.daily_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: <a href="${profileLink}"><b>${nameForTopd}</b></a> - <b>${user.daily_total.toLocaleString('de-DE')}₽</b>\n`;
       }
     });
 
@@ -2738,9 +2738,9 @@ bot.onText(/\/(topm|топм)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
 
       const nameForTopm = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
       if (user.profile_hidden) {
-        topText += `${medal}: <b>${nameForTopm}</b> - ${user.monthly_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: <b>${nameForTopm}</b> - <b>${user.monthly_total.toLocaleString('de-DE')}₽</b>\n`;
       } else {
-        topText += `${medal}: <a href="${profileLink}"><b>${nameForTopm}</b></a> - ${user.monthly_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: <a href="${profileLink}"><b>${nameForTopm}</b></a> - <b>${user.monthly_total.toLocaleString('de-DE')}₽</b>\n`;
       }
     });
 
