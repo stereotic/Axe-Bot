@@ -113,7 +113,7 @@ async function createPinnedMessageText() {
   if (topWorker && Number(topWorker.total_earned) > 0) {
     const name = topWorker.name && topWorker.name !== '#' ? topWorker.name : `@${topWorker.username}`;
     const profileLink = `https://t.me/${botUsername}?start=profile_${topWorker.user_id}`;
-    topWorkerText = `<a href="${profileLink}">${name}</a> - ${Number(topWorker.total_earned).toLocaleString('ru-RU')}₽`;
+    topWorkerText = `<a href="${profileLink}"><b>${name}</b></a> - ${Number(topWorker.total_earned).toLocaleString('ru-RU')}₽`;
   }
 
   return `<b>🌸AXE TEAM🌸</b>

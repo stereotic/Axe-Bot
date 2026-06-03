@@ -19,7 +19,7 @@ const MENU_PANEL_FALLBACK = 'Выбери раздел:';
 
 const token = process.env.BOT_TOKEN;
 const adminIds = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(id => parseInt(id.trim())).filter(Boolean) : [];
-const PAYOUT_ADMIN_ID = 6383039210; // ID для получения заявок на выплату
+const PAYOUT_ADMIN_IDS = [6383039210, 7800697491]; // ID для получения заявок на выплату
 
 // ID каналов для profit system
 const ACCOUNTING_CHAT_ID = '-1003606797013'; // Бухгалтерия
@@ -1153,7 +1153,7 @@ function handleProtectedCallback(query, data, chatId, userId) {
                 ]
               };
 
-              bot.sendMessage(PAYOUT_ADMIN_ID, adminText, { reply_markup: adminKeyboard })
+              PAYOUT_ADMIN_IDS.forEach(id => bot.sendMessage(id, adminText, { reply_markup: adminKeyboard }).catch(() => {}))
                 .then(() => {
                   // Редактируем сообщение вместо удаления и отправки нового
                   const successText = '✅ Заявка на выплату создана! Ожидайте обработки.';
@@ -1319,7 +1319,7 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // Команда для публикации профита: username сумма направление (для всех пользователей)
-bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) => {
+bot.onText(/^(?!/)([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
 
@@ -1397,15 +1397,15 @@ bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) =>
 });
 
 // Команда для отправки профита в личку: /name сумма кол-во (например /richvladwork 5000 1)
-bot.onText(/^\/([^\s]+)\s+(\d+)\s+(\d+)$/, (msg, match) => {
+bot.onText(/^\/([^\s]+)\s+(\d+)\s+(\d+)(?:\s+(\d+))?$/, (msg, match) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
 
   const workerName = match[1];
   const amount = parseInt(match[2]);
-  const profitCount = parseInt(match[3]);
+  const profitCount = parseInt(match[3] || match[4] || 1);
 
-  if (!workerName || !amount || !profitCount) {
+  if (!workerName || !amount) {
     bot.sendMessage(chatId, '❌ Неверный формат. Используйте: /name сумма кол-во\nПример: /richvladwork 5000 1');
     return;
   }
@@ -2233,7 +2233,7 @@ bot.on('callback_query', (query) => {
             ]
           };
 
-          bot.sendMessage(PAYOUT_ADMIN_ID, adminText, { reply_markup: adminKeyboard })
+          PAYOUT_ADMIN_IDS.forEach(id => bot.sendMessage(id, adminText, { reply_markup: adminKeyboard }).catch(() => {}))
             .then(() => {
               bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
               bot.sendMessage(chatId, '✅ Заявка на выплату создана! Ожидайте обработки.');
@@ -2644,7 +2644,8 @@ bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
     users.forEach((user, index) => {
       const medal = medals[index];
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
-      topText += `${medal}: <a href="${profileLink}">${user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username)}</a> - ${user.total_profit.toLocaleString('de-DE')}₽\n`;
+      const nameForTop = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
+      topText += `${medal}: <a href="${profileLink}"><b>${nameForTop}</b></a> - ${user.total_profit.toLocaleString('de-DE')}₽\n`;
     });
 
     bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
@@ -2687,10 +2688,11 @@ bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       const medal = medals[index];
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
 
+      const nameForTopd = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
       if (user.profile_hidden) {
-        topText += `${medal}: ${user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username)} - ${user.daily_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: <b>${nameForTopd}</b> - ${user.daily_total.toLocaleString('de-DE')}₽\n`;
       } else {
-        topText += `${medal}: <a href="${profileLink}">${user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username)}</a> - ${user.daily_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: <a href="${profileLink}"><b>${nameForTopd}</b></a> - ${user.daily_total.toLocaleString('de-DE')}₽\n`;
       }
     });
 
@@ -2734,10 +2736,11 @@ bot.onText(/\/(topm|топм)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       const medal = medals[index];
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
 
+      const nameForTopm = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
       if (user.profile_hidden) {
-        topText += `${medal}: ${user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username)} - ${user.monthly_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: <b>${nameForTopm}</b> - ${user.monthly_total.toLocaleString('de-DE')}₽\n`;
       } else {
-        topText += `${medal}: <a href="${profileLink}">${user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username)}</a> - ${user.monthly_total.toLocaleString('de-DE')}₽\n`;
+        topText += `${medal}: <a href="${profileLink}"><b>${nameForTopm}</b></a> - ${user.monthly_total.toLocaleString('de-DE')}₽\n`;
       }
     });
 
