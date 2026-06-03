@@ -1319,7 +1319,7 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // Команда для публикации профита: username сумма направление (для всех пользователей)
-bot.onText(/^(?!/)([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) => {
+bot.onText(/^(?!\/)([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
 
