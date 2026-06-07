@@ -1414,35 +1414,44 @@ bot.onText(/^\/([^\s]+)\s+(\d+)\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) => {
   const searchUsername = workerName.toLowerCase();
 
   db.get('SELECT * FROM users WHERE LOWER(username) = ?', [searchUsername], (err, user) => {
+    let workerData;
+
     if (err || !user) {
-      bot.sendMessage(chatId, `❌ Пользователь @${workerName} не найден`);
-      return;
+      workerData = {
+        user_id: 0,
+        username: workerName,
+        name: `#${workerName}`
+      };
+    } else {
+      workerData = user;
     }
+
+    const displayName = workerData.name && workerData.name.startsWith('#')
+      ? workerData.name
+      : '#' + (workerData.name || workerData.username);
 
     const workerPayout = utils.calculateWorkerPayout(amount, direction);
     const shares = utils.calculateProfitShares(amount);
     const directionName = utils.getDirectionName(direction);
     const directionPercent = utils.DIRECTION_PERCENTAGES[direction];
 
-    const displayName = user.name && user.name.startsWith('#') ? user.name : '#' + (user.name || user.username);
-
-    const profitId = `${user.user_id}_${Date.now()}`;
+    const profitId = `${workerData.user_id}_${Date.now()}`;
     profitData[profitId] = {
-      userId: user.user_id,
-      username: user.username,
+      userId: workerData.user_id,
+      username: workerData.username,
       name: displayName,
       amount: amount,
       workerPayout: workerPayout,
       direction: direction,
       directionName: directionName,
       shares: shares,
-      curator: user.curator || null,
-      isRegistered: true,
+      curator: user ? user.curator : null,
+      isRegistered: !!user,
       mammothCount: mammothCount
     };
 
     const accountingText = `<b>🚀${directionName}
-👤Воркер: @${user.username}
+👤Воркер: @${workerData.username}
 💸Сумма профита: ${amount.toLocaleString()}₽
 💼К выплате: ${workerPayout.toLocaleString()}₽ (${directionPercent}%)
 👑Владелец: ${shares.owner.toLocaleString()}₽
