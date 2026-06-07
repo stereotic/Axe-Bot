@@ -1112,77 +1112,6 @@ function handleProtectedCallback(query, data, chatId, userId) {
       });
       break;
 
-    default:
-      if (data.startsWith('confirm_withdraw_')) {
-        bot.answerCallbackQuery(query.id);
-        const amount = parseInt(data.replace('confirm_withdraw_', ''));
-
-        getUser(userId, (err, user) => {
-          if (err || !user) {
-            bot.answerCallbackQuery(query.id, { text: '❌ Ошибка', show_alert: true });
-            return;
-          }
-
-          // Создаем заявку на вывод
-          db.run('INSERT INTO withdrawals (user_id, amount, status) VALUES (?, ?, ?)',
-            [userId, amount, 'pending'],
-            function(err) {
-              if (err) {
-                bot.answerCallbackQuery(query.id, { text: '❌ Ошибка создания заявки', show_alert: true });
-                return;
-              }
-
-              const withdrawalId = this.lastID;
-
-              // Обнуляем баланс воркера
-              db.run('UPDATE users SET balance = 0 WHERE user_id = ?', [userId], (err) => {
-                if (err) {
-                  console.error('Error updating balance:', err);
-                }
-              });
-
-              // Отправляем заявку админу
-              const adminText = `✅Новая заявка на выплату!
-🌶Воркер: @${user.username || 'unknown'}
-🪪Никнейм: ${user.name}
-💌Сумма выплаты: ${amount.toLocaleString()}₽`;
-
-              const adminKeyboard = {
-                inline_keyboard: [
-                  [{ text: 'Выплатить ✅', callback_data: `process_withdrawal_${withdrawalId}` }]
-                ]
-              };
-
-              PAYOUT_ADMIN_IDS.forEach(id => bot.sendMessage(id, adminText, { reply_markup: adminKeyboard }).catch(() => {}))
-                .then(() => {
-                  // Редактируем сообщение вместо удаления и отправки нового
-                  const successText = '✅ Заявка на выплату создана! Ожидайте обработки.';
-
-                  if (hasPhoto) {
-                    bot.editMessageCaption(successText, {
-                      chat_id: chatId,
-                      message_id: messageId
-                    }).catch(() => {
-                      bot.sendMessage(chatId, successText);
-                    });
-                  } else {
-                    bot.editMessageText(successText, {
-                      chat_id: chatId,
-                      message_id: messageId
-                    }).catch(() => {
-                      bot.sendMessage(chatId, successText);
-                    });
-                  }
-                })
-                .catch((err) => {
-                  console.error('Error sending to admin:', err);
-                  bot.answerCallbackQuery(query.id, { text: '❌ Ошибка отправки заявки администратору', show_alert: true });
-                });
-            }
-          );
-        });
-      }
-      break;
   }
 }
 
@@ -2231,15 +2160,20 @@ bot.on('callback_query', (query) => {
             ]
           };
 
-          PAYOUT_ADMIN_IDS.forEach(id => bot.sendMessage(id, adminText, { reply_markup: adminKeyboard }).catch(() => {}))
-            .then(() => {
-              bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
-              bot.sendMessage(chatId, '✅ Заявка на выплату создана! Ожидайте обработки.');
-            })
-            .catch((err) => {
-              console.error('Error sending to admin:', err);
-              bot.sendMessage(chatId, '❌ Ошибка отправки заявки администратору');
+          Promise.all(PAYOUT_ADMIN_IDS.map(id =>
+            bot.sendMessage(id, adminText, { reply_markup: adminKeyboard }).catch(() => {})
+          )).then(() => {
+            const successText = '✅ Заявка на выплату создана! Ожидайте обработки.';
+            bot.editMessageText(successText, {
+              chat_id: chatId,
+              message_id: query.message.message_id
+            }).catch(() => {
+              bot.sendMessage(chatId, successText);
             });
+          }).catch((err) => {
+            console.error('Error sending to admin:', err);
+            bot.sendMessage(chatId, '❌ Ошибка отправки заявки администратору');
+          });
         }
       );
     });
