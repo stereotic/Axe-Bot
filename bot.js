@@ -2163,12 +2163,13 @@ bot.on('callback_query', (query) => {
           Promise.all(PAYOUT_ADMIN_IDS.map(id =>
             bot.sendMessage(id, adminText, { reply_markup: adminKeyboard }).catch(() => {})
           )).then(() => {
-            const successText = '✅ Заявка на выплату создана! Ожидайте обработки.';
+            const successText = '<b>✅ Заявка на выплату создана! Ожидайте обработки.</b>';
             bot.editMessageText(successText, {
               chat_id: chatId,
-              message_id: query.message.message_id
+              message_id: query.message.message_id,
+              parse_mode: 'HTML'
             }).catch(() => {
-              bot.sendMessage(chatId, successText);
+              bot.sendMessage(chatId, successText, { parse_mode: 'HTML' });
             });
           }).catch((err) => {
             console.error('Error sending to admin:', err);
