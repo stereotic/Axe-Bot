@@ -1396,17 +1396,18 @@ bot.onText(/^(?!\/)([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, mat
   return true; // Предотвращаем дальнейшую обработку
 });
 
-// Команда для отправки профита в личку: /name сумма кол-во (например /richvladwork 5000 1)
-bot.onText(/^\/([^\s]+)\s+(\d+)\s+(\d+)(?:\s+(\d+))?$/, (msg, match) => {
+// Команда для публикации профита: /name сумма направление (например /richvladwork 5000 1)
+bot.onText(/^\/([^\s]+)\s+(\d+)\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
 
   const workerName = match[1];
   const amount = parseInt(match[2]);
-  const profitCount = parseInt(match[3] || match[4] || 1);
+  const direction = parseInt(match[3]);
+  const mammothCount = match[4] ? parseInt(match[4]) : null;
 
-  if (!workerName || !amount) {
-    bot.sendMessage(chatId, '❌ Неверный формат. Используйте: /name сумма кол-во\nПример: /richvladwork 5000 1');
+  if (!workerName || !amount || ![1, 2].includes(direction)) {
+    bot.sendMessage(chatId, '❌ Неверный формат. Используйте: /name сумма направление\nПример: /richvladwork 5000 1');
     return;
   }
 
@@ -1418,88 +1419,44 @@ bot.onText(/^\/([^\s]+)\s+(\d+)\s+(\d+)(?:\s+(\d+))?$/, (msg, match) => {
       return;
     }
 
-    const direction = 1;
     const workerPayout = utils.calculateWorkerPayout(amount, direction);
     const shares = utils.calculateProfitShares(amount);
+    const directionName = utils.getDirectionName(direction);
+    const directionPercent = utils.DIRECTION_PERCENTAGES[direction];
 
-    // Сохраняем профит в БД
-    db.run('INSERT INTO profits (user_id, amount, amount_to_pay, direction) VALUES (?, ?, ?, ?)',
-      [user.user_id, amount, workerPayout, direction],
-      function(err) {
-        if (err) {
-          console.error('Error saving profit:', err);
-          bot.sendMessage(chatId, '❌ Ошибка сохранения профита');
-          return;
-        }
+    const displayName = user.name && user.name.startsWith('#') ? user.name : '#' + (user.name || user.username);
 
-        const dbProfitId = this.lastID;
+    const profitId = `${user.user_id}_${Date.now()}`;
+    profitData[profitId] = {
+      userId: user.user_id,
+      username: user.username,
+      name: displayName,
+      amount: amount,
+      workerPayout: workerPayout,
+      direction: direction,
+      directionName: directionName,
+      shares: shares,
+      curator: user.curator || null,
+      isRegistered: true,
+      mammothCount: mammothCount
+    };
 
-        for (const [role, shareAmount] of Object.entries(shares)) {
-          db.run('INSERT OR IGNORE INTO profit_shares (profit_id, role, percentage, amount) VALUES (?, ?, ?, ?)',
-            [dbProfitId, role, utils.PROFIT_SHARES[role], shareAmount]
-          );
-        }
+    const accountingText = `<b>🚀${directionName}
+👤Воркер: @${user.username}
+💸Сумма профита: ${amount.toLocaleString()}₽
+💼К выплате: ${workerPayout.toLocaleString()}₽ (${directionPercent}%)
+👑Владелец: ${shares.owner.toLocaleString()}₽
+👔Администратор: ${shares.admin.toLocaleString()}₽
+🍌Инвестор: ${shares.investor.toLocaleString()}₽
+🧑‍💻Кодер: ${shares.coder.toLocaleString()}₽</b>`;
 
-        db.run(`UPDATE users SET
-          balance = balance + ?,
-          total_earned = total_earned + ?,
-          profit_count = profit_count + 1
-          WHERE user_id = ?`,
-          [workerPayout, amount, user.user_id],
-          (err) => {
-            if (err) {
-              console.error('Error updating user:', err);
-            } else {
-              utils.updateWorkerStatus(user.user_id, (err) => {
-                if (err) console.error('Error updating status:', err);
-              });
-            }
-          }
-        );
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '✅Отправить', callback_data: `send_profit_accounting_${profitId}` }]
+      ]
+    };
 
-        utils.updateProjectStats(amount, (err) => {
-          if (err) console.error('Error updating project stats:', err);
-        });
-
-        updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((pinErr) =>
-          console.error('Error updating pinned after profit:', pinErr)
-        );
-      }
-    );
-
-    const currentStatus = user.status || 'NEW';
-    const currentTotal = user.total_earned || 0;
-
-    const nextThreshold = utils.STATUS_THRESHOLDS.find(t => t.threshold > currentTotal);
-    const nextLevelAmount = nextThreshold ? nextThreshold.threshold : null;
-
-    let nextLevelText = '';
-    if (nextLevelAmount) {
-      const remaining = nextLevelAmount - currentTotal;
-      nextLevelText = `До нового уровня ${nextLevelAmount.toLocaleString()}₽`;
-    } else {
-      nextLevelText = 'Максимальный уровень достигнут';
-    }
-
-    const profitMessage = `🎉<b>Успешный профит </b>🎉
-
-┏ 🏠<b>Сервис: Кардинг
-</b>┣ 🏦<b>На сумму: ${amount.toLocaleString()}₽
-┣ 🔥Кол-во профитов: ${profitCount}
-┣ 💼Твой статус: ${currentStatus}
-┗ 🍾${nextLevelText} </b>
-
-⚠️<i>Подать заявку на выплату можно в профиле. Напоминаем период выплаты каждые 3 часа.</i>`;
-
-    bot.sendMessage(user.user_id, profitMessage, { parse_mode: 'HTML' })
-      .then(() => {
-        const profitUserName = user.name && user.name.startsWith('#') ? user.name : '#' + (user.name || user.username);
-        bot.sendMessage(chatId, `✅ Профит отправлен пользователю ${profitUserName}!\n💸 Сумма: ${amount.toLocaleString()}₽\n🔥 Кол-во профитов: ${profitCount}`);
-      })
-      .catch((err) => {
-        console.error('Error sending profit to user:', err);
-        bot.sendMessage(chatId, `❌ Не удалось отправить сообщение пользователю. Возможно, он не начинал диалог с ботом.`);
-      });
+    bot.sendMessage(chatId, accountingText, { parse_mode: 'HTML', reply_markup: keyboard });
   });
   return true;
 });
@@ -1675,7 +1632,7 @@ bot.on('callback_query', (query) => {
               );
             }
 
-            db.run(`UPDATE users SET
+              db.run(`UPDATE users SET
               balance = balance + ?,
               total_earned = total_earned + ?,
               profit_count = profit_count + 1
@@ -1692,6 +1649,31 @@ bot.on('callback_query', (query) => {
                 }
               }
             );
+
+            db.get('SELECT status, total_earned FROM users WHERE user_id = ?', [targetUserId], (err, updatedUser) => {
+              if (!err && updatedUser) {
+                const currentStatus = updatedUser.status || 'NEW';
+                const currentTotal = updatedUser.total_earned || 0;
+                const nextThreshold = utils.STATUS_THRESHOLDS.find(t => t.threshold > currentTotal);
+                const nextLevelAmount = nextThreshold ? nextThreshold.threshold : null;
+                let nextLevelText = '';
+                if (nextLevelAmount) {
+                  const remaining = nextLevelAmount - currentTotal;
+                  nextLevelText = `До нового уровня ${nextLevelAmount.toLocaleString()}₽`;
+                } else {
+                  nextLevelText = 'Максимальный уровень достигнут';
+                }
+                const profitMessage = `🎉<b>Успешный профит </b>🎉
+
+┏ 🏠<b>Сервис: ${profit.directionName}
+</b>┣ 🏦<b>На сумму: ${profit.amount.toLocaleString()}₽
+┣ 💼Твой статус: ${currentStatus}
+┗ 🍾${nextLevelText} </b>
+
+⚠️<i>Подать заявку на выплату можно в профиле. Напоминаем период выплаты каждые 3 часа.</i>`;
+                bot.sendMessage(targetUserId, profitMessage, { parse_mode: 'HTML' }).catch(() => {});
+              }
+            });
 
             // Обновляем статистику проекта и закреп после сохранения профита в БД
             utils.updateProjectStats(profit.amount, (err) => {
