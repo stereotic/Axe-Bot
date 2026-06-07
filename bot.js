@@ -1680,13 +1680,13 @@ bot.on('callback_query', (query) => {
               total_earned = total_earned + ?,
               profit_count = profit_count + 1
               WHERE user_id = ?`,
-              [profit.workerPayout, profit.amount, profit.userId],
+              [profit.workerPayout, profit.amount, targetUserId],
               (err) => {
                 if (err) {
                   console.error('Error updating user:', err);
                 } else {
-                  console.log(`✅ Updated balance for user ${profit.userId}: +${profit.workerPayout}₽`);
-                  utils.updateWorkerStatus(profit.userId, (err) => {
+                  console.log(`✅ Updated balance for user ${targetUserId}: +${profit.workerPayout}₽`);
+                  utils.updateWorkerStatus(targetUserId, (err) => {
                     if (err) console.error('Error updating status:', err);
                   });
                 }
@@ -1705,36 +1705,8 @@ bot.on('callback_query', (query) => {
         );
       };
 
-      if (profit.isRegistered && profit.userId !== 0) {
-        saveProfitAndUpdateUser(profit.userId);
-      } else {
-        db.get('SELECT user_id FROM users WHERE username = ?', [profit.username], (err, existingUser) => {
-          if (existingUser) {
-            saveProfitAndUpdateUser(existingUser.user_id);
-          } else {
-            utils.generateWorkerNumber((err, workerNumber) => {
-              if (err) {
-                console.error('Error generating worker number:', err);
-                return;
-              }
-              const newUserId = Date.now() + Math.floor(Math.random() * 10000);
-              db.run(
-                'INSERT INTO users (user_id, username, name, worker_number, application_approved, balance, total_earned, profit_count) VALUES (?, ?, ?, ?, 1, 0, 0, 0)',
-                [newUserId, profit.username, profit.name, workerNumber],
-                function(err) {
-                  if (err) {
-                    console.error('Error creating user:', err);
-                    return;
-                  }
-                  saveProfitAndUpdateUser(newUserId);
-                }
-              );
-            });
-          }
-        });
-      }
-
-      let combinedText = `<b>📊 БУХГАЛТЕРИЯ:</b>
+      const showCombinedKeyboard = () => {
+        let combinedText = `<b>📊 БУХГАЛТЕРИЯ:</b>
 🚀${profit.directionName}
 👤Воркер: @${profit.username}
 💸Сумма профита: ${profit.amount.toLocaleString()}₽
@@ -1752,29 +1724,64 @@ bot.on('callback_query', (query) => {
 🏠Сервис: ${profit.directionName}
 ┣👤Воркер: <a href="https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}">${profit.name}</a>`;
 
-      if (profit.direction === 1 && profit.curator) {
-        combinedText += `\n┣💸Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
-      } else {
-        combinedText += `\n┗💸Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
-      }
+        if (profit.direction === 1 && profit.curator) {
+          combinedText += `\n┣💸Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
+        } else {
+          combinedText += `\n┗💸Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
+        }
 
-      const combinedKeyboard = {
-        inline_keyboard: [
-          [{ text: '📊 Отправить в бухгалтерию', callback_data: `send_accounting_${profitId}` }],
-          [{ text: '🌸 Отправить в кассу/чат', callback_data: `send_public_${profitId}` }],
-          [{ text: '✅ Отправить везде', callback_data: `send_all_${profitId}` }]
-        ]
+        const combinedKeyboard = {
+          inline_keyboard: [
+            [{ text: '📊 Отправить в бухгалтерию', callback_data: `send_accounting_${profitId}` }],
+            [{ text: '🌸 Отправить в кассу/чат', callback_data: `send_public_${profitId}` }],
+            [{ text: '✅ Отправить везде', callback_data: `send_all_${profitId}` }]
+          ]
+        };
+
+        bot.sendMessage(chatId, combinedText, { parse_mode: 'HTML', reply_markup: combinedKeyboard })
+          .then(() => {
+            bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
+          })
+          .catch((err) => {
+            console.error('Error sending profit action menu:', err);
+            bot.answerCallbackQuery(query.id, { text: '❌ Не удалось показать опции публикации профита, попробуйте снова.' });
+            bot.sendMessage(chatId, '❌ Не удалось показать опции публикации профита, попробуйте снова.').catch(() => {});
+          });
       };
 
-      bot.sendMessage(chatId, combinedText, { parse_mode: 'HTML', reply_markup: combinedKeyboard })
-        .then(() => {
-          bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
-        })
-        .catch((err) => {
-          console.error('Error sending profit action menu:', err);
-          bot.answerCallbackQuery(query.id, { text: '❌ Не удалось показать опции публикации профита, попробуйте снова.' });
-          bot.sendMessage(chatId, '❌ Не удалось показать опции публикации профита, попробуйте снова.').catch(() => {});
+      if (profit.isRegistered && profit.userId !== 0) {
+        saveProfitAndUpdateUser(profit.userId);
+        showCombinedKeyboard();
+      } else {
+        db.get('SELECT user_id FROM users WHERE username = ?', [profit.username], (err, existingUser) => {
+          if (existingUser) {
+            profit.userId = existingUser.user_id;
+            saveProfitAndUpdateUser(existingUser.user_id);
+            showCombinedKeyboard();
+          } else {
+            utils.generateWorkerNumber((err, workerNumber) => {
+              if (err) {
+                console.error('Error generating worker number:', err);
+                return;
+              }
+              const newUserId = Date.now() + Math.floor(Math.random() * 10000);
+              profit.userId = newUserId;
+              db.run(
+                'INSERT INTO users (user_id, username, name, worker_number, application_approved, balance, total_earned, profit_count) VALUES (?, ?, ?, ?, 1, 0, 0, 0)',
+                [newUserId, profit.username, profit.name, workerNumber],
+                function(err) {
+                  if (err) {
+                    console.error('Error creating user:', err);
+                    return;
+                  }
+                  saveProfitAndUpdateUser(newUserId);
+                }
+              );
+              showCombinedKeyboard();
+            });
+          }
         });
+      }
       return;
     }
 
