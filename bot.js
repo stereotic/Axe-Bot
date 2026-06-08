@@ -1532,12 +1532,6 @@ bot.on('callback_query', (query) => {
   // Обновляем username пользователя при каждом callback
   updateUsername(userId, username);
 
-  const adminProfitAction = data.startsWith('send_all_') || data.startsWith('send_accounting_') || data.startsWith('send_public_');
-  if (adminProfitAction && !adminIds.includes(userId)) {
-    bot.answerCallbackQuery(query.id, { text: '❌ У вас нет прав на это действие' });
-    return;
-  }
-
   // Обработка profit system
   if (data.startsWith('send_profit_accounting_') || (data.startsWith('send_profit_') && !data.startsWith('send_profit_accounting_'))) {
       const profitId = data.startsWith('send_profit_accounting_') ? data.replace('send_profit_accounting_', '') : data.replace('send_profit_', '');
@@ -1705,8 +1699,7 @@ bot.on('callback_query', (query) => {
       return;
     }
 
-    if (adminIds.includes(userId)) {
-      if (data.startsWith('send_all_')) {
+    if (data.startsWith('send_all_')) {
       const profitId = data.replace('send_all_', '');
       const profit = profitData[profitId];
 
@@ -1841,7 +1834,6 @@ bot.on('callback_query', (query) => {
       bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
       return;
     }
-  }
 
   // Обработка начала заявки
   if (data === 'start_application') {
