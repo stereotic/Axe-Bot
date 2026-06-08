@@ -62,7 +62,7 @@ function getLevel(totalEarned) {
   }
 
   const progress = next
-    ? Math.max(0, Math.min(100, ((total - current.threshold) / (next.threshold - current.threshold)) * 100))
+    ? Math.max(0, Math.min(100, (total / next.threshold) * 100))
     : 100;
 
   return { current, next, progress };
@@ -148,8 +148,9 @@ function drawProgress(ctx, level, totalEarned) {
   const height = 73;
   const radius = 24;
   const fillWidth = Math.max(height, (width * level.progress) / 100);
+  const remaining = level.next ? 100 - level.progress : 0;
   const label = level.next
-    ? `${Math.round(level.progress)}% ДО ${level.next.name} • ${formatRub(totalEarned)} / ${formatRub(level.next.threshold)}`
+    ? `${Math.round(remaining)}% ДО ${level.next.name} • ${formatRub(totalEarned)} / ${formatRub(level.next.threshold)}`
     : `GG MAX • ${formatRub(totalEarned)}`;
 
   ctx.save();

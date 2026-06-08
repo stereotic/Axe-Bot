@@ -1575,27 +1575,21 @@ bot.on('callback_query', (query) => {
                   console.error('Error updating user:', err);
                 } else {
                   console.log(`✅ Updated balance for user ${targetUserId}: +${profit.workerPayout}₽`);
-                  utils.updateWorkerStatus(targetUserId, (err) => {
-                    if (err) console.error('Error updating status:', err);
-                  });
-                }
-              }
-            );
-
-            db.get('SELECT status, total_earned FROM users WHERE user_id = ?', [targetUserId], (err, updatedUser) => {
-              if (!err && updatedUser) {
-                const currentStatus = updatedUser.status || 'NEW';
-                const currentTotal = updatedUser.total_earned || 0;
-                const nextThreshold = utils.STATUS_THRESHOLDS.find(t => t.threshold > currentTotal);
-                const nextLevelAmount = nextThreshold ? nextThreshold.threshold : null;
-                let nextLevelText = '';
-                if (nextLevelAmount) {
-                  const remaining = nextLevelAmount - currentTotal;
-                  nextLevelText = `До нового уровня ${nextLevelAmount.toLocaleString()}₽`;
-                } else {
-                  nextLevelText = 'Максимальный уровень достигнут';
-                }
-                const profitMessage = `🎉<b>Успешный профит </b>🎉
+                  utils.updateWorkerStatus(targetUserId, () => {
+                    db.get('SELECT status, total_earned FROM users WHERE user_id = ?', [targetUserId], (err, updatedUser) => {
+                      if (!err && updatedUser) {
+                        const currentStatus = updatedUser.status || 'NEW';
+                        const currentTotal = updatedUser.total_earned || 0;
+                        const nextThreshold = utils.STATUS_THRESHOLDS.find(t => t.threshold > currentTotal);
+                        const nextLevelAmount = nextThreshold ? nextThreshold.threshold : null;
+                        let nextLevelText = '';
+                        if (nextLevelAmount) {
+                          const remaining = nextLevelAmount - currentTotal;
+                          nextLevelText = `До нового уровня ${remaining.toLocaleString()}₽`;
+                        } else {
+                          nextLevelText = 'Максимальный уровень достигнут';
+                        }
+                        const profitMessage = `🎉<b>Успешный профит </b>🎉
 
 ┏ 🏠<b>Сервис: ${profit.directionName}
 </b>┣ 🏦<b>На сумму: ${profit.amount.toLocaleString()}₽
@@ -1603,9 +1597,13 @@ bot.on('callback_query', (query) => {
 ┗ 🍾${nextLevelText} </b>
 
 ⚠️<i>Подать заявку на выплату можно в профиле. Напоминаем период выплаты каждые 3 часа.</i>`;
-                bot.sendMessage(targetUserId, profitMessage, { parse_mode: 'HTML' }).catch(() => {});
+                        bot.sendMessage(targetUserId, profitMessage, { parse_mode: 'HTML' }).catch(() => {});
+                      }
+                    });
+                  });
+                }
               }
-            });
+            );
 
             // Обновляем статистику проекта и закреп после сохранения профита в БД
             utils.updateProjectStats(profit.amount, (err) => {
