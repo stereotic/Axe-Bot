@@ -1964,7 +1964,9 @@ bot.on('callback_query', (query) => {
           });
 
           bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
-          bot.sendMessage(chatId, `✅ Заявка от @${application.username} одобрена`);
+          bot.sendMessage(chatId, `✅ Заявка от @${application.username} одобрена`).catch(err => {
+            console.error('Error sending approval message:', err);
+          });
 
           // Отправляем пользователю правила
           const rulesText = `<b>Поздравляем! 🥂</b>
@@ -2027,7 +2029,9 @@ bot.on('callback_query', (query) => {
           resetOnboardingProgress(application.user_id);
 
           bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
-          bot.sendMessage(chatId, `❌ Заявка от @${application.username} отклонена`);
+          bot.sendMessage(chatId, `❌ Заявка от @${application.username} отклонена`).catch(err => {
+            console.error('Error sending rejection message:', err);
+          });
 
           // Уведомляем пользователя
           bot.sendMessage(application.user_id, '❌ К сожалению, ваша заявка была отклонена.').catch(err => {
