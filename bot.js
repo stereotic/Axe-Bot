@@ -2549,11 +2549,10 @@ bot.onText(/\/staff/, (msg) => {
 bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
   const chatId = msg.chat.id;
 
-  db.all(`SELECT u.*, SUM(p.amount) as total_profit
+  db.all(`SELECT u.*, COALESCE(SUM(p.amount), 0) as total_profit
           FROM users u
           JOIN profits p ON u.user_id = p.user_id
-          WHERE u.profile_hidden = 0
-            AND ${utils.topExclusionWhere('u')}
+          WHERE ${utils.topExclusionWhere('u')}
           GROUP BY u.user_id
           HAVING total_profit > 0
           ORDER BY total_profit DESC, u.user_id ASC
@@ -2572,7 +2571,11 @@ bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       const medal = medals[index];
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
       const nameForTop = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
-      topText += `${medal}: <a href="${profileLink}"><b>${nameForTop}</b></a> - <b>${user.total_profit.toLocaleString('de-DE')}₽</b>\n`;
+      if (user.profile_hidden) {
+        topText += `${medal}: <b>${nameForTop}</b> - <b>${user.total_profit.toLocaleString('de-DE')}₽</b>\n`;
+      } else {
+        topText += `${medal}: <a href="${profileLink}"><b>${nameForTop}</b></a> - <b>${user.total_profit.toLocaleString('de-DE')}₽</b>\n`;
+      }
     });
 
     bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
