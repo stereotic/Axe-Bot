@@ -737,24 +737,24 @@ function handleProtectedCallback(query, data, chatId, userId) {
       db.get('SELECT COUNT(*) as count FROM users WHERE curator = ?', [mentorData.username], (err, result) => {
         const studentsCount = err ? 0 : result.count;
 
-        const mentorText = `👨‍🏫<b>Куратор:</b> <b>@${mentorData.username}</b>
+        const mentorText = `<tg-emoji emoji-id="5992157823838984339">👨‍🏫</tg-emoji><b>Куратор:</b> <b>@${mentorData.username}</b>
 
-<b>🏠Сервис</b>
+<tg-emoji emoji-id="5956561916573782596">🏠</tg-emoji><b>Сервис</b>
 ┗  <b>${mentorData.service}</b>
 
-⏰<b>На должности</b>
+<tg-emoji emoji-id="5875291072225087249">⏰</tg-emoji><b>На должности</b>
 ┗  ${mentorData.monthsOnPosition} месяцев
 
-🤵‍♂️<b>Обучается</b>
+<tg-emoji emoji-id="5942877472163892475">🤵‍♂️</tg-emoji><b>Обучается</b>
 ┗  ${studentsCount}
 
-⚖️<b>Процент</b>
+<tg-emoji emoji-id="5879813604068298387">⚖️</tg-emoji><b>Процент</b>
 ┗  ${mentorData.percent}%
 
-📚<b>Время обучения</b>
+<tg-emoji emoji-id="5776213190387961618">📚</tg-emoji><b>Время обучения</b>
 ┗  ${mentorData.trainingProfits} профитов
 
-⏳<b>Рабочее время</b>
+<tg-emoji emoji-id="5877396173135811032">⏳</tg-emoji><b>Рабочее время</b>
 ┗  ${mentorData.workingHours}
 
 ⚠️<b>Описание:</b>
