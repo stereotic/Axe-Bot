@@ -250,14 +250,14 @@ async function renderProfileBanner(profile) {
 function buildProfileCaption(user, topPosition) {
   const level = getLevel(user.total_earned);
 
-  return `👤<b>Воркер:</b> @${user.username || 'unknown'}
-🪪<b>Name:</b> ${user.name}
+  return `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji><b>Воркер:</b> @${user.username || 'unknown'}
+<tg-emoji emoji-id="5936017305585586269">🪪</tg-emoji><b>Name:</b> ${user.name}
 └ <b>Статус:</b> ${level.current.name}
 
-💼<b>Кошелек</b>
+<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji><b>Кошелек</b>
 └ <b>На вывод:</b> <i>${formatRub(user.balance)}</i>
 
-🏦<b>Касса воркера:</b> <i>${formatRub(user.total_earned)}</i>
+<tg-emoji emoji-id="5877485980901971030">🏦</tg-emoji><b>Касса воркера:</b> <i>${formatRub(user.total_earned)}</i>
 ┣ <b>Кол-во профитов:</b> ${user.profit_count || 0}
 └ <b>Место в топе:</b> ${topPosition || 0}`;
 }

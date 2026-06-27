@@ -62,9 +62,9 @@ bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) =>
 
     // Формируем сообщение для бухгалтерии
     const accountingText = `🚀${directionName}
-👤Воркер: @${user.username}
+<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${user.username}
 💸Сумма профита: ${utils.formatAmount(amount)}₽
-💼К выплате: ${utils.formatAmount(workerPayout)}₽ (${directionPercent}%)
+<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${utils.formatAmount(workerPayout)}₽ (${directionPercent}%)
 👑Владелец: ${utils.PROFIT_SHARES.owner}% - ${utils.formatAmount(shares.owner)}₽
 👔Администратор: ${utils.PROFIT_SHARES.admin}% - ${utils.formatAmount(shares.admin)}₽
 🍌Инвестор: ${utils.PROFIT_SHARES.investor}% - ${utils.formatAmount(shares.investor)}₽
@@ -76,7 +76,7 @@ bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) =>
       ]
     };
 
-    bot.sendMessage(chatId, accountingText, { reply_markup: keyboard });
+    bot.sendMessage(chatId, accountingText, { parse_mode: 'HTML', reply_markup: keyboard });
   });
   return true; // Предотвращаем дальнейшую обработку
 });
@@ -148,15 +148,15 @@ bot.on('callback_query', (query) => {
 
         // Отправляем в бухгалтерию
         const accountingText = `🚀${profit.directionName}
-👤Воркер: @${profit.username}
+<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${profit.username}
 💸Сумма профита: ${utils.formatAmount(profit.amount)}₽
-💼К выплате: ${utils.formatAmount(profit.workerPayout)}₽
+<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${utils.formatAmount(profit.workerPayout)}₽
 👑Владелец: ${utils.PROFIT_SHARES.owner}% - ${utils.formatAmount(profit.shares.owner)}₽
 👔Администратор: ${utils.PROFIT_SHARES.admin}% - ${utils.formatAmount(profit.shares.admin)}₽
 🍌Инвестор: ${utils.PROFIT_SHARES.investor}% - ${utils.formatAmount(profit.shares.investor)}₽
 🧑‍💻Кодер: ${utils.PROFIT_SHARES.coder}% - ${utils.formatAmount(profit.shares.coder)}₽`;
 
-        bot.sendMessage(ACCOUNTING_CHAT_ID, accountingText).catch((err) => {
+        bot.sendMessage(ACCOUNTING_CHAT_ID, accountingText, { parse_mode: 'HTML' }).catch((err) => {
           console.error('Error sending to accounting:', err);
         });
 
@@ -165,7 +165,7 @@ bot.on('callback_query', (query) => {
         const publicText = `🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
-┣👤Воркер: <a href="${profileLink}">${profit.name}</a>
+┣<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>
 ┗💸Сумма: ${utils.formatAmount(profit.amount)}₽`;
 
         const publicKeyboard = {
@@ -197,7 +197,7 @@ bot.on('callback_query', (query) => {
     const publicText = `🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
-┣👤Воркер: <a href="${profileLink}">${profit.name}</a>
+┣<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>
 ┗💸Сумма: ${utils.formatAmount(profit.amount)}₽`;
 
     // Отправляем в общую кассу

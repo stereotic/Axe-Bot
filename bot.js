@@ -156,19 +156,19 @@ const INFO_BANNER = () => {
         const projectBalance = parseInt(profitRow?.total || '0');
         const totalProfits = parseInt(countRow?.count || '0');
 
-        const banner = `<b>AXE TEAM - Информация 💎</b>
+        const banner = `<b>AXE TEAM - Информация <tg-emoji emoji-id="5359719332542718652">💎</tg-emoji></b>
 
-<b>Проценты выплат </b>💱
+<b>Проценты выплат </b><tg-emoji emoji-id="5258503720928288433">💱</tg-emoji>
 ┣<b>Пополнение - 80%
 ┗Прямой перевод - 75%</b>
 
-🏠<b>Сервисы</b>
+<tg-emoji emoji-id="5956561916573782596">🏠</tg-emoji><b>Сервисы</b>
 ┗ <b>Кардинг</b>
 
-<b>🏦Касса проекта:</b> <i>${projectBalance.toLocaleString()}₽</i>
+<b><tg-emoji emoji-id="5258330865674494479">🏦</tg-emoji>Касса проекта:</b> <i>${projectBalance.toLocaleString()}₽</i>
 ┗<b>Кол-во профитов:</b> <b><i>${totalProfits} шт</i></b>
 
-<b>📆Дата открытия проекта 05.05.2026.</b>`;
+<b><tg-emoji emoji-id="5258419835922030550">📆</tg-emoji>Дата открытия проекта 05.05.2026.</b>`;
 
         infoBannerCache = { text: banner, timestamp: now };
         resolve(banner);
@@ -177,23 +177,23 @@ const INFO_BANNER = () => {
   });
 };
 
-const WORK_INFO = `<b>🏠Сервис:</b> <b>Кардинг</b> 
+const WORK_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji>Сервис:</b> <b>Кардинг</b> 
 
-<b>🤖Бот</b> <i>(Магазин)</i>
+<b><tg-emoji emoji-id="5258093637450866522">🤖</tg-emoji>Бот</b> <i>(Магазин)</i>
 ┗ @CrystalCC_xBot
 
-👾<b>ТП</b> <i>(Обнальщик)</i>
+<tg-emoji emoji-id="5258513401784573443">👾</tg-emoji><b>ТП</b> <i>(Обнальщик)</i>
 ┣ @Opium2D
 ┗ 👨‍💻: @Enhtein
 
-<b>📚 Мануал</b>:
+<b><tg-emoji emoji-id="5258328383183396223">📚</tg-emoji> Мануал</b>:
 ┗ <a href="https://telegra.ph/Napravlenie-Karding-05-12">Кардинг</a> ← Читать
 
 • <b>WORK-Панель</b>, <i>и  реферальная ссылка находится в </i><i><b>магазине</b> по команде</i> /bb`;
 
 const FEEDBACK_INFO = `• <b>Feedback</b>
 
-<b>📨Связаться с администрацией</b>
+<b><tg-emoji emoji-id="5260535596941582167">📨</tg-emoji>Связаться с администрацией</b>
 ┗ @FeedbackAXEbot`;
 
 
@@ -276,14 +276,14 @@ function updateUsername(userId, username) {
 
 // Функция форматирования профиля
 function formatProfile(user, topPosition) {
-  return `👤<b>Воркер:</b> @${user.username || 'unknown'}
-🪪<b>Name:</b> ${user.name}
+  return `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji><b>Воркер:</b> @${user.username || 'unknown'}
+<tg-emoji emoji-id="5936017305585586269">🪪</tg-emoji><b>Name:</b> ${user.name}
 ┗ <b>Статус:</b> ${user.status}
 
-💼<b>Кошелек</b>
+<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji><b>Кошелек</b>
 ┗ <b>На вывод:</b> <i>${user.balance.toLocaleString()}₽</i>
 
-<b>🏦Касса воркера:</b> <i>${user.total_earned.toLocaleString()}₽</i>
+<b><tg-emoji emoji-id="5877485980901971030">🏦</tg-emoji>Касса воркера:</b> <i>${user.total_earned.toLocaleString()}₽</i>
 ┣ <b>Кол-во профитов:</b> ${user.profit_count}
 ┗ <b>Место в топе:</b> ${topPosition}`;
 }
@@ -815,7 +815,7 @@ function handleProtectedCallback(query, data, chatId, userId) {
     case 'community':
       bot.answerCallbackQuery(query.id);
       const communityImagePath = path.join(__dirname, 'images', 'buy_card.jpg');
-      const communityText = '<b>⭐️Для создания комьюнити необходимо согласование администрации.\n\nОбратитесь в Feedback</b>';
+      const communityText = '<b><tg-emoji emoji-id="5260687119092817530">⭐️</tg-emoji>Для создания комьюнити необходимо согласование администрации.\n\nОбратитесь в Feedback</b>';
 
       const communityKeyboard = {
         inline_keyboard: [
@@ -1180,7 +1180,7 @@ bot.onText(/\/start/, (msg) => {
       return;
     }
 
-    const applicationFormText = `🏠 <b>Для вступления в AXE TEAM тебе нужно подать заявку, ответив на пару вопросов.</b>`;
+    const applicationFormText = `<tg-emoji emoji-id="5951665890079544884">🏠</tg-emoji> <b>Для вступления в AXE TEAM тебе нужно подать заявку, ответив на пару вопросов.</b>`;
 
     const sendApplicationForm = () => {
       bot.sendMessage(chatId, applicationFormText, {
@@ -1192,14 +1192,14 @@ bot.onText(/\/start/, (msg) => {
     const runStartFlow = () => {
       const handleApplicationState = (application) => {
         if (application && application.status === 'pending') {
-          bot.sendMessage(chatId, '⏳ Ваша заявка находится на рассмотрении. Пожалуйста, ожидайте.');
+          bot.sendMessage(chatId, '<tg-emoji emoji-id="5776213190387961618">⏳</tg-emoji> Ожидай рассмотрения...', { parse_mode: 'HTML' });
           return;
         }
 
         if (application && application.status === 'approved' && !hasFullAccess(user)) {
           bot.sendMessage(
             chatId,
-            `🍌 <b>Для полного использования проекта необходимо быть участником основных каналов связи.</b>`,
+            `<tg-emoji emoji-id="5881702736843511327">🍌</tg-emoji> <b>Для полного использования проекта необходимо быть участником основных каналов связи.</b>`,
             { parse_mode: 'HTML', reply_markup: keyboards.subscription_check }
           );
           return;
@@ -1306,9 +1306,9 @@ bot.onText(/^(?!\/)([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, mat
 
     // Формируем сообщение для бухгалтерии
     const accountingText = `<b>🚀${directionName}
-👤Воркер: @${workerData.username}
+<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${workerData.username}
 💸Сумма профита: ${amount.toLocaleString()}₽
-💼К выплате: ${workerPayout.toLocaleString()}₽ (${directionPercent}%)
+<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${workerPayout.toLocaleString()}₽ (${directionPercent}%)
 👑Владелец: ${shares.owner.toLocaleString()}₽
 👔Администратор: ${shares.admin.toLocaleString()}₽
 🍌Инвестор: ${shares.investor.toLocaleString()}₽
@@ -1380,9 +1380,9 @@ bot.onText(/^\/([^\s]+)\s+(\d+)\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) => {
     };
 
     const accountingText = `<b>🚀${directionName}
-👤Воркер: @${workerData.username}
+<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${workerData.username}
 💸Сумма профита: ${amount.toLocaleString()}₽
-💼К выплате: ${workerPayout.toLocaleString()}₽ (${directionPercent}%)
+<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${workerPayout.toLocaleString()}₽ (${directionPercent}%)
 👑Владелец: ${shares.owner.toLocaleString()}₽
 👔Администратор: ${shares.admin.toLocaleString()}₽
 🍌Инвестор: ${shares.investor.toLocaleString()}₽
@@ -1593,7 +1593,7 @@ bot.on('callback_query', (query) => {
 
 ┏ 🏠<b>Сервис: ${profit.directionName}
 </b>┣ 🏦<b>На сумму: ${profit.amount.toLocaleString()}₽
-┣ 💼Твой статус: ${currentStatus}
+┣ <tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>Твой статус: ${currentStatus}
 ┗ 🍾${nextLevelText} </b>
 
 ⚠️<i>Подать заявку на выплату можно в профиле. Напоминаем период выплаты каждые 3 часа.</i>`;
@@ -1620,9 +1620,9 @@ bot.on('callback_query', (query) => {
       const showCombinedKeyboard = () => {
         let combinedText = `<b>📊 БУХГАЛТЕРИЯ:</b>
 🚀${profit.directionName}
-👤Воркер: @${profit.username}
+<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${profit.username}
 💸Сумма профита: ${profit.amount.toLocaleString()}₽
-💼К выплате: ${profit.workerPayout.toLocaleString()}₽
+<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${profit.workerPayout.toLocaleString()}₽
 👑Владелец: ${profit.shares.owner.toLocaleString()}₽
 👔Администратор: ${profit.shares.admin.toLocaleString()}₽
 🍌Инвестор: ${profit.shares.investor.toLocaleString()}₽
@@ -1634,7 +1634,7 @@ bot.on('callback_query', (query) => {
 <b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
-┣👤Воркер: <a href="https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}">${profit.name}</a>`;
+┣<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: <a href="https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}">${profit.name}</a>`;
 
         if (profit.direction === 1 && profit.curator) {
           combinedText += `\n┣💸Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
@@ -1710,9 +1710,9 @@ bot.on('callback_query', (query) => {
 
       // Отправляем в бухгалтерию
       const accountingText = `<b>🚀${profit.directionName}
-👤Воркер: @${profit.username}
+<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${profit.username}
 💸Сумма профита: ${profit.amount.toLocaleString()}₽
-💼К выплате: ${profit.workerPayout.toLocaleString()}₽
+<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${profit.workerPayout.toLocaleString()}₽
 👑Владелец: ${profit.shares.owner.toLocaleString()}₽
 👔Администратор: ${profit.shares.admin.toLocaleString()}₽
 🍌Инвестор: ${profit.shares.investor.toLocaleString()}₽
@@ -1727,7 +1727,7 @@ bot.on('callback_query', (query) => {
       let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
-┣👤Воркер: <a href="${profileLink}">${profit.name}</a>`;
+┣<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
 
       // Добавляем куратора, если он есть и направление = 1 (Кардинг)
       if (profit.direction === 1 && profit.curator) {
@@ -1768,9 +1768,9 @@ bot.on('callback_query', (query) => {
       bot.answerCallbackQuery(query.id);
 
       const accountingText = `<b>🚀${profit.directionName}
-👤Воркер: @${profit.username}
+<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${profit.username}
 💸Сумма профита: ${profit.amount.toLocaleString()}₽
-💼К выплате: ${profit.workerPayout.toLocaleString()}₽
+<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${profit.workerPayout.toLocaleString()}₽
 👑Владелец: ${profit.shares.owner.toLocaleString()}₽
 👔Администратор: ${profit.shares.admin.toLocaleString()}₽
 🍌Инвестор: ${profit.shares.investor.toLocaleString()}₽
@@ -1801,7 +1801,7 @@ bot.on('callback_query', (query) => {
       let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 🏠Сервис: ${profit.directionName}
-┣👤Воркер: <a href="${profileLink}">${profit.name}</a>`;
+┣<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
 
       // Добавляем куратора, если он есть и направление = 1 (Кардинг)
       if (profit.direction === 1 && profit.curator) {
@@ -1876,7 +1876,7 @@ bot.on('callback_query', (query) => {
 
             const applicationId = this.lastID;
 
-            bot.sendMessage(chatId, '<b>📨 Твоя заявка отправлена на рассмотрение!</b>', { parse_mode: 'HTML' });
+            bot.sendMessage(chatId, '<b><tg-emoji emoji-id="5843843420468024653">📨</tg-emoji> Твоя заявка отправлена на рассмотрение!</b>', { parse_mode: 'HTML' });
 
             // Отправляем заявку админам
             const adminText = `Заявка от @${msg.from.username || 'unknown'} (ID: ${userId})
@@ -1969,9 +1969,9 @@ bot.on('callback_query', (query) => {
           });
 
           // Отправляем пользователю правила
-          const rulesText = `<b>Поздравляем! 🥂</b>
+          const rulesText = `<b>Поздравляем! <tg-emoji emoji-id="5260268501515377807">🥂</tg-emoji></b>
 
-💌 <i>Твоя заявка принята, осталось ознакомиться с правилами проекта</i> <b><i>AXE TEAM.</i></b>
+<tg-emoji emoji-id="5260268501515377807">💌</tg-emoji> <i>Твоя заявка принята, осталось ознакомиться с правилами проекта</i> <b><i>AXE TEAM.</i></b>
 
 <b>1. Оскорбления участников проекта ЗАПРЕЩЕНЫ, от администраторов до обычных пользователей.</b>
 
@@ -2145,8 +2145,8 @@ bot.on('callback_query', (query) => {
           // Отправляем заявку админу
           const adminText = `✅Новая заявка на выплату!
 🌶Воркер: @${user.username || 'unknown'}
-🪪Никнейм: ${user.name}
-💌Сумма выплаты: ${amount.toLocaleString()}₽`;
+<tg-emoji emoji-id="5936017305585586269">🪪</tg-emoji>Никнейм: ${user.name}
+<tg-emoji emoji-id="5260268501515377807">💌</tg-emoji>Сумма выплаты: ${amount.toLocaleString()}₽`;
 
           const adminKeyboard = {
             inline_keyboard: [
@@ -2223,8 +2223,8 @@ bot.on('callback_query', (query) => {
           // Отправляем подтверждение
           const confirmText = `✅Выплата!
 🌶Воркер: @${withdrawal.username || 'unknown'}
-🪪Никнейм: ${withdrawal.name}
-💌Сумма выплаты: ${withdrawal.amount.toLocaleString()}₽
+<tg-emoji emoji-id="5936017305585586269">🪪</tg-emoji>Никнейм: ${withdrawal.name}
+<tg-emoji emoji-id="5260268501515377807">💌</tg-emoji>Сумма выплаты: ${withdrawal.amount.toLocaleString()}₽
 Чек: ${checkMessage}`;
 
           const confirmKeyboard = {
@@ -2272,7 +2272,7 @@ bot.on('callback_query', (query) => {
 
             // Уведомляем воркера
             const workerText = `✅Успешный вывод
-💼Сумма к выплате: ${withdrawal.amount.toLocaleString()}₽
+<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>Сумма к выплате: ${withdrawal.amount.toLocaleString()}₽
 ⚙Способ выплаты @send
 ${withdrawal.check_message || ''}`;
 

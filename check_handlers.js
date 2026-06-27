@@ -403,9 +403,9 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
 
         // Отправляем в бухгалтерию
         const accountingText = `<b>🚀${directionName}
-👤Воркер: @${user.username}
+<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${user.username}
 💸Сумма профита: ${utils.formatAmount(amount)}₽
-💼К выплате: ${utils.formatAmount(workerPayout)}₽
+<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${utils.formatAmount(workerPayout)}₽
 👑Владелец: ${utils.formatAmount(shares.owner)}₽
 👔Администратор: ${utils.formatAmount(shares.admin)}₽
 🍌Инвестор: ${utils.formatAmount(shares.investor)}₽
@@ -423,7 +423,7 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
         let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸
 
 🏠Сервис: ${directionName}
-┣👤Воркер: <a href="${profileLink}">${workerName}</a>`;
+┣<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: <a href="${profileLink}">${workerName}</a>`;
 
         // Добавляем куратора, если он есть и направление = 1 (Кардинг)
         if (direction === 1 && user.curator) {
