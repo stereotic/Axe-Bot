@@ -422,14 +422,14 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
         const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
         let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸
 
-🏠Сервис: ${directionName}
-┣<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: <a href="${profileLink}">${workerName}</a>`;
+<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${directionName}
+┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${workerName}</a>`;
 
         // Добавляем куратора, если он есть и направление = 1 (Кардинг)
         if (direction === 1 && user.curator) {
-          publicText += `\n┣💸Сумма: ${utils.formatAmount(amount)}₽\n┗👨‍🏫Куратор: @${user.curator}</b>`;
+          publicText += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(amount)}₽\n┗👨‍🏫Куратор: @${user.curator}</b>`;
         } else {
-          publicText += `\n┗💸Сумма: ${utils.formatAmount(amount)}₽</b>`;
+          publicText += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(amount)}₽</b>`;
         }
 
         bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {

@@ -164,9 +164,9 @@ bot.on('callback_query', (query) => {
         const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
         const publicText = `🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
-🏠Сервис: ${profit.directionName}
-┣<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>
-┗💸Сумма: ${utils.formatAmount(profit.amount)}₽`;
+<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
+┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>
+┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽`;
 
         const publicKeyboard = {
           inline_keyboard: [
@@ -196,9 +196,9 @@ bot.on('callback_query', (query) => {
     const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
     const publicText = `🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
-🏠Сервис: ${profit.directionName}
-┣<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>
-┗💸Сумма: ${utils.formatAmount(profit.amount)}₽`;
+<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
+┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>
+┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽`;
 
     // Отправляем в общую кассу
     bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) => {

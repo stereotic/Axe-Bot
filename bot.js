@@ -1633,13 +1633,13 @@ bot.on('callback_query', (query) => {
 <b>🌸 КАССА/ЧАТ:</b>
 <b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
-🏠Сервис: ${profit.directionName}
-┣<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: <a href="https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}">${profit.name}</a>`;
+<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
+┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}">${profit.name}</a>`;
 
         if (profit.direction === 1 && profit.curator) {
-          combinedText += `\n┣💸Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
+          combinedText += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
         } else {
-          combinedText += `\n┗💸Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
+          combinedText += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
         }
 
         const combinedKeyboard = {
@@ -1726,14 +1726,14 @@ bot.on('callback_query', (query) => {
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
       let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
-🏠Сервис: ${profit.directionName}
-┣<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
+<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
+┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
 
       // Добавляем куратора, если он есть и направление = 1 (Кардинг)
       if (profit.direction === 1 && profit.curator) {
-        publicText += `\n┣💸Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
+        publicText += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
       } else {
-        publicText += `\n┗💸Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
+        publicText += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
       }
 
       bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) => {
@@ -1800,14 +1800,14 @@ bot.on('callback_query', (query) => {
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
       let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
-🏠Сервис: ${profit.directionName}
-┣<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
+<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
+┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
 
       // Добавляем куратора, если он есть и направление = 1 (Кардинг)
       if (profit.direction === 1 && profit.curator) {
-        publicText += `\n┣💸Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
+        publicText += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
       } else {
-        publicText += `\n┗💸Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
+        publicText += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
       }
 
       // Отправляем в общую кассу
@@ -1969,7 +1969,7 @@ bot.on('callback_query', (query) => {
           });
 
           // Отправляем пользователю правила
-          const rulesText = `<b>Поздравляем! <tg-emoji emoji-id="5260268501515377807">🥂</tg-emoji></b>
+          const rulesText = `<b>Поздравляем! <tg-emoji emoji-id="5278611606756942667">🥂</tg-emoji></b>
 
 <tg-emoji emoji-id="5260268501515377807">💌</tg-emoji> <i>Твоя заявка принята, осталось ознакомиться с правилами проекта</i> <b><i>AXE TEAM.</i></b>
 
@@ -2048,7 +2048,7 @@ bot.on('callback_query', (query) => {
     bot.answerCallbackQuery(query.id);
     bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
 
-    const subscriptionText = `🍌 <b>Для полного использования проекта необходимо быть участником основных каналов связи.</b>`;
+    const subscriptionText = `<tg-emoji emoji-id="5881702736843511327">🍌</tg-emoji> <b>Для полного использования проекта необходимо быть участником основных каналов связи.</b>`;
 
     bot.sendMessage(chatId, subscriptionText, {
       parse_mode: 'HTML',
