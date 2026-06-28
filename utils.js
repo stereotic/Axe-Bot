@@ -170,7 +170,7 @@ function updateProjectStats(profitAmount, callback) {
  * Получить название направления
  */
 function getDirectionName(direction) {
-  return direction === 1 ? 'Кардинг' : '💳 Прямой перевод';
+  return direction === 1 ? 'Кардинг' : 'Прямой';
 }
 
 // Исключения из топов (тестовые / служебные аккаунты)

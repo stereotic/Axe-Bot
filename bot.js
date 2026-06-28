@@ -75,6 +75,19 @@ if (telegramProxy) {
 
 const bot = new TelegramBot(token, botOptions);
 
+// Отправляем JSON через axios
+const TELEGRAM_API = `https://api.telegram.org/bot${token}`;
+bot.sendMessage = function (chatId, text, extra = {}) {
+  return axios.post(`${TELEGRAM_API}/sendMessage`, {
+    chat_id: chatId,
+    text,
+    ...extra
+  }).then(res => {
+    if (!res.data.ok) throw new Error(`Telegram API error: ${res.data.description}`);
+    return res.data.result;
+  });
+};
+
 // Подключаем обработчики системы реквизитов
 setupCardHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, CASH_CHANNEL_ID);
 setupCardViewHandlers(bot);

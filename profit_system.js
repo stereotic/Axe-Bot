@@ -6,6 +6,18 @@ const { updatePinnedMessage } = require('./update_pinned');
 
 const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
+const axios = require('axios');
+const TELEGRAM_API = `https://api.telegram.org/bot${token}`;
+bot.sendMessage = function (chatId, text, extra = {}) {
+  return axios.post(`${TELEGRAM_API}/sendMessage`, {
+    chat_id: chatId,
+    text,
+    ...extra
+  }).then(res => {
+    if (!res.data.ok) throw new Error(`Telegram API error: ${res.data.description}`);
+    return res.data.result;
+  });
+};
 
 // ID каналов
 const ACCOUNTING_CHAT_ID = '-1002394699502'; // Бухгалтерия
@@ -57,18 +69,19 @@ bot.onText(/^([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) =>
       direction: direction,
       directionName: directionName,
       shares: shares,
-      mammothCount: mammothCount
+      mammothCount: mammothCount,
+      curator: user.curator || null
     };
 
     // Формируем сообщение для бухгалтерии
-    const accountingText = `🚀${directionName}
+    const accountingText = `<b>🚀${directionName}
 <tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${user.username}
 💸Сумма профита: ${utils.formatAmount(amount)}₽
 <tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${utils.formatAmount(workerPayout)}₽ (${directionPercent}%)
 👑Владелец: ${utils.PROFIT_SHARES.owner}% - ${utils.formatAmount(shares.owner)}₽
 👔Администратор: ${utils.PROFIT_SHARES.admin}% - ${utils.formatAmount(shares.admin)}₽
 🍌Инвестор: ${utils.PROFIT_SHARES.investor}% - ${utils.formatAmount(shares.investor)}₽
-🧑‍💻Кодер: ${utils.PROFIT_SHARES.coder}% - ${utils.formatAmount(shares.coder)}₽`;
+🧑‍💻Кодер: ${utils.PROFIT_SHARES.coder}% - ${utils.formatAmount(shares.coder)}₽</b>`;
 
     const keyboard = {
       inline_keyboard: [
@@ -147,14 +160,14 @@ bot.on('callback_query', (query) => {
         updatePinnedMessage(bot, GENERAL_CHAT_ID).catch(err => console.error('Error updating pinned message:', err));
 
         // Отправляем в бухгалтерию
-        const accountingText = `🚀${profit.directionName}
+        const accountingText = `<b>🚀${profit.directionName}
 <tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${profit.username}
 💸Сумма профита: ${utils.formatAmount(profit.amount)}₽
 <tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${utils.formatAmount(profit.workerPayout)}₽
 👑Владелец: ${utils.PROFIT_SHARES.owner}% - ${utils.formatAmount(profit.shares.owner)}₽
 👔Администратор: ${utils.PROFIT_SHARES.admin}% - ${utils.formatAmount(profit.shares.admin)}₽
 🍌Инвестор: ${utils.PROFIT_SHARES.investor}% - ${utils.formatAmount(profit.shares.investor)}₽
-🧑‍💻Кодер: ${utils.PROFIT_SHARES.coder}% - ${utils.formatAmount(profit.shares.coder)}₽`;
+🧑‍💻Кодер: ${utils.PROFIT_SHARES.coder}% - ${utils.formatAmount(profit.shares.coder)}₽</b>`;
 
         bot.sendMessage(ACCOUNTING_CHAT_ID, accountingText, { parse_mode: 'HTML' }).catch((err) => {
           console.error('Error sending to accounting:', err);
@@ -162,11 +175,16 @@ bot.on('callback_query', (query) => {
 
         // Формируем сообщение для общей кассы и чата
         const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
-        const publicText = `🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
+        let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 <tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
-┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>
-┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽`;
+┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
+
+        if (profit.direction === 1 && profit.curator) {
+          publicText += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
+        } else {
+          publicText += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
+        }
 
         const publicKeyboard = {
           inline_keyboard: [
@@ -194,11 +212,16 @@ bot.on('callback_query', (query) => {
     bot.answerCallbackQuery(query.id);
 
     const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
-    const publicText = `🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
+    let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 <tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
-┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>
-┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽`;
+┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
+
+    if (profit.direction === 1 && profit.curator) {
+      publicText += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
+    } else {
+      publicText += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
+    }
 
     // Отправляем в общую кассу
     bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) => {
