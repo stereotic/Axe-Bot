@@ -8,6 +8,7 @@ const { setupCardHandlers } = require('./card_handlers');
 const { setupCardViewHandlers, openCardView, startCardRequestInPrivate, startCardCheckInPrivate } = require('./card_view_handlers');
 const { setupCardRequestHandlers } = require('./card_request_handlers');
 const { setupCheckHandlers } = require('./check_handlers');
+const { setupProfitSystem } = require('./profit_system');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
@@ -28,6 +29,7 @@ const GENERAL_CHAT_ID = '-1003986505552'; // Общий чат
 
 // Временное хранилище для данных профита
 const profitData = {};
+global.profitData = profitData;
 
 // Данные куратора
 const mentorData = {
@@ -93,6 +95,7 @@ setupCardHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, CASH_CHANN
 setupCardViewHandlers(bot);
 setupCardRequestHandlers(bot, adminIds);
 setupCheckHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, CASH_CHANNEL_ID);
+setupProfitSystem(bot, adminIds);
 
 // Устанавливаем меню команд бота
 bot.setMyCommands([
@@ -725,7 +728,7 @@ function handleProtectedCallback(query, data, chatId, userId) {
       const trainingKeyboard = {
         inline_keyboard: [
           [{ text: `@${mentorData.username}  ${mentorData.percent}%`, callback_data: 'show_mentor' }],
-          [{ text: '◀️ Назад в меню', callback_data: 'back_to_menu' }]
+          [{ text: 'Назад в меню', callback_data: 'back_to_menu' }]
         ]
       };
 
@@ -775,8 +778,8 @@ function handleProtectedCallback(query, data, chatId, userId) {
 
         const mentorKeyboard = {
           inline_keyboard: [
-            [{ text: '🖇Закрепиться за куратором', callback_data: 'assign_mentor' }],
-            [{ text: '◀️ Назад', callback_data: 'training' }]
+            [{ text: 'Закрепиться за куратором', callback_data: 'assign_mentor' }],
+            [{ text: 'Назад', callback_data: 'training' }]
           ]
         };
 
@@ -832,8 +835,8 @@ function handleProtectedCallback(query, data, chatId, userId) {
 
       const communityKeyboard = {
         inline_keyboard: [
-          [{ text: '🗣Feedback', url: 'https://t.me/FeedbackAXEbot' }],
-          [{ text: '◀️ Назад в меню', callback_data: 'back_to_menu' }]
+          [{ text: 'Feedback', url: 'https://t.me/FeedbackAXEbot' }],
+          [{ text: 'Назад в меню', callback_data: 'back_to_menu' }]
         ]
       };
 
@@ -1048,8 +1051,8 @@ function handleProtectedCallback(query, data, chatId, userId) {
         const withdrawKeyboard = {
           inline_keyboard: [
             [
-              { text: '✅Создать', callback_data: `confirm_withdraw_${user.balance}` },
-              { text: '❌Отменить', callback_data: 'cancel_withdraw' }
+              { text: 'Создать', callback_data: `confirm_withdraw_${user.balance}` },
+              { text: 'Отменить', callback_data: 'cancel_withdraw' }
             ]
           ]
         };
@@ -1329,7 +1332,7 @@ bot.onText(/^(?!\/)([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, mat
 
     const keyboard = {
       inline_keyboard: [
-        [{ text: '✅Отправить', callback_data: `send_profit_accounting_${profitId}` }]
+        [{ text: 'Отправить', callback_data: `send_profit_accounting_${profitId}` }]
       ]
     };
 
@@ -1403,7 +1406,7 @@ bot.onText(/^\/([^\s]+)\s+(\d+)\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) => {
 
     const keyboard = {
       inline_keyboard: [
-        [{ text: '✅Отправить', callback_data: `send_profit_accounting_${profitId}` }]
+        [{ text: 'Отправить', callback_data: `send_profit_accounting_${profitId}` }]
       ]
     };
 
@@ -1512,7 +1515,7 @@ bot.on('message', async (msg) => {
         bot.sendMessage(chatId, '❌ Ошибка получения информации');
       });
       return;
-    } else if (text === '🦋Меню🦋') {
+    } else if (text === 'Меню') {
       const imagePath = path.join(__dirname, 'images', 'info.jpg');
 
       if (fs.existsSync(imagePath)) {
@@ -1530,7 +1533,7 @@ bot.on('message', async (msg) => {
 });
 
 // Обработка callback кнопок (единый обработчик)
-bot.on('callback_query', (query) => {
+bot.on('callback_query', async (query) => {
   const chatId = query.message.chat.id;
   const userId = query.from.id;
   const data = query.data;
@@ -1657,9 +1660,9 @@ bot.on('callback_query', (query) => {
 
         const combinedKeyboard = {
           inline_keyboard: [
-            [{ text: '📊 Отправить в бухгалтерию', callback_data: `send_accounting_${profitId}` }],
-            [{ text: '🌸 Отправить в кассу/чат', callback_data: `send_public_${profitId}` }],
-            [{ text: '✅ Отправить везде', callback_data: `send_all_${profitId}` }]
+            [{ text: 'Отправить в бухгалтерию', callback_data: `send_accounting_${profitId}` }],
+            [{ text: 'Отправить в кассу/чат', callback_data: `send_public_${profitId}` }],
+            [{ text: 'Отправить везде', callback_data: `send_all_${profitId}` }]
           ]
         };
 
@@ -1731,10 +1734,6 @@ bot.on('callback_query', (query) => {
 🍌Инвестор: ${profit.shares.investor.toLocaleString()}₽
 🧑‍💻Кодер: ${profit.shares.coder.toLocaleString()}₽</b>`;
 
-      bot.sendMessage(ACCOUNTING_CHAT_ID, accountingText, { parse_mode: 'HTML' }).catch((err) => {
-        console.error('Error sending to accounting:', err);
-      });
-
       // Отправляем в общую кассу и чат
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
       let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
@@ -1742,30 +1741,48 @@ bot.on('callback_query', (query) => {
 <tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
 ┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
 
-      // Добавляем куратора, если он есть и направление = 1 (Кардинг)
       if (profit.direction === 1 && profit.curator) {
         publicText += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
       } else {
         publicText += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
       }
 
-      bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) => {
-        console.error('Error sending to cash channel:', err);
-      });
+      let hasError = false;
+      let cashOk = false;
 
-      bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) => {
+      try {
+        await bot.sendMessage(ACCOUNTING_CHAT_ID, accountingText, { parse_mode: 'HTML' });
+      } catch (err) {
+        console.error('Error sending to accounting:', err);
+        hasError = true;
+      }
+
+      try {
+        await bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true });
+        cashOk = true;
+      } catch (err) {
+        console.error('Error sending to cash channel:', err);
+        hasError = true;
+      }
+
+      try {
+        await bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true });
+      } catch (err) {
         console.error('Error sending to general chat:', err);
-      });
+        hasError = true;
+        if (cashOk) {
+          bot.sendMessage(chatId, '⚠️ Профит отправлен в кассу, но НЕ отправлен в общий чат. Проверь права бота в чате.').catch(() => {});
+        }
+      }
 
       updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((err) =>
         console.error('Error updating pinned after send_all:', err)
       );
-      
-      // Удаляем данные профита
+
       delete profitData[profitId];
 
       bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
-      bot.sendMessage(chatId, '✅ Профит отправлен везде!');
+      bot.sendMessage(chatId, hasError ? '⚠️ Профит отправлен с ошибками (см. лог).' : '✅ Профит отправлен везде!');
       return;
     }
 
@@ -1816,33 +1833,41 @@ bot.on('callback_query', (query) => {
 <tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
 ┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
 
-      // Добавляем куратора, если он есть и направление = 1 (Кардинг)
       if (profit.direction === 1 && profit.curator) {
         publicText += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
       } else {
         publicText += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
       }
 
-      // Отправляем в общую кассу
-      bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) => {
+      let hasError = false;
+      let cashOk = false;
+
+      try {
+        await bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true });
+        cashOk = true;
+      } catch (err) {
         console.error('Error sending to cash channel:', err);
-      });
+        hasError = true;
+      }
 
-      // Отправляем в общий чат
-      bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) => {
+      try {
+        await bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true });
+      } catch (err) {
         console.error('Error sending to general chat:', err);
-      });
+        hasError = true;
+        if (cashOk) {
+          bot.sendMessage(chatId, '⚠️ Профит отправлен в кассу, но НЕ отправлен в общий чат. Проверь права бота в чате.').catch(() => {});
+        }
+      }
 
-      // Обновляем закрепленное сообщение
       updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((err) =>
         console.error('Error updating pinned after send_public:', err)
       );
 
-      // Удаляем данные профита
       delete profitData[profitId];
 
-      bot.sendMessage(chatId, '✅ Профит опубликован!');
       bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
+      bot.sendMessage(chatId, hasError ? '⚠️ Профит отправлен с ошибками (см. лог).' : '✅ Профит опубликован!');
       return;
     }
 
@@ -2163,7 +2188,7 @@ bot.on('callback_query', (query) => {
 
           const adminKeyboard = {
             inline_keyboard: [
-              [{ text: 'Выплатить ✅', callback_data: `process_withdrawal_${withdrawalId}` }]
+              [{ text: 'Выплатить', callback_data: `process_withdrawal_${withdrawalId}` }]
             ]
           };
 
@@ -2211,7 +2236,7 @@ bot.on('callback_query', (query) => {
         const checkText = `📥Отправьте чек на сумму: ${withdrawal.amount.toLocaleString()}₽`;
         const cancelKeyboard = {
           inline_keyboard: [
-            [{ text: '❌Отменить', callback_data: `cancel_withdrawal_${withdrawalId}` }]
+            [{ text: 'Отменить', callback_data: `cancel_withdrawal_${withdrawalId}` }]
           ]
         };
 
@@ -2243,8 +2268,8 @@ bot.on('callback_query', (query) => {
           const confirmKeyboard = {
             inline_keyboard: [
               [
-                { text: '✅Подтвердить', callback_data: `confirm_payout_${withdrawalId}` },
-                { text: '❌Отменить', callback_data: `cancel_withdrawal_${withdrawalId}` }
+                { text: 'Подтвердить', callback_data: `confirm_payout_${withdrawalId}` },
+                { text: 'Отменить', callback_data: `cancel_withdrawal_${withdrawalId}` }
               ]
             ]
           };
@@ -2699,7 +2724,7 @@ bot.onText(/\/materials/, (msg) => {
 
   const materialsKeyboard = {
     inline_keyboard: [
-      [{ text: '📂 Материалы', url: 'https://t.me/+GMixQrZvJkQ4ODE6' }]
+      [{ text: 'Материалы', url: 'https://t.me/+GMixQrZvJkQ4ODE6' }]
     ]
   };
 
@@ -2745,8 +2770,8 @@ bot.onText(/\/cards/, (msg) => {
 
   const keyboard = {
     inline_keyboard: [
-      [{ text: '➕ Добавить реквизит', callback_data: 'admin_add_card' }],
-      [{ text: '➖ Удалить реквизит', callback_data: 'admin_delete_card' }]
+      [{ text: 'Добавить реквизит', callback_data: 'admin_add_card' }],
+      [{ text: 'Удалить реквизит', callback_data: 'admin_delete_card' }]
     ]
   };
 
@@ -3038,9 +3063,9 @@ bot.onText(/\/setcard/, (msg) => {
 
   const keyboard = {
     inline_keyboard: [
-      [{ text: '➕ Создать реквизит', callback_data: 'card_create' }],
-      [{ text: '🗑 Удалить реквизит', callback_data: 'card_delete' }],
-      [{ text: '✏️ Изменить реквизит', callback_data: 'card_edit' }]
+      [{ text: 'Создать реквизит', callback_data: 'card_create' }],
+      [{ text: 'Удалить реквизит', callback_data: 'card_delete' }],
+      [{ text: 'Изменить реквизит', callback_data: 'card_edit' }]
     ]
   };
 

@@ -119,8 +119,8 @@ function getCardRequestById(requestId, callback) {
 // Функция создания чека
 function createCheck(checkData, callback) {
   db.run(`INSERT INTO checks
-    (user_id, card_id, request_id, file_id, file_type, amount, status, user_message_id)
-    VALUES (?, ?, ?, ?, ?, ?, 'sent', ?)`,
+    (user_id, card_id, request_id, file_id, file_type, amount, direction, status, user_message_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'sent', ?)`,
     [
       checkData.user_id,
       checkData.card_id,
@@ -128,6 +128,7 @@ function createCheck(checkData, callback) {
       checkData.file_id,
       checkData.file_type,
       checkData.amount,
+      checkData.direction || 1,
       checkData.user_message_id
     ],
     function(err) {

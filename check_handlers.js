@@ -46,8 +46,8 @@ function setupCheckHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, 
           const keyboard = {
             inline_keyboard: [
               [
-                { text: '✅ Успешно', callback_data: `check_approve_${checkId}` },
-                { text: '❌ Отсутствует', callback_data: `check_reject_${checkId}` }
+                { text: 'Успешно', callback_data: `check_approve_${checkId}` },
+                { text: 'Отсутствует', callback_data: `check_reject_${checkId}` }
               ]
             ]
           };
@@ -179,7 +179,7 @@ function setupCheckHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, 
 
         const workerKeyboard = {
           inline_keyboard: [
-            [{ text: '🕘 Отправлено', callback_data: 'check_status_sent' }]
+            [{ text: 'Отправлено', callback_data: 'check_status_sent' }]
           ]
         };
 
@@ -234,7 +234,7 @@ function setupCheckHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, 
 
         const workerKeyboard = {
           inline_keyboard: [
-            [{ text: '🕘 Отправлено', callback_data: 'check_status_sent' }]
+            [{ text: 'Отправлено', callback_data: 'check_status_sent' }]
           ]
         };
 
@@ -291,7 +291,7 @@ function sendCheckToAdmin(bot, checkId, adminId, fileId, fileType, amount, last4
 
   const keyboard = {
     inline_keyboard: [
-      [{ text: '🔍 На проверке', callback_data: `check_verify_${checkId}` }]
+      [{ text: 'На проверке', callback_data: `check_verify_${checkId}` }]
     ]
   };
 
@@ -317,10 +317,10 @@ function sendCheckToAdmin(bot, checkId, adminId, fileId, fileType, amount, last4
 // Функция обновления статуса чека у воркера
 function updateWorkerCheckStatus(bot, userId, messageId, status) {
   const statusButtons = {
-    'sent': '🕘 Отправлено',
-    'checking': '🔍 На проверке',
-    'approved': '✅ Успешно',
-    'rejected': '❌ Отсутствует'
+    'sent': 'Отправлено',
+    'checking': 'На проверке',
+    'approved': 'Успешно',
+    'rejected': 'Отсутствует'
   };
 
   const keyboard = {
@@ -349,7 +349,7 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
     }
 
     const amount = check.amount;
-    const direction = 1; // По умолчанию направление 1 (пополнение)
+    const direction = check.direction || 1; // Используем направление из чека, по умолчанию 1
 
     // Рассчитываем суммы
     const workerPayout = utils.calculateWorkerPayout(amount, direction);

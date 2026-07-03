@@ -30,11 +30,11 @@ function setupCardRequestHandlers(bot, adminIds) {
         const genderKeyboard = {
           inline_keyboard: [
             [
-              { text: '👨 Мужской', callback_data: 'request_gender_male' },
-              { text: '👩‍🦱 Женский', callback_data: 'request_gender_female' }
+              { text: 'Мужской', callback_data: 'request_gender_male' },
+              { text: 'Женский', callback_data: 'request_gender_female' }
             ],
             [
-              { text: '🤷 Не важно', callback_data: 'request_gender_any' }
+              { text: 'Не важно', callback_data: 'request_gender_any' }
             ]
           ]
         };
@@ -168,8 +168,8 @@ function setupCardRequestHandlers(bot, adminIds) {
           const genderKeyboard = {
             inline_keyboard: [
               [
-                { text: '👨 Мужской', callback_data: 'card_gender_male' },
-                { text: '👩‍🦱 Женский', callback_data: 'card_gender_female' }
+                { text: 'Мужской', callback_data: 'card_gender_male' },
+                { text: 'Женский', callback_data: 'card_gender_female' }
               ]
             ]
           };
@@ -185,7 +185,7 @@ function setupCardRequestHandlers(bot, adminIds) {
     // Админ откладывает запрос
     if (data.startsWith('request_postpone_') && adminIds.includes(userId)) {
       bot.answerCallbackQuery(query.id, {
-        text: '⏳ Запрос отложен',
+        text: 'Запрос отложен',
         show_alert: false
       });
     }
@@ -230,8 +230,8 @@ function showRequestConfirmation(bot, chatId, userId, state) {
   const keyboard = {
     inline_keyboard: [
       [
-        { text: '✅ Отправить', callback_data: 'request_confirm_send' },
-        { text: '❌ Отменить', callback_data: 'request_confirm_cancel' }
+        { text: 'Отправить', callback_data: 'request_confirm_send' },
+        { text: 'Отменить', callback_data: 'request_confirm_cancel' }
       ]
     ]
   };
@@ -259,9 +259,9 @@ function sendRequestToAdmins(bot, adminIds, workerId, requestId, state) {
 
     const keyboard = {
       inline_keyboard: [
-        [{ text: '✅ Начать обработку', callback_data: `request_process_${requestId}` }],
-        [{ text: '⏳ Отложить запрос', callback_data: `request_postpone_${requestId}` }],
-        [{ text: '❌ Отказаться', callback_data: `request_reject_${requestId}` }]
+        [{ text: 'Начать обработку', callback_data: `request_process_${requestId}` }],
+        [{ text: 'Отложить запрос', callback_data: `request_postpone_${requestId}` }],
+        [{ text: 'Отказаться', callback_data: `request_reject_${requestId}` }]
       ]
     };
 

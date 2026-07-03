@@ -1,6 +1,10 @@
 const sqlite3 = require('sqlite3').verbose();
 const db = new sqlite3.Database('./database.db');
 
+// WAL mode для предотвращения SQLITE_BUSY при конкурентных чтениях/записях
+db.run('PRAGMA journal_mode=WAL');
+db.run('PRAGMA busy_timeout=5000');
+
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY,
@@ -131,7 +135,9 @@ db.serialize(() => {
     user_id INTEGER,
     amount INTEGER,
     status TEXT DEFAULT 'pending',
+    check_message TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    completed_at DATETIME,
     FOREIGN KEY (user_id) REFERENCES users(user_id)
   )`);
 
@@ -142,26 +148,6 @@ db.serialize(() => {
     purchased_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id),
     FOREIGN KEY (card_id) REFERENCES shop_cards(id)
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS withdrawals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    amount INTEGER,
-    status TEXT DEFAULT 'pending',
-    check_message TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    completed_at DATETIME,
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS profit_shares (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    profit_id INTEGER,
-    role TEXT,
-    percentage INTEGER,
-    amount INTEGER,
-    FOREIGN KEY (profit_id) REFERENCES profits(id)
   )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS applications (
@@ -220,6 +206,7 @@ db.serialize(() => {
     file_id TEXT,
     file_type TEXT,
     amount INTEGER,
+    direction INTEGER DEFAULT 1,
     status TEXT DEFAULT 'sent',
     admin_message_id INTEGER,
     user_message_id INTEGER,
@@ -229,6 +216,13 @@ db.serialize(() => {
     FOREIGN KEY (card_id) REFERENCES card_requisites(id),
     FOREIGN KEY (request_id) REFERENCES card_requests(id)
   )`);
+
+  // Добавляем колонку direction в checks если её нет (для старых БД)
+  db.run(`ALTER TABLE checks ADD COLUMN direction INTEGER DEFAULT 1`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding direction to checks:', err);
+    }
+  });
 
   db.run(`INSERT OR IGNORE INTO stats (key, value) VALUES ('project_balance', '2000000')`);
   db.run(`INSERT OR IGNORE INTO stats (key, value) VALUES ('total_profits', '120')`);

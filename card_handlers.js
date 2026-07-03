@@ -20,8 +20,8 @@ function setupCardHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, C
       const keyboard = {
         inline_keyboard: [
           [
-            { text: '👨 Мужской', callback_data: 'card_gender_male' },
-            { text: '👩‍🦱 Женский', callback_data: 'card_gender_female' }
+            { text: 'Мужской', callback_data: 'card_gender_male' },
+            { text: 'Женский', callback_data: 'card_gender_female' }
           ]
         ]
       };
@@ -60,10 +60,10 @@ function setupCardHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, C
             const last4 = card.card_number.slice(-4);
             const genderEmoji = cardSystem.getGenderEmoji(card.gender);
             return [{
-              text: `${last4} ${card.bank} ${genderEmoji}`,
+              text: `${last4} ${card.bank}`,
               callback_data: `card_delete_confirm_${card.id}`
             }, {
-              text: '❌',
+              text: 'X',
               callback_data: `card_delete_${card.id}`
             }];
           })
@@ -132,8 +132,8 @@ ${cardSystem.formatCardRequisite(card)}`;
             const last4 = card.card_number.slice(-4);
             const genderEmoji = cardSystem.getGenderEmoji(card.gender);
             return [{
-              text: `${last4} ${card.bank} ${genderEmoji}`,
-              callback_data: `card_edit_select_${card.id}`
+            text: `${last4} ${card.bank}`,
+            callback_data: `card_edit_select_${card.id}`
             }];
           })
         };
@@ -153,14 +153,14 @@ ${cardSystem.formatCardRequisite(card)}`;
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: '👤 Изменить пол', callback_data: `card_edit_field_${cardId}_gender` }],
-          [{ text: '💰 Изменить процент', callback_data: `card_edit_field_${cardId}_percent` }],
-          [{ text: '📉 Изменить мин. лимит', callback_data: `card_edit_field_${cardId}_min_limit` }],
-          [{ text: '📈 Изменить макс. лимит', callback_data: `card_edit_field_${cardId}_max_limit` }],
-          [{ text: '🏦 Изменить банк', callback_data: `card_edit_field_${cardId}_bank` }],
-          [{ text: '💳 Изменить номер карты', callback_data: `card_edit_field_${cardId}_card_number` }],
-          [{ text: '📝 Изменить ФИО', callback_data: `card_edit_field_${cardId}_full_name` }],
-          [{ text: '📋 Изменить примечание', callback_data: `card_edit_field_${cardId}_notes` }]
+          [{ text: 'Изменить пол', callback_data: `card_edit_field_${cardId}_gender` }],
+          [{ text: 'Изменить процент', callback_data: `card_edit_field_${cardId}_percent` }],
+          [{ text: 'Изменить мин. лимит', callback_data: `card_edit_field_${cardId}_min_limit` }],
+          [{ text: 'Изменить макс. лимит', callback_data: `card_edit_field_${cardId}_max_limit` }],
+          [{ text: 'Изменить банк', callback_data: `card_edit_field_${cardId}_bank` }],
+          [{ text: 'Изменить номер карты', callback_data: `card_edit_field_${cardId}_card_number` }],
+          [{ text: 'Изменить ФИО', callback_data: `card_edit_field_${cardId}_full_name` }],
+          [{ text: 'Изменить примечание', callback_data: `card_edit_field_${cardId}_notes` }]
         ]
       };
 
@@ -199,8 +199,8 @@ ${cardSystem.formatCardRequisite(card)}`;
         const keyboard = {
           inline_keyboard: [
             [
-              { text: '👨 Мужской', callback_data: `card_edit_value_${cardId}_gender_male` },
-              { text: '👩‍🦱 Женский', callback_data: `card_edit_value_${cardId}_gender_female` }
+              { text: 'Мужской', callback_data: `card_edit_value_${cardId}_gender_male` },
+              { text: 'Женский', callback_data: `card_edit_value_${cardId}_gender_female` }
             ]
           ]
         };
@@ -353,7 +353,7 @@ ${cardSystem.formatCardRequisite(card)}`;
 
         const keyboard = {
           inline_keyboard: [
-            [{ text: '⏭ Пропустить', callback_data: 'card_notes_skip' }]
+            [{ text: 'Пропустить', callback_data: 'card_notes_skip' }]
           ]
         };
 
@@ -434,7 +434,7 @@ ${cardText}`;
 
           const keyboard = {
             inline_keyboard: [
-              [{ text: '🔍 Отправить чек', callback_data: `check_submit_${cardId}` }]
+              [{ text: 'Отправить чек', callback_data: `check_submit_${cardId}` }]
             ]
           };
 

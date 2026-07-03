@@ -108,44 +108,45 @@ async function createPinnedMessageText() {
 
   const usdRate = await getUsdRate();
   const botUsername = process.env.BOT_USERNAME || 'AXE_xBOT';
-  let topWorkerText = '';
-
-  if (topWorker && Number(topWorker.total_earned) > 0) {
-    const name = topWorker.name && topWorker.name !== '#' ? topWorker.name : `@${topWorker.username}`;
-    const profileLink = `https://t.me/${botUsername}?start=profile_${topWorker.user_id}`;
-    topWorkerText = `<a href="${profileLink}"><b>${name}</b></a> - <b>${Number(topWorker.total_earned).toLocaleString('ru-RU')}₽</b>`;
-  }
+  const topWorkerName = topWorker && Number(topWorker.total_earned) > 0
+    ? (topWorker.name && topWorker.name !== '#' ? topWorker.name : `@${topWorker.username}`)
+    : '';
+  const topWorkerLink = topWorker && Number(topWorker.total_earned) > 0
+    ? `https://t.me/${botUsername}?start=profile_${topWorker.user_id}`
+    : '';
+  const topWorkerAmount = topWorker && Number(topWorker.total_earned) > 0
+    ? Number(topWorker.total_earned).toLocaleString('ru-RU')
+    : '0';
 
   return `<b>🌸AXE TEAM🌸</b>
 
-<b>🏦Касса проекта -</b> <i>${projectBalance.toLocaleString('ru-RU')}₽</i>
-<b>☀️Касса за сутки -</b> <i>${dailyTotal.toLocaleString('ru-RU')}₽</i>
-📊<b>Курс USD/RUB:</b> ${usdRate}₽
+[5258330865674494479]<b>Касса проекта -</b> ${projectBalance.toLocaleString('ru-RU')}₽
+[5258391025281408576]<b>Касса за сутки -</b> ${dailyTotal.toLocaleString('ru-RU')}₽
+[5897958754267174109]<b>Курс USD/RUB:</b> ${usdRate}₽
 
-<b>🌶ТОП 1 ЗА СУТКИ</b> - ${topWorkerText}
+<b>🌶ТОП 1 ЗА СУТКИ</b> - ${topWorkerName} (<a href="${topWorkerLink}">https://t.me/AXE_xBOT?start=profile_${topWorker ? topWorker.user_id : ''}</a>) - ${topWorkerAmount}₽
 
-<b>⚖️Инфраструктура</b>
-┣<b>Основной бот -</b> <a href="https://t.me/AXE_xBot"><b>ССЫЛКА</b></a>
-┣<b>Feedback</b> - <a href="https://t.me/FeedbackAXEbot"><b>CCЫЛКА</b></a>
-┣<b>Материалы -</b> <a href="https://t.me/+GMixQrZvJkQ4ODE6"><b>ССЫЛКА</b></a>
-┣<b>Профиты</b> - <a href="https://t.me/+euO9gzLMUMFhNmJi"><b>CCЫЛКА</b></a><b> </b>
-┗<b>AXE NEWS - </b><a href="https://t.me/+BO1F4O1KUd0zZTI6"><b>ССЫЛКА</b></a>
+[5807868868886009920]<b>Инфраструктура</b>
+┣<b>Основной бот -</b> <a href="https://t.me/AXE_xBot">ССЫЛКА</a>
+┣<b>Feedback</b> - <a href="https://t.me/FeedbackAXEbot">ССЫЛКА</a>
+┣<b>Материалы -</b> <a href="https://t.me/+GMixQrZvJkQ4ODE6">ССЫЛКА</a>
+┣<b>Профиты</b> - <a href="https://t.me/+euO9gzLMUMFhNmJi">ССЫЛКА</a>
+┗<b>AXE NEWS -</b> <a href="https://t.me/+BO1F4O1KUd0zZTI6">ССЫЛКА</a>
 
-<b>⚙️Команды чата</b>
-┣<b>Профиль - </b><b>/me</b><b> </b>
-┣<b>Администрация - </b><b>/staff</b><b>
-┣Материлы - /materials
-┣Топ суток - </b><b>/topd</b><b>
-┣Топ месяца - </b><b>/topm</b><b>
-┣Топ за все время -  </b><b>/top</b><b>
-┗Актуальный реквизит - </b><b>/card</b>
+[5931415565955503486]<b>Команды чата</b>
+┣<b>Профиль -</b> /me
+┣<b>Администрация -</b> /staff
+┣<b>Материалы -</b> /materials
+┣<b>Топ суток -</b> /topd
+┣<b>Топ месяца -</b> /topm
+┣<b>Топ за все время -</b> /top
+┗<b>Актуальный реквизит -</b> /card
 
-<b>⭐️Активные бонусы </b>
-<b>1.</b> <b>#AXE</b> <i>в нике аккаунта +3% к выплате профита.</i>
-<b>2.</b> <i><b>Топ 1</b> суток </i><i><b>+5%</b> к выплате профита</i>
-<b>🔥Соблюдение двух условий = +8% в выплате профита</b>
+[6008118472066732010]<b>Активные бонусы</b>
+<b>1.</b> #AXE в нике аккаунта +3% к выплате профита.
+<b>2.</b> Топ 1 суток +5% к выплате профита
 
-<b>AXE TEAM</b> <b>-</b> <b>"</b><i>Все великие достижения требовали времени.</i><b>"</b>`;
+<b>AXE TEAM</b> - "Все великие достижения требовали времени."`;
 }
 
 async function editPinnedMessage(bot, chatId, messageId, messageText) {

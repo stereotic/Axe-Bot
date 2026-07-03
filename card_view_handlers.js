@@ -24,22 +24,22 @@ function createRequestButton(chatType) {
   const isGroup = chatType && chatType !== 'private';
   if (isGroup) {
     return {
-      text: '💳 Запросить реквизит',
+      text: 'Запросить реквизит',
       url: `https://t.me/${getBotUsername()}?start=card_request`
     };
   }
-  return { text: '💳 Запросить реквизит', callback_data: 'card_request' };
+  return { text: 'Запросить реквизит', callback_data: 'card_request' };
 }
 
 function createCheckButton(chatType) {
   const isGroup = chatType && chatType !== 'private';
   if (isGroup) {
     return {
-      text: '🔍 Проверить чек',
+      text: 'Проверить чек',
       url: `https://t.me/${getBotUsername()}?start=card_check`
     };
   }
-  return { text: '🔍 Проверить чек', callback_data: 'card_check_status' };
+  return { text: 'Проверить чек', callback_data: 'card_check_status' };
 }
 
 function openCardView(bot, chatId, userId, options = {}) {
@@ -210,7 +210,7 @@ function setupCardViewHandlers(bot) {
 
     if (data === 'card_notifications') {
       bot.answerCallbackQuery(query.id, {
-        text: '🔔 Уведомления включены',
+        text: 'Уведомления включены',
         show_alert: false
       });
       return;
@@ -273,18 +273,18 @@ function createCardKeyboard(card, currentIndex, totalCards, options = {}) {
   const checkButton = createCheckButton(chatType);
 
   const rows = [
-    [{ text: '🔔 Уведомления', callback_data: 'card_notifications' }],
+    [{ text: 'Уведомления', callback_data: 'card_notifications' }],
     [checkButton],
     [requestButton],
     [
-      { text: '◀️', callback_data: 'card_nav_left' },
-      { text: `${genderEmoji} | ${countryFlag}`, callback_data: 'card_info' },
-      { text: '▶️', callback_data: 'card_nav_right' }
+      { text: '<', callback_data: 'card_nav_left' },
+      { text: `Инфо`, callback_data: 'card_info' },
+      { text: '>', callback_data: 'card_nav_right' }
     ]
   ];
 
   if (showBackToMenu) {
-    rows.push([{ text: '◀️ Назад в меню', callback_data: 'back_to_menu' }]);
+    rows.push([{ text: 'Назад в меню', callback_data: 'back_to_menu' }]);
   }
 
   return { inline_keyboard: rows };
@@ -294,18 +294,18 @@ function noCardsRequestButton(chatType) {
   if (chatType && chatType !== 'private') {
     return createRequestButton(chatType);
   }
-  return { text: 'Запросить реквизит💳', callback_data: 'card_request' };
+  return { text: 'Запросить реквизит', callback_data: 'card_request' };
 }
 
 function createNoCardsKeyboard(options = {}) {
   const { chatType = 'private', showBackToMenu = false } = options;
   const rows = [
     [noCardsRequestButton(chatType)],
-    [{ text: '🔄Обновить', callback_data: 'card_refresh' }]
+    [{ text: 'Обновить', callback_data: 'card_refresh' }]
   ];
 
   if (showBackToMenu) {
-    rows.push([{ text: '◀️ Назад в меню', callback_data: 'back_to_menu' }]);
+    rows.push([{ text: 'Назад в меню', callback_data: 'back_to_menu' }]);
   }
 
   return { inline_keyboard: rows };
