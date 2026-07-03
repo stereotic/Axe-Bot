@@ -120,20 +120,20 @@ async function createPinnedMessageText() {
 
   return `<b>🌸AXE TEAM🌸</b>
 
-[5258330865674494479]<b>Касса проекта -</b> ${projectBalance.toLocaleString('ru-RU')}₽
-[5258391025281408576]<b>Касса за сутки -</b> ${dailyTotal.toLocaleString('ru-RU')}₽
-[5897958754267174109]<b>Курс USD/RUB:</b> ${usdRate}₽
+<tg-emoji emoji-id="5258330865674494479">💰</tg-emoji><b>Касса проекта -</b> ${projectBalance.toLocaleString('ru-RU')}₽
+<tg-emoji emoji-id="5258391025281408576">📊</tg-emoji><b>Касса за сутки -</b> ${dailyTotal.toLocaleString('ru-RU')}₽
+<tg-emoji emoji-id="5897958754267174109">💵</tg-emoji><b>Курс USD/RUB:</b> ${usdRate}₽
 
 <b>🌶ТОП 1 ЗА СУТКИ</b> - ${topWorkerName} (<a href="${topWorkerLink}">https://t.me/AXE_xBOT?start=profile_${topWorker ? topWorker.user_id : ''}</a>) - ${topWorkerAmount}₽
 
-[5807868868886009920]<b>Инфраструктура</b>
+<tg-emoji emoji-id="5807868868886009920">🏗️</tg-emoji><b>Инфраструктура</b>
 ┣<b>Основной бот -</b> <a href="https://t.me/AXE_xBot">ССЫЛКА</a>
 ┣<b>Feedback</b> - <a href="https://t.me/FeedbackAXEbot">ССЫЛКА</a>
 ┣<b>Материалы -</b> <a href="https://t.me/+GMixQrZvJkQ4ODE6">ССЫЛКА</a>
 ┣<b>Профиты</b> - <a href="https://t.me/+euO9gzLMUMFhNmJi">ССЫЛКА</a>
 ┗<b>AXE NEWS -</b> <a href="https://t.me/+BO1F4O1KUd0zZTI6">ССЫЛКА</a>
 
-[5931415565955503486]<b>Команды чата</b>
+<tg-emoji emoji-id="5931415565955503486">⌨️</tg-emoji><b>Команды чата</b>
 ┣<b>Профиль -</b> /me
 ┣<b>Администрация -</b> /staff
 ┣<b>Материалы -</b> /materials
@@ -142,7 +142,7 @@ async function createPinnedMessageText() {
 ┣<b>Топ за все время -</b> /top
 ┗<b>Актуальный реквизит -</b> /card
 
-[6008118472066732010]<b>Активные бонусы</b>
+<tg-emoji emoji-id="6008118472066732010">🎁</tg-emoji><b>Активные бонусы</b>
 <b>1.</b> #AXE в нике аккаунта +3% к выплате профита.
 <b>2.</b> Топ 1 суток +5% к выплате профита
 
