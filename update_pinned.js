@@ -118,13 +118,17 @@ async function createPinnedMessageText() {
     ? Number(topWorker.total_earned).toLocaleString('ru-RU')
     : '0';
 
+  const topWorkerLine = topWorker && Number(topWorker.total_earned) > 0
+    ? `<b>🌶ТОП 1 ЗА СУТКИ</b> - ${topWorkerName} (<a href="${topWorkerLink}">ссылка</a>) - ${topWorkerAmount}₽`
+    : '<b>🌶ТОП 1 ЗА СУТКИ</b> -';
+
   return `<b>🌸AXE TEAM🌸</b>
 
 <tg-emoji emoji-id="5258330865674494479">💰</tg-emoji><b>Касса проекта -</b> ${projectBalance.toLocaleString('ru-RU')}₽
 <tg-emoji emoji-id="5258391025281408576">📊</tg-emoji><b>Касса за сутки -</b> ${dailyTotal.toLocaleString('ru-RU')}₽
 <tg-emoji emoji-id="5897958754267174109">💵</tg-emoji><b>Курс USD/RUB:</b> ${usdRate}₽
 
-<b>🌶ТОП 1 ЗА СУТКИ</b> - ${topWorkerName} (<a href="${topWorkerLink}">https://t.me/AXE_xBOT?start=profile_${topWorker ? topWorker.user_id : ''}</a>) - ${topWorkerAmount}₽
+${topWorkerLine}
 
 <tg-emoji emoji-id="5807868868886009920">🏗️</tg-emoji><b>Инфраструктура</b>
 ┣<b>Основной бот -</b> <a href="https://t.me/AXE_xBot">ССЫЛКА</a>
