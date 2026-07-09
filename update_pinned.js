@@ -119,7 +119,7 @@ async function createPinnedMessageText() {
     : '0';
 
   const topWorkerLine = topWorker && Number(topWorker.total_earned) > 0
-    ? `<b>🌶ТОП 1 ЗА СУТКИ</b> - <a href="${topWorkerLink}">${topWorkerName}</a> - ${topWorkerAmount}₽`
+    ? `<b>🌶ТОП 1 ЗА СУТКИ</b> - <a href="${topWorkerLink}"><b>${topWorkerName}</b></a> - ${topWorkerAmount}₽`
     : '<b>🌶ТОП 1 ЗА СУТКИ</b> -';
 
   return `<b>🌸AXE TEAM🌸</b>
