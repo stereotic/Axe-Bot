@@ -141,6 +141,18 @@ db.serialize(() => {
     FOREIGN KEY (user_id) REFERENCES users(user_id)
   )`);
 
+  // Добавляем колонки для хранения файла чека в withdrawals
+  db.run(`ALTER TABLE withdrawals ADD COLUMN check_file_id TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding check_file_id column:', err);
+    }
+  });
+  db.run(`ALTER TABLE withdrawals ADD COLUMN check_file_type TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding check_file_type column:', err);
+    }
+  });
+
   db.run(`CREATE TABLE IF NOT EXISTS purchased_cards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,

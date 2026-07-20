@@ -2193,7 +2193,7 @@ bot.on('callback_query', async (query) => {
           };
 
           Promise.all(PAYOUT_ADMIN_IDS.map(id =>
-            bot.sendMessage(id, adminText, { reply_markup: adminKeyboard }).catch(() => {})
+            bot.sendMessage(id, adminText, { parse_mode: 'HTML', reply_markup: adminKeyboard }).catch(() => {})
           )).then(() => {
             const successText = '<b>✅ Заявка на выплату создана! Ожидайте обработки.</b>';
             bot.editMessageText(successText, {
@@ -2245,14 +2245,28 @@ bot.on('callback_query', async (query) => {
         // Ждем чек от админа
         const checkListener = (msg) => {
           if (msg.chat.id !== chatId) return;
-          if (!msg.text && !msg.caption) return;
+          if (!msg.text && !msg.caption && !msg.photo && !msg.document) {
+            bot.sendMessage(chatId, '❌ Пожалуйста, отправьте чек текстом, фотографией или документом').catch(() => {});
+            return;
+          }
 
           bot.removeListener('message', checkListener);
 
-          const checkMessage = msg.text || msg.caption || 'Чек получен';
+          const checkMessage = msg.text || msg.caption || '';
+          let checkFileId = null;
+          let checkFileType = null;
+
+          if (msg.photo && msg.photo.length > 0) {
+            checkFileId = msg.photo[msg.photo.length - 1].file_id;
+            checkFileType = 'photo';
+          } else if (msg.document) {
+            checkFileId = msg.document.file_id;
+            checkFileType = 'document';
+          }
 
           // Сохраняем чек
-          db.run('UPDATE withdrawals SET check_message = ? WHERE id = ?', [checkMessage, withdrawalId], (err) => {
+          db.run('UPDATE withdrawals SET check_message = ?, check_file_id = ?, check_file_type = ? WHERE id = ?',
+            [checkMessage, checkFileId, checkFileType, withdrawalId], (err) => {
             if (err) {
               console.error('Error saving check:', err);
             }
@@ -2263,7 +2277,7 @@ bot.on('callback_query', async (query) => {
 🌶Воркер: @${withdrawal.username || 'unknown'}
 <tg-emoji emoji-id="5936017305585586269">🪪</tg-emoji>Никнейм: ${withdrawal.name}
 <tg-emoji emoji-id="5260268501515377807">💌</tg-emoji>Сумма выплаты: ${withdrawal.amount.toLocaleString()}₽
-Чек: ${checkMessage}`;
+${checkMessage ? `Чек: ${checkMessage}` : ''}`;
 
           const confirmKeyboard = {
             inline_keyboard: [
@@ -2274,10 +2288,20 @@ bot.on('callback_query', async (query) => {
             ]
           };
 
-          bot.sendMessage(chatId, confirmText, { reply_markup: confirmKeyboard });
+          if (checkFileId && checkFileType === 'photo') {
+            bot.sendPhoto(chatId, checkFileId, { caption: confirmText, parse_mode: 'HTML', reply_markup: confirmKeyboard }).catch(() => {
+              bot.sendMessage(chatId, confirmText, { reply_markup: confirmKeyboard });
+            });
+          } else if (checkFileId && checkFileType === 'document') {
+            bot.sendDocument(chatId, checkFileId, { caption: confirmText, parse_mode: 'HTML', reply_markup: confirmKeyboard }).catch(() => {
+              bot.sendMessage(chatId, confirmText, { reply_markup: confirmKeyboard });
+            });
+          } else {
+            bot.sendMessage(chatId, confirmText, { reply_markup: confirmKeyboard });
+          }
         };
 
-        bot.once('message', checkListener);
+        bot.on('message', checkListener);
       }
     );
     return;
@@ -2311,12 +2335,24 @@ bot.on('callback_query', async (query) => {
             // Уведомляем воркера
             const workerText = `✅Успешный вывод
 <tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>Сумма к выплате: ${withdrawal.amount.toLocaleString()}₽
-⚙Способ выплаты @send
+⚙Способ выплаты: перевод на карту
 ${withdrawal.check_message || ''}`;
 
-            bot.sendMessage(withdrawal.user_id, workerText).catch((err) => {
-              console.error('Error notifying worker:', err);
-            });
+            if (withdrawal.check_file_id && withdrawal.check_file_type === 'photo') {
+              bot.sendPhoto(withdrawal.user_id, withdrawal.check_file_id, { caption: workerText, parse_mode: 'HTML' }).catch((err) => {
+                console.error('Error sending check photo to worker:', err);
+                bot.sendMessage(withdrawal.user_id, workerText, { parse_mode: 'HTML' }).catch(() => {});
+              });
+            } else if (withdrawal.check_file_id && withdrawal.check_file_type === 'document') {
+              bot.sendDocument(withdrawal.user_id, withdrawal.check_file_id, { caption: workerText, parse_mode: 'HTML' }).catch((err) => {
+                console.error('Error sending check document to worker:', err);
+                bot.sendMessage(withdrawal.user_id, workerText, { parse_mode: 'HTML' }).catch(() => {});
+              });
+            } else {
+              bot.sendMessage(withdrawal.user_id, workerText, { parse_mode: 'HTML' }).catch((err) => {
+                console.error('Error notifying worker:', err);
+              });
+            }
           }
         );
       }
