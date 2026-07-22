@@ -143,9 +143,6 @@ process.on('uncaughtException', (error) => {
 let infoBannerCache = { text: null, timestamp: 0 };
 const INFO_BANNER_CACHE_TTL = 60000;
 
-const EXCLUDED_NAMES = ['#sss', '#Testovhik', '#тестик', 'тестик', '#testovhik', 'testovhik'];
-const EXCLUDED_USERNAMES = ['sss', 'freeobnall'];
-
 const INFO_BANNER = () => {
   return new Promise((resolve, reject) => {
     const now = Date.now();
@@ -154,23 +151,20 @@ const INFO_BANNER = () => {
       return;
     }
 
-    const excludedNameList = EXCLUDED_NAMES.map(n => `'${n.replace(/'/g, "''")}'`).join(',');
-    const excludedUserList = EXCLUDED_USERNAMES.map(n => `'${n.replace(/'/g, "''")}'`).join(',');
-
-    db.get(`SELECT SUM(amount) as total FROM profits p JOIN users u ON p.user_id = u.user_id WHERE LOWER(TRIM(COALESCE(u.name, ''))) NOT IN (${excludedNameList}) AND LOWER(TRIM(COALESCE(u.username, ''))) NOT IN (${excludedUserList})`, (err, profitRow) => {
+    db.get(`SELECT value FROM stats WHERE key = 'project_balance'`, (err, balanceRow) => {
       if (err) {
         reject(err);
         return;
       }
 
-      db.get(`SELECT COUNT(*) as count FROM profits p JOIN users u ON p.user_id = u.user_id WHERE LOWER(TRIM(COALESCE(u.name, ''))) NOT IN (${excludedNameList}) AND LOWER(TRIM(COALESCE(u.username, ''))) NOT IN (${excludedUserList})`, (err, countRow) => {
+      db.get(`SELECT value FROM stats WHERE key = 'total_profits'`, (err, countRow) => {
         if (err) {
           reject(err);
           return;
         }
 
-        const projectBalance = parseInt(profitRow?.total || '0');
-        const totalProfits = parseInt(countRow?.count || '0');
+        const projectBalance = parseInt(balanceRow?.value || '0');
+        const totalProfits = parseInt(countRow?.value || '0');
 
         const banner = `<b>AXE TEAM - Информация <tg-emoji emoji-id="5359719332542718652">💎</tg-emoji></b>
 
@@ -1156,34 +1150,39 @@ bot.onText(/\/start/, (msg) => {
   }
 
   // Проверяем есть ли параметр (для просмотра профиля)
-  const match = msg.text.match(/\/start\s+profile_(\d+)/);
+  const match = msg.text.match(/\/start\s+profile_(\d+)(?:_n_(.+))?/);
 
   if (match) {
     const targetUserId = parseInt(match[1]);
+    const targetName = match[2] || null;
 
-    db.get('SELECT * FROM users WHERE user_id = ?', [targetUserId], async (err, user) => {
-      if (err || !user || user.profile_hidden) {
+    db.get('SELECT * FROM users WHERE user_id = ?', [targetUserId], (err, user) => {
+      if (user && !user.profile_hidden) {
+        bot.getChat(user.user_id).then(() => {
+          utils.getTopPosition(user.user_id, (err2, position) => {
+            sendProfileMessage(chatId, user, err2 ? 0 : position, { reply_markup: null }).catch(() => {});
+          });
+        }).catch(() => {
+          bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' });
+        });
+      } else if (targetName) {
+        const cleanName = targetName.replace(/^#/, '');
+        db.get('SELECT * FROM users WHERE (name = ? OR name = ?) AND profile_hidden = 0', [cleanName, '#' + cleanName], (err2, user2) => {
+          if (user2) {
+            bot.getChat(user2.user_id).then(() => {
+              utils.getTopPosition(user2.user_id, (err3, position) => {
+                sendProfileMessage(chatId, user2, err3 ? 0 : position, { reply_markup: null }).catch(() => {});
+              });
+            }).catch(() => {
+              bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' });
+            });
+          } else {
+            bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' });
+          }
+        });
+      } else {
         bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' });
-        return;
       }
-
-      try {
-        await bot.getChat(targetUserId);
-      } catch (e) {
-        bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' });
-        return;
-      }
-
-      utils.getTopPosition(targetUserId, async (err, position) => {
-        const topPosition = err ? 0 : position;
-
-        try {
-          await sendProfileMessage(chatId, user, topPosition, { reply_markup: null });
-        } catch (error) {
-          console.error('Error sending profile:', error);
-          bot.sendMessage(chatId, '❌ Ошибка загрузки профиля');
-        }
-      });
     });
     return;
   }
@@ -1203,6 +1202,26 @@ bot.onText(/\/start/, (msg) => {
         parse_mode: 'HTML',
         reply_markup: keyboards.application_start
       });
+    };
+
+    const autoApproveIfMember = async (callback) => {
+      try {
+        const [chatMember, channelMember] = await Promise.all([
+          bot.getChatMember(REQUIRED_CHAT_ID, userId),
+          bot.getChatMember(REQUIRED_CHANNEL_ID, userId)
+        ]);
+        if (isSubscribedChatMember(chatMember) && isSubscribedChatMember(channelMember)) {
+          db.run('UPDATE users SET welcome_keyboard_sent = 1 WHERE user_id = ?', [userId], () => {});
+          finalizeUserApproval(userId, () => {
+            sendInfoPanel(chatId).catch((err) => {
+              console.error('/start info failed:', telegramErrorSummary(err));
+              bot.sendMessage(chatId, '❌ Ошибка загрузки. Нажми /start ещё раз.').catch(() => {});
+            });
+          });
+          return;
+        }
+      } catch (e) {}
+      callback();
     };
 
     const runStartFlow = () => {
@@ -1236,12 +1255,12 @@ bot.onText(/\/start/, (msg) => {
           return;
         }
 
-        sendApplicationForm();
+        autoApproveIfMember(sendApplicationForm);
       };
 
       if (!user) {
         createUser(userId, username);
-        sendApplicationForm();
+        autoApproveIfMember(sendApplicationForm);
         return;
       }
 
@@ -2643,7 +2662,8 @@ bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
 
     users.forEach((user, index) => {
       const medal = medals[index];
-      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
+      const nameClean = (user.name || user.username || '').replace(/^#/, '');
+      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameClean}`;
       const nameForTop = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
       if (user.profile_hidden) {
         topText += `${medal}: <b>${nameForTop}</b> - <b>${user.total_profit.toLocaleString('de-DE')}₽</b>\n`;
@@ -2690,7 +2710,8 @@ bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
 
     results.forEach((user, index) => {
       const medal = medals[index];
-      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
+      const nameClean = (user.name || user.username || '').replace(/^#/, '');
+      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameClean}`;
 
       const nameForTopd = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
       if (user.profile_hidden) {
@@ -2706,8 +2727,8 @@ bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
   });
 });
 
-// Команда /topm - Топ 10 за месяц
-bot.onText(/\/(topm|топм)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
+// Команда /topm и /m - Топ 10 за месяц
+bot.onText(/\/(topm|топм|m)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
   const chatId = msg.chat.id;
 
   const now = new Date();
@@ -2738,7 +2759,8 @@ bot.onText(/\/(topm|топм)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
 
     results.forEach((user, index) => {
       const medal = medals[index];
-      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
+      const nameClean = (user.name || user.username || '').replace(/^#/, '');
+      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameClean}`;
 
       const nameForTopm = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
       if (user.profile_hidden) {
