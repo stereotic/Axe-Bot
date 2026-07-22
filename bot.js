@@ -2662,11 +2662,8 @@ bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       const medal = medals[index];
       const nameB64 = Buffer.from((user.name || user.username || '').replace(/^#/, '')).toString('base64url');
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameB64}`;
-      const cleanName = (user.name || user.username || '').replace(/^#/, '');
-      const hasHash = user.name?.startsWith('#');
-      const displayName = hasHash ? cleanName : (user.name || user.username);
-      const hashPrefix = hasHash ? '#' : '';
-      topText += `${medal}: ${hashPrefix}<a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.total_profit.toLocaleString('de-DE')}₽</b>\n`;
+      const displayName = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
+      topText += `${medal}: <a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.total_profit.toLocaleString('de-DE')}₽</b>\n`;
     });
 
     bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
@@ -2709,12 +2706,8 @@ bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       const medal = medals[index];
       const nameB64 = Buffer.from((user.name || user.username || '').replace(/^#/, '')).toString('base64url');
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameB64}`;
-
-      const cleanName = (user.name || user.username || '').replace(/^#/, '');
-      const hasHash = user.name?.startsWith('#');
-      const displayName = hasHash ? cleanName : (user.name || user.username);
-      const hashPrefix = hasHash ? '#' : '';
-      topText += `${medal}: ${hashPrefix}<a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.daily_total.toLocaleString('de-DE')}₽</b>\n`;
+      const displayName = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
+      topText += `${medal}: <a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.daily_total.toLocaleString('de-DE')}₽</b>\n`;
     });
 
     bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
@@ -2757,12 +2750,8 @@ bot.onText(/\/(topm|топм|m)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       const medal = medals[index];
       const nameB64 = Buffer.from((user.name || user.username || '').replace(/^#/, '')).toString('base64url');
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameB64}`;
-
-      const cleanName = (user.name || user.username || '').replace(/^#/, '');
-      const hasHash = user.name?.startsWith('#');
-      const displayName = hasHash ? cleanName : (user.name || user.username);
-      const hashPrefix = hasHash ? '#' : '';
-      topText += `${medal}: ${hashPrefix}<a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.monthly_total.toLocaleString('de-DE')}₽</b>\n`;
+      const displayName = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
+      topText += `${medal}: <a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.monthly_total.toLocaleString('de-DE')}₽</b>\n`;
     });
 
     bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
