@@ -151,7 +151,7 @@ const INFO_BANNER = () => {
       return;
     }
 
-    const excludedNames = ['#Testovhik','#тестик','тестик','#testovhik','testovhik'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+    const excludedNames = ['#sss','#Testovhik','#тестик','тестик','#testovhik','testovhik'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
     const excludedUsernames = ['sss','freeobnall'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
 
     db.get(`SELECT COALESCE(SUM(p.amount), 0) as total, COUNT(p.id) as count

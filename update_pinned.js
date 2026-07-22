@@ -96,7 +96,7 @@ async function getDailyStats() {
   };
 }
 
-const EXCLUDED_NAMES = ['#Testovhik', '#тестик', 'тестик', '#testovhik', 'testovhik'];
+const EXCLUDED_NAMES = ['#sss', '#Testovhik', '#тестик', 'тестик', '#testovhik', 'testovhik'];
 const EXCLUDED_USERNAMES = ['sss', 'freeobnall'];
 
 async function createPinnedMessageText() {
