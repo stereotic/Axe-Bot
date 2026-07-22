@@ -1154,31 +1154,29 @@ bot.onText(/\/start/, (msg) => {
 
   if (match) {
     const targetUserId = parseInt(match[1]);
-    const targetName = match[2] || null;
+    const targetNameB64 = match[2] || null;
+
+    const showProfileOrHidden = (userToShow) => {
+      if (!userToShow || userToShow.profile_hidden) {
+        bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' });
+        return;
+      }
+      bot.getChat(userToShow.user_id).then(() => {
+        utils.getTopPosition(userToShow.user_id, (err2, pos) => {
+          sendProfileMessage(chatId, userToShow, err2 ? 0 : pos, { reply_markup: null }).catch(() => {});
+        });
+      }).catch(() => {
+        bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' });
+      });
+    };
 
     db.get('SELECT * FROM users WHERE user_id = ?', [targetUserId], (err, user) => {
       if (user && !user.profile_hidden) {
-        bot.getChat(user.user_id).then(() => {
-          utils.getTopPosition(user.user_id, (err2, position) => {
-            sendProfileMessage(chatId, user, err2 ? 0 : position, { reply_markup: null }).catch(() => {});
-          });
-        }).catch(() => {
-          bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' });
-        });
-      } else if (targetName) {
-        const cleanName = targetName.replace(/^#/, '');
+        showProfileOrHidden(user);
+      } else if (targetNameB64) {
+        const cleanName = Buffer.from(targetNameB64, 'base64url').toString();
         db.get('SELECT * FROM users WHERE (name = ? OR name = ?) AND profile_hidden = 0', [cleanName, '#' + cleanName], (err2, user2) => {
-          if (user2) {
-            bot.getChat(user2.user_id).then(() => {
-              utils.getTopPosition(user2.user_id, (err3, position) => {
-                sendProfileMessage(chatId, user2, err3 ? 0 : position, { reply_markup: null }).catch(() => {});
-              });
-            }).catch(() => {
-              bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' });
-            });
-          } else {
-            bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' });
-          }
+          showProfileOrHidden(user2);
         });
       } else {
         bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' });
@@ -2662,8 +2660,8 @@ bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
 
     users.forEach((user, index) => {
       const medal = medals[index];
-      const nameClean = (user.name || user.username || '').replace(/^#/, '');
-      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameClean}`;
+      const nameB64 = Buffer.from((user.name || user.username || '').replace(/^#/, '')).toString('base64url');
+      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameB64}`;
       const nameForTop = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
       if (user.profile_hidden) {
         topText += `${medal}: <b>${nameForTop}</b> - <b>${user.total_profit.toLocaleString('de-DE')}₽</b>\n`;
