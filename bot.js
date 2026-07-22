@@ -2708,8 +2708,8 @@ bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
 
     results.forEach((user, index) => {
       const medal = medals[index];
-      const nameClean = (user.name || user.username || '').replace(/^#/, '');
-      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameClean}`;
+      const nameB64 = Buffer.from((user.name || user.username || '').replace(/^#/, '')).toString('base64url');
+      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameB64}`;
 
       const nameForTopd = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
       if (user.profile_hidden) {
@@ -2757,8 +2757,8 @@ bot.onText(/\/(topm|топм|m)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
 
     results.forEach((user, index) => {
       const medal = medals[index];
-      const nameClean = (user.name || user.username || '').replace(/^#/, '');
-      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameClean}`;
+      const nameB64 = Buffer.from((user.name || user.username || '').replace(/^#/, '')).toString('base64url');
+      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameB64}`;
 
       const nameForTopm = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
       if (user.profile_hidden) {
