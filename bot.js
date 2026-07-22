@@ -2666,11 +2666,7 @@ bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       const hasHash = user.name?.startsWith('#');
       const displayName = hasHash ? cleanName : (user.name || user.username);
       const hashPrefix = hasHash ? '#' : '';
-      if (user.profile_hidden) {
-        topText += `${medal}: <b>${hashPrefix}${displayName}</b> - <b>${user.total_profit.toLocaleString('de-DE')}₽</b>\n`;
-      } else {
-        topText += `${medal}: ${hashPrefix}<a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.total_profit.toLocaleString('de-DE')}₽</b>\n`;
-      }
+      topText += `${medal}: ${hashPrefix}<a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.total_profit.toLocaleString('de-DE')}₽</b>\n`;
     });
 
     bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
@@ -2718,11 +2714,7 @@ bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       const hasHash = user.name?.startsWith('#');
       const displayName = hasHash ? cleanName : (user.name || user.username);
       const hashPrefix = hasHash ? '#' : '';
-      if (user.profile_hidden) {
-        topText += `${medal}: <b>${hashPrefix}${displayName}</b> - <b>${user.daily_total.toLocaleString('de-DE')}₽</b>\n`;
-      } else {
-        topText += `${medal}: ${hashPrefix}<a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.daily_total.toLocaleString('de-DE')}₽</b>\n`;
-      }
+      topText += `${medal}: ${hashPrefix}<a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.daily_total.toLocaleString('de-DE')}₽</b>\n`;
     });
 
     bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
@@ -2770,11 +2762,7 @@ bot.onText(/\/(topm|топм|m)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       const hasHash = user.name?.startsWith('#');
       const displayName = hasHash ? cleanName : (user.name || user.username);
       const hashPrefix = hasHash ? '#' : '';
-      if (user.profile_hidden) {
-        topText += `${medal}: <b>${hashPrefix}${displayName}</b> - <b>${user.monthly_total.toLocaleString('de-DE')}₽</b>\n`;
-      } else {
-        topText += `${medal}: ${hashPrefix}<a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.monthly_total.toLocaleString('de-DE')}₽</b>\n`;
-      }
+      topText += `${medal}: ${hashPrefix}<a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.monthly_total.toLocaleString('de-DE')}₽</b>\n`;
     });
 
     bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
