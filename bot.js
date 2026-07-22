@@ -151,20 +151,20 @@ const INFO_BANNER = () => {
       return;
     }
 
-    db.get(`SELECT value FROM stats WHERE key = 'project_balance'`, (err, balanceRow) => {
+    const excludedNames = ['#sss','#Testovhik','#тестик','тестик','#testovhik','testovhik'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+    const excludedUsernames = ['sss','freeobnall'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+
+    db.get(`SELECT COALESCE(SUM(p.amount), 0) as total, COUNT(p.id) as count
+            FROM profits p JOIN users u ON p.user_id = u.user_id
+            WHERE LOWER(TRIM(COALESCE(u.name, ''))) NOT IN (${excludedNames})
+              AND LOWER(TRIM(COALESCE(u.username, ''))) NOT IN (${excludedUsernames})`, (err, row) => {
       if (err) {
         reject(err);
         return;
       }
 
-      db.get(`SELECT value FROM stats WHERE key = 'total_profits'`, (err, countRow) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-
-        const projectBalance = parseInt(balanceRow?.value || '0');
-        const totalProfits = parseInt(countRow?.value || '0');
+      const projectBalance = parseInt(row?.total || '0');
+      const totalProfits = parseInt(row?.count || '0');
 
         const banner = `<b>AXE TEAM - Информация <tg-emoji emoji-id="5359719332542718652">💎</tg-emoji></b>
 
@@ -184,8 +184,7 @@ const INFO_BANNER = () => {
         resolve(banner);
       });
     });
-  });
-};
+  };
 
 const WORK_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji>Сервис:</b> <b>Кардинг</b> 
 
