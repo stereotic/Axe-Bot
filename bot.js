@@ -164,21 +164,21 @@ const INFO_BANNER = () => {
 
       const projectBalance = parseInt(row?.total || '0');
       const totalProfits = parseInt(row?.count || '0');
-      const banner = `<b>AXE TEAM - Информация</b>
+      const banner = `<b>AXE TEAM - Информация </b>
 
-<b>Проценты выплат</b>
+<tg-emoji emoji-id="5987880246865565644">💸</tg-emoji><b>Проценты выплат
 ┣Букмекер - 70%
 ┣Кардинг - 80%
-┗Прямой перевод - 75%
+┗Прямой перевод - 75%</b>
 
-<b>Сервисы</b>
-┣ Букмекер
-┗ Кардинг
+<tg-emoji emoji-id="5956561916573782596">🏠</tg-emoji><b>Сервисы</b>
+┣ <b>Букмекер
+┗ Кардинг</b>
 
-<b>Касса проекта:</b> ${projectBalance.toLocaleString('en-US')}₽
-┗<b>Кол-во профитов:</b> ${totalProfits} шт
+<tg-emoji emoji-id="5258330865674494479">🏦</tg-emoji><b>Касса проекта: </b><b><i>${projectBalance.toLocaleString('en-US')}₽</i>
+┗Кол-во профитов: </b><b><i>${totalProfits} шт</i></b>
 
-<b>Дата открытия проекта 05.05.2026.</b>`;
+<tg-emoji emoji-id="5258419835922030550">📆</tg-emoji><b>Дата открытия проекта 05.05.2026.</b>`;
 
       infoBannerCache = { text: banner, timestamp: now };
       resolve(banner);
