@@ -139,7 +139,6 @@ process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
 });
 
-// Баннеры с кешированием
 let infoBannerCache = { text: null, timestamp: 0 };
 const INFO_BANNER_CACHE_TTL = 60000;
 
@@ -165,26 +164,27 @@ const INFO_BANNER = () => {
 
       const projectBalance = parseInt(row?.total || '0');
       const totalProfits = parseInt(row?.count || '0');
+      const banner = `<b>AXE TEAM - Информация</b>
 
-        const banner = `<b>AXE TEAM - Информация <tg-emoji emoji-id="5359719332542718652">💎</tg-emoji></b>
+<b>Проценты выплат</b>
+┣Букмекер - 70%
+┣Кардинг - 80%
+┗Прямой перевод - 75%
 
-<b>Проценты выплат </b><tg-emoji emoji-id="5258503720928288433">💱</tg-emoji>
-┣<b>Пополнение - 80%
-┗Прямой перевод - 75%</b>
+<b>Сервисы</b>
+┣ Букмекер
+┗ Кардинг
 
-<tg-emoji emoji-id="5956561916573782596">🏠</tg-emoji><b>Сервисы</b>
-┗ <b>Кардинг</b>
+<b>Касса проекта:</b> ${projectBalance.toLocaleString('en-US')}₽
+┗<b>Кол-во профитов:</b> ${totalProfits} шт
 
-<b><tg-emoji emoji-id="5258330865674494479">🏦</tg-emoji>Касса проекта:</b> <i>${projectBalance.toLocaleString()}₽</i>
-┗<b>Кол-во профитов:</b> <b><i>${totalProfits} шт</i></b>
+<b>Дата открытия проекта 05.05.2026.</b>`;
 
-<b><tg-emoji emoji-id="5258419835922030550">📆</tg-emoji>Дата открытия проекта 05.05.2026.</b>`;
-
-        infoBannerCache = { text: banner, timestamp: now };
-        resolve(banner);
-      });
+      infoBannerCache = { text: banner, timestamp: now };
+      resolve(banner);
     });
-  };
+  });
+};
 
 const WORK_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji>Сервис:</b> <b>Кардинг</b> 
 
