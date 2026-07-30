@@ -1,4 +1,4 @@
-const { createCanvas, loadImage } = require('canvas');
+const { createCanvas, loadImage, registerFont } = require('canvas');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
@@ -11,16 +11,54 @@ const TEMPLATE_PATHS = [
 const CANVAS_WIDTH = 1280;
 const CANVAS_HEIGHT = 720;
 
+// Слоты нового шаблона. Координаты сняты с рамок подложки (обводка 1px).
+const SLOTS = {
+  avatar: { x: 76, y: 95, size: 351, radius: 30 },
+  name: { x: 461, y: 89, width: 366, height: 96 },
+  status: { x: 915, y: 90, width: 285, height: 95 },
+  profitCount: { x: 461, y: 264, width: 749, height: 74 },
+  profitSum: { x: 461, y: 420, width: 749, height: 64 },
+  progress: { x: 73, y: 551, width: 1133, height: 70, radius: 26 }
+};
+
+const NEON = {
+  base: '#e9c6ff',
+  accent: '#c77dff',
+  deep: '#7b2cbf',
+  money: '#8dffb8',
+  moneyDeep: '#1fa85e',
+  track: 'rgba(18, 6, 30, 0.55)'
+};
+
 const LEVELS = [
-  { name: 'NEW', threshold: 0, color: '#ff2f9a', soft: '#ffd7ea' },
-  { name: 'PRO', threshold: 30000, color: '#28c7e8', soft: '#d8f7ff' },
-  { name: 'MASTER', threshold: 100000, color: '#ffb822', soft: '#fff0bd' },
-  { name: 'GOAT', threshold: 300000, color: '#ff5a4f', soft: '#ffe0dd' },
-  { name: 'GOLD', threshold: 1000000, color: '#f5c542', soft: '#fff1b8' },
-  { name: 'GG', threshold: 5000000, color: '#38e66b', soft: '#dcffe5' }
+  { name: 'NEW', threshold: 0, color: '#ff5fb8', soft: '#ffc9e8' },
+  { name: 'PRO', threshold: 30000, color: '#4fd8ff', soft: '#c9f4ff' },
+  { name: 'MASTER', threshold: 100000, color: '#ffc247', soft: '#ffe9b3' },
+  { name: 'GOAT', threshold: 300000, color: '#ff6a5c', soft: '#ffd0cb' },
+  { name: 'GOLD', threshold: 1000000, color: '#f7d24a', soft: '#fff0b5' },
+  { name: 'GG', threshold: 5000000, color: '#57ff90', soft: '#d2ffe1' }
 ];
 
+const FONT_FAMILY = resolveFontFamily();
+
 let cachedTemplate = null;
+
+function resolveFontFamily() {
+  const fontsDir = path.join(__dirname, 'assets', 'fonts');
+
+  try {
+    const files = fs.readdirSync(fontsDir).filter((file) => /\.(ttf|otf)$/i.test(file));
+    if (files.length === 0) return 'Arial';
+
+    for (const file of files) {
+      registerFont(path.join(fontsDir, file), { family: 'AxeProfile' });
+    }
+
+    return 'AxeProfile';
+  } catch (error) {
+    return 'Arial';
+  }
+}
 
 function roundRect(ctx, x, y, width, height, radius) {
   const r = Math.min(radius, width / 2, height / 2);
@@ -72,33 +110,71 @@ function formatRub(value) {
   return `${(Number(value) || 0).toLocaleString('ru-RU')}₽`;
 }
 
-function fitText(ctx, text, maxWidth, baseSize, fontFamily = 'Arial') {
+function fitText(ctx, text, maxWidth, baseSize, minSize = 18) {
   let fontSize = baseSize;
-  do {
-    ctx.font = `900 ${fontSize}px ${fontFamily}`;
-    if (ctx.measureText(text).width <= maxWidth) return;
-    fontSize -= 2;
-  } while (fontSize >= 18);
+  ctx.font = `900 ${fontSize}px ${FONT_FAMILY}`;
+
+  while (ctx.measureText(text).width > maxWidth && fontSize > minSize) {
+    fontSize -= 1;
+    ctx.font = `900 ${fontSize}px ${FONT_FAMILY}`;
+  }
+
+  return fontSize;
 }
 
-function drawCircleFallback(ctx, centerX, centerY, radius) {
-  const gradient = ctx.createRadialGradient(centerX - 24, centerY - 28, 8, centerX, centerY, radius);
-  gradient.addColorStop(0, '#ffffff');
-  gradient.addColorStop(1, '#f1f1f1');
+// Неон: два прохода тени под один fillText — дальний ореол и ближний контур.
+function drawNeonText(ctx, text, centerX, centerY, options) {
+  const { maxWidth, size, minSize = 18, fill, glow, glowBlur = 22 } = options;
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  fitText(ctx, text, maxWidth, size, minSize);
+
+  ctx.shadowColor = glow;
+  ctx.shadowBlur = glowBlur;
+  ctx.fillStyle = fill;
+  ctx.fillText(text, centerX, centerY);
+  ctx.fillText(text, centerX, centerY);
+
+  ctx.shadowBlur = Math.round(glowBlur / 3);
+  ctx.fillText(text, centerX, centerY);
+  ctx.restore();
+}
+
+function drawSlotText(ctx, slot, text, options) {
+  drawNeonText(ctx, text, slot.x + slot.width / 2, slot.y + slot.height / 2, {
+    maxWidth: slot.width - 28,
+    ...options
+  });
+}
+
+function drawAvatarFallback(ctx, slot) {
+  const gradient = ctx.createLinearGradient(slot.x, slot.y, slot.x + slot.size, slot.y + slot.size);
+  gradient.addColorStop(0, '#3c1b5c');
+  gradient.addColorStop(1, '#1a0a2b');
 
   ctx.fillStyle = gradient;
-  ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius * 2);
+  ctx.fillRect(slot.x, slot.y, slot.size, slot.size);
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `900 132px ${FONT_FAMILY}`;
+  ctx.shadowColor = NEON.deep;
+  ctx.shadowBlur = 26;
+  ctx.fillStyle = NEON.accent;
+  ctx.fillText('AXE', slot.x + slot.size / 2, slot.y + slot.size / 2);
+  ctx.shadowBlur = 0;
 }
 
 async function drawAvatar(ctx, avatarSource) {
-  const centerX = 640;
-  const centerY = 303;
-  const radius = 86;
+  const slot = SLOTS.avatar;
 
   ctx.save();
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+  roundRect(ctx, slot.x, slot.y, slot.size, slot.size, slot.radius);
   ctx.clip();
+
+  let drawn = false;
 
   if (avatarSource) {
     try {
@@ -108,74 +184,88 @@ async function drawAvatar(ctx, avatarSource) {
       const sy = (avatar.height - side) / 2;
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(avatar, sx, sy, side, side, centerX - radius, centerY - radius, radius * 2, radius * 2);
+      ctx.drawImage(avatar, sx, sy, side, side, slot.x, slot.y, slot.size, slot.size);
+      drawn = true;
     } catch (error) {
-      drawCircleFallback(ctx, centerX, centerY, radius);
+      drawn = false;
     }
-  } else {
-    drawCircleFallback(ctx, centerX, centerY, radius);
   }
 
+  if (!drawn) drawAvatarFallback(ctx, slot);
+
+  // Фиолетовая вуаль поверх фото — аватар садится в палитру подложки.
+  const veil = ctx.createLinearGradient(slot.x, slot.y, slot.x, slot.y + slot.size);
+  veil.addColorStop(0, 'rgba(123, 44, 191, 0.10)');
+  veil.addColorStop(1, 'rgba(40, 8, 66, 0.42)');
+  ctx.fillStyle = veil;
+  ctx.fillRect(slot.x, slot.y, slot.size, slot.size);
+
+  ctx.restore();
+
+  ctx.save();
+  roundRect(ctx, slot.x, slot.y, slot.size, slot.size, slot.radius);
+  ctx.strokeStyle = 'rgba(199, 125, 255, 0.85)';
+  ctx.lineWidth = 3;
+  ctx.shadowColor = NEON.accent;
+  ctx.shadowBlur = 18;
+  ctx.stroke();
   ctx.restore();
 }
 
-function drawValue(ctx, value, x, y, width, height, colors) {
-  const centerX = x + width / 2;
-  const centerY = y + height / 2;
-  const gradient = ctx.createLinearGradient(x, y, x + width, y);
-
-  gradient.addColorStop(0, colors[0]);
-  gradient.addColorStop(1, colors[1]);
-
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  fitText(ctx, value, width - 24, 39);
-
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
-  ctx.shadowBlur = 2;
-  ctx.shadowOffsetY = 2;
-  ctx.fillStyle = gradient;
-  ctx.fillText(value, centerX, centerY + 2);
-
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
-}
-
 function drawProgress(ctx, level, totalEarned) {
-  const x = 90;
-  const y = 625;
-  const width = 1100;
-  const height = 73;
-  const radius = 24;
-  const fillWidth = Math.max(height, (width * level.progress) / 100);
-  const remaining = level.next ? 100 - level.progress : 0;
+  const { x, y, width, height, radius } = SLOTS.progress;
+  const ratio = Math.max(0, Math.min(1, level.progress / 100));
+  const fillWidth = Math.max(height, width * ratio);
   const label = level.next
-    ? `${Math.round(remaining)}% ДО ${level.next.name} • ${formatRub(totalEarned)} / ${formatRub(level.next.threshold)}`
-    : `GG MAX • ${formatRub(totalEarned)}`;
+    ? `${formatRub(totalEarned)} / ${formatRub(level.next.threshold)}  •  ${Math.round(100 - level.progress)}% ДО ${level.next.name}`
+    : `GG MAX  •  ${formatRub(totalEarned)}`;
 
   ctx.save();
   roundRect(ctx, x, y, width, height, radius);
   ctx.clip();
 
-  const gradient = ctx.createLinearGradient(x, y, x + width, y);
-  gradient.addColorStop(0, level.current.color);
-  gradient.addColorStop(0.65, level.next ? level.next.color : level.current.soft);
-  gradient.addColorStop(1, level.next ? level.next.soft : '#f4fff6');
+  ctx.fillStyle = NEON.track;
+  ctx.fillRect(x, y, width, height);
+
+  const gradient = ctx.createLinearGradient(x, y, x + fillWidth, y);
+  gradient.addColorStop(0, NEON.deep);
+  gradient.addColorStop(0.55, level.current.color);
+  gradient.addColorStop(1, level.next ? level.next.color : level.current.color);
 
   ctx.fillStyle = gradient;
   ctx.fillRect(x, y, fillWidth, height);
+
+  const sheen = ctx.createLinearGradient(x, y, x, y + height);
+  sheen.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+  sheen.addColorStop(0.5, 'rgba(255, 255, 255, 0.04)');
+  sheen.addColorStop(1, 'rgba(0, 0, 0, 0.20)');
+  ctx.fillStyle = sheen;
+  ctx.fillRect(x, y, fillWidth, height);
+
+  // Светящийся торец заполнения.
+  if (ratio > 0 && ratio < 1) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.shadowColor = level.next ? level.next.color : NEON.accent;
+    ctx.shadowBlur = 24;
+    ctx.fillRect(x + fillWidth - 4, y, 4, height);
+    ctx.shadowBlur = 0;
+  }
+
   ctx.restore();
 
-  ctx.fillStyle = '#232323';
+  // Обводка вместо тени: полоса заливается любым цветом, текст читается всегда.
+  ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  fitText(ctx, label, width - 48, 31);
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.18)';
-  ctx.shadowBlur = 1;
-  ctx.shadowOffsetY = 1;
+  fitText(ctx, label, width - 56, 33, 20);
+  ctx.lineJoin = 'round';
+  ctx.miterLimit = 2;
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = 'rgba(24, 5, 42, 0.92)';
+  ctx.strokeText(label, x + width / 2, y + height / 2 + 1);
+  ctx.fillStyle = '#ffffff';
   ctx.fillText(label, x + width / 2, y + height / 2 + 1);
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
+  ctx.restore();
 }
 
 async function fetchBuffer(url, attempts = 2) {
@@ -228,20 +318,57 @@ async function getTelegramAvatarBuffer(bot, userId) {
   }
 }
 
+function formatName(rawName) {
+  const name = String(rawName || 'UNKNOWN').trim().toUpperCase();
+  return name.startsWith('#') ? name : `#${name}`;
+}
+
+function formatCount(value) {
+  return (Number(value) || 0).toLocaleString('ru-RU');
+}
+
 async function renderProfileBanner(profile) {
   const template = await loadTemplate();
   const canvas = createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
   const ctx = canvas.getContext('2d');
   const totalEarned = Number(profile.total_earned || profile.totalEarned || 0);
   const level = getLevel(totalEarned);
-  const topPosition = Number(profile.topPosition || profile.top_position || 0);
+  const status = String(profile.status || level.current.name).toUpperCase();
 
   ctx.drawImage(template, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   await drawAvatar(ctx, profile.avatarBuffer || profile.avatarUrl);
 
-  drawValue(ctx, level.current.name, 127, 481, 251, 60, [level.current.color, '#ff70bc']);
-  drawValue(ctx, topPosition > 0 ? `${topPosition}` : '0', 511, 481, 251, 60, ['#f0ad00', '#ffd24d']);
-  drawValue(ctx, formatRub(totalEarned), 902, 481, 251, 60, ['#20c957', '#67e887']);
+  drawSlotText(ctx, SLOTS.name, formatName(profile.name), {
+    size: 52,
+    minSize: 22,
+    fill: NEON.base,
+    glow: NEON.accent
+  });
+
+  drawSlotText(ctx, SLOTS.status, status, {
+    size: 46,
+    minSize: 20,
+    fill: level.current.soft,
+    glow: level.current.color,
+    glowBlur: 26
+  });
+
+  drawSlotText(ctx, SLOTS.profitCount, formatCount(profile.profit_count || profile.profitCount), {
+    size: 58,
+    minSize: 26,
+    fill: '#ffffff',
+    glow: NEON.accent,
+    glowBlur: 26
+  });
+
+  drawSlotText(ctx, SLOTS.profitSum, formatRub(totalEarned), {
+    size: 54,
+    minSize: 24,
+    fill: NEON.money,
+    glow: NEON.moneyDeep,
+    glowBlur: 26
+  });
+
   drawProgress(ctx, level, totalEarned);
 
   return canvas.toBuffer('image/png');
@@ -252,7 +379,7 @@ function buildProfileCaption(user, topPosition) {
 
   return `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji><b>Воркер:</b> @${user.username || 'unknown'}
 <tg-emoji emoji-id="5936017305585586269">🪪</tg-emoji><b>Name:</b> ${user.name}
-└ <b>Статус:</b> ${level.current.name}
+└ <b>Статус:</b> ${user.status || level.current.name}
 
 <tg-emoji emoji-id="5258204546391351475">💼</tg-emoji><b>Кошелек</b>
 └ <b>На вывод:</b> <i>${formatRub(user.balance)}</i>
@@ -278,6 +405,7 @@ async function buildProfileMedia(bot, user, topPosition) {
 
 module.exports = {
   LEVELS,
+  SLOTS,
   getLevel,
   formatRub,
   renderProfileBanner,
