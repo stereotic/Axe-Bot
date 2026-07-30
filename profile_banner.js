@@ -25,8 +25,6 @@ const NEON = {
   base: '#e9c6ff',
   accent: '#c77dff',
   deep: '#7b2cbf',
-  money: '#8dffb8',
-  moneyDeep: '#1fa85e',
   track: 'rgba(18, 6, 30, 0.55)'
 };
 
@@ -364,8 +362,8 @@ async function renderProfileBanner(profile) {
   drawSlotText(ctx, SLOTS.profitSum, formatRub(totalEarned), {
     size: 54,
     minSize: 24,
-    fill: NEON.money,
-    glow: NEON.moneyDeep,
+    fill: NEON.base,
+    glow: NEON.accent,
     glowBlur: 26
   });
 
