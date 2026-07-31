@@ -2623,19 +2623,21 @@ bot.onText(/\/me/, async (msg) => {
 // Команда /staff
 bot.onText(/\/staff/, (msg) => {
   const chatId = msg.chat.id;
-  const staffText = `🦺<b>Personnel - AXE TEAM</b>
+  const staffText = `<tg-emoji emoji-id="5357069174512303778">🦺</tg-emoji><b>Лица администрации</b>
 
-🗣<b>Feedback</b>
-┗@FeedbackAXEbot
+┏ <tg-emoji emoji-id="5992157823838984339">👨‍🏫</tg-emoji><b>Кураторы</b>
+┗  @Henry_AXE
 
-🕵‍♂️<b>Саппорт</b>
-┗ @Deryl_AXE
+┏<tg-emoji emoji-id="5960714428394507968">👁</tg-emoji><b>Модераторы</b>
+┗ @Aether_AXE
 
-👨‍🏫<b>Куратор</b>
-┗ @Henry_AXE
+┏<tg-emoji emoji-id="6028226658543082010">🕵️‍♂️</tg-emoji><b>Саппорты</b> 
+┗ @Daryl_AXE
 
-👁<b>Модератор</b>
-┗ @Aether_AXE`;
+┏<tg-emoji emoji-id="5967280668885913944">🗣</tg-emoji><b>Feedback</b>
+┗ @FeedbackAXEbot
+
+<tg-emoji emoji-id="5276240711795107620">⚠️</tg-emoji><b>Администрация AXE TEAM никогда не пишет первой</b>`;
 
   bot.sendMessage(chatId, staffText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
     console.error('Error sending staff message:', err);
