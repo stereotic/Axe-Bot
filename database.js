@@ -241,6 +241,17 @@ db.serialize(() => {
   db.run(`INSERT OR IGNORE INTO stats (key, value) VALUES ('open_date', '03.03.2026')`);
   db.run(`INSERT OR IGNORE INTO stats (key, value) VALUES ('worker_counter', '0')`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS scheduled_broadcasts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    time TEXT UNIQUE,
+    content_type TEXT,
+    text TEXT,
+    file_id TEXT,
+    target TEXT DEFAULT 'all',
+    last_sent_date TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   db.run(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_users_application_approved ON users(application_approved)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_profits_user_id ON profits(user_id)`);

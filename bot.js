@@ -14,6 +14,7 @@ const path = require('path');
 const axios = require('axios');
 const profileBanner = require('./profile_banner');
 const { loadPinnedMessageId, updatePinnedMessage } = require('./update_pinned');
+const { setupRassSystem, isRassEditing, cancelRassEdit } = require('./rass');
 
 // Короткий текст, если нет картинки для меню (пустой sendMessage/caption Telegram отклоняет).
 const MENU_PANEL_FALLBACK = 'Выбери раздел:';
@@ -96,6 +97,7 @@ setupCardViewHandlers(bot);
 setupCardRequestHandlers(bot, adminIds);
 setupCheckHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, CASH_CHANNEL_ID);
 setupProfitSystem(bot, adminIds);
+setupRassSystem(bot, adminIds);
 
 // Устанавливаем меню команд бота
 bot.setMyCommands([
@@ -1441,6 +1443,11 @@ bot.on('message', async (msg) => {
   // Обновляем username пользователя при каждом сообщении
   updateUsername(userId, username);
 
+  // Редактирование рассылки обрабатывается в rass.js
+  if (isRassEditing(userId)) {
+    return;
+  }
+
   // Проверяем режим рассылки (для админов в личных сообщениях)
   if (broadcastMode[userId] && msg.chat.type === 'private') {
     // Игнорируем команды
@@ -2635,6 +2642,50 @@ bot.onText(/\/staff/, (msg) => {
   });
 });
 
+const TOP_RANK_EMOJI = [
+  { id: '5440539497383087970', fallback: '🥇' },
+  { id: '5447203607294265305', fallback: '🥈' },
+  { id: '5453902265922376865', fallback: '🥉' },
+  { id: '5994495149336434048', fallback: '🥉' },
+  { id: '5994495149336434048', fallback: '🥉' },
+  { id: '5994495149336434048', fallback: '🥉' },
+  { id: '5994495149336434048', fallback: '🥉' },
+  { id: '5994495149336434048', fallback: '🥉' },
+  { id: '5994495149336434048', fallback: '🥉' },
+  { id: '5994495149336434048', fallback: '🥉' }
+];
+
+const CASH_EMOJI = { id: '5967390100357648692', fallback: '🏦' };
+
+const rankEmojiTag = (index) => {
+  const e = TOP_RANK_EMOJI[index] || TOP_RANK_EMOJI[9];
+  return `<tg-emoji emoji-id="${e.id}">${e.fallback}</tg-emoji>`;
+};
+
+const formatTopLine = (user, value, index) => {
+  const displayName = (user.name || user.username || '').replace(/^#/, '');
+  const nameB64 = Buffer.from(displayName).toString('base64url');
+  const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameB64}`;
+  return `<b>${rankEmojiTag(index)}<a href="${profileLink}">${displayName}</a> - ${value.toLocaleString('de-DE')}₽</b>\n`;
+};
+
+const formatCashLine = (balance) => {
+  return `<b><tg-emoji emoji-id="${CASH_EMOJI.id}">${CASH_EMOJI.fallback}</tg-emoji>Касса проекта: ${balance.toLocaleString('de-DE')}₽</b>`;
+};
+
+const getProjectBalance = () => {
+  return new Promise((resolve) => {
+    const excludedNames = ['#sss','#Testovhik','#тестик','тестик','#testovhik','testovhik'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+    const excludedUsernames = ['sss','freeobnall'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+    db.get(`SELECT COALESCE(SUM(p.amount), 0) as total
+            FROM profits p JOIN users u ON p.user_id = u.user_id
+            WHERE LOWER(TRIM(COALESCE(u.name, ''))) NOT IN (${excludedNames})
+              AND LOWER(TRIM(COALESCE(u.username, ''))) NOT IN (${excludedUsernames})`, (err, row) => {
+      resolve(err ? 0 : parseInt(row?.total || '0'));
+    });
+  });
+};
+
 // Команда /top - Топ 10 за все время
 bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
   const chatId = msg.chat.id;
@@ -2654,19 +2705,17 @@ bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       return;
     }
 
-    const medals = ['🏆', '🥈', '🥉', '🎯', '🍺', '🎭', '💣', '🦁', '🦄', '🧸'];
     let topText = '🏆<b>Топ 10</b>\n\n';
 
     users.forEach((user, index) => {
-      const medal = medals[index];
-      const nameB64 = Buffer.from((user.name || user.username || '').replace(/^#/, '')).toString('base64url');
-      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameB64}`;
-      const displayName = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
-      topText += `${medal}: <a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.total_profit.toLocaleString('de-DE')}₽</b>\n`;
+      topText += formatTopLine(user, user.total_profit, index);
     });
 
-    bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
-      console.error('Error sending top message:', err);
+    getProjectBalance().then(balance => {
+      topText += `\n${formatCashLine(balance)}`;
+      bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
+        console.error('Error sending top message:', err);
+      });
     });
   });
 });
@@ -2698,19 +2747,17 @@ bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       return;
     }
 
-    const medals = ['🎖', '🥈', '🥉', '4', '5', '6', '7', '8', '9', '🍺'];
     let topText = '🌶<b>Топ 10 за сутки.</b>\n\n';
 
     results.forEach((user, index) => {
-      const medal = medals[index];
-      const nameB64 = Buffer.from((user.name || user.username || '').replace(/^#/, '')).toString('base64url');
-      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameB64}`;
-      const displayName = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
-      topText += `${medal}: <a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.daily_total.toLocaleString('de-DE')}₽</b>\n`;
+      topText += formatTopLine(user, user.daily_total, index);
     });
 
-    bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
-      console.error('Error sending topd message:', err);
+    getProjectBalance().then(balance => {
+      topText += `\n${formatCashLine(balance)}`;
+      bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
+        console.error('Error sending topd message:', err);
+      });
     });
   });
 });
@@ -2742,19 +2789,17 @@ bot.onText(/\/(topm|топм|m)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       return;
     }
 
-    const medals = ['🎖', '🥈', '🥉', '4', '5', '6', '7', '8', '9', '10'];
     let topText = '📆<b>Топ 10 за месяц</b>\n\n';
 
     results.forEach((user, index) => {
-      const medal = medals[index];
-      const nameB64 = Buffer.from((user.name || user.username || '').replace(/^#/, '')).toString('base64url');
-      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameB64}`;
-      const displayName = user.name?.startsWith('#') ? user.name : '#' + (user.name || user.username);
-      topText += `${medal}: <a href="${profileLink}"><b>${displayName}</b></a> - <b>${user.monthly_total.toLocaleString('de-DE')}₽</b>\n`;
+      topText += formatTopLine(user, user.monthly_total, index);
     });
 
-    bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
-      console.error('Error sending topm message:', err);
+    getProjectBalance().then(balance => {
+      topText += `\n${formatCashLine(balance)}`;
+      bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
+        console.error('Error sending topm message:', err);
+      });
     });
   });
 });
@@ -3067,6 +3112,11 @@ bot.onText(/\/cancel/, (msg) => {
   if (broadcastMode[userId]) {
     delete broadcastMode[userId];
     bot.sendMessage(chatId, '❌ Режим рассылки отменен');
+  }
+
+  // Отмена редактирования рассылки
+  if (cancelRassEdit(userId)) {
+    bot.sendMessage(chatId, '❌ Редактирование рассылки отменено');
   }
 
   // Отмена создания реквизита
