@@ -2671,21 +2671,26 @@ const formatTopLine = (user, value, index) => {
   return `<b>${rankEmojiTag(index)}<a href="${profileLink}">${displayName}</a> - ${value.toLocaleString('de-DE')}₽</b>\n`;
 };
 
-const formatCashLine = (balance) => {
-  return `<b><tg-emoji emoji-id="${CASH_EMOJI.id}">${CASH_EMOJI.fallback}</tg-emoji>Касса проекта: ${balance.toLocaleString('de-DE')}₽</b>`;
+const formatCashLine = (balance, label = 'Касса проекта') => {
+  return `<b><tg-emoji emoji-id="${CASH_EMOJI.id}">${CASH_EMOJI.fallback}</tg-emoji>${label}: ${balance.toLocaleString('de-DE')}₽</b>`;
 };
 
-const getProjectBalance = () => {
+const getPeriodBalance = (startStr, endStr) => {
   return new Promise((resolve) => {
     const excludedNames = ['#sss','#Testovhik','#тестик','тестик','#testovhik','testovhik'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
     const excludedUsernames = ['sss','freeobnall'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
     db.get(`SELECT COALESCE(SUM(p.amount), 0) as total
             FROM profits p JOIN users u ON p.user_id = u.user_id
-            WHERE LOWER(TRIM(COALESCE(u.name, ''))) NOT IN (${excludedNames})
-              AND LOWER(TRIM(COALESCE(u.username, ''))) NOT IN (${excludedUsernames})`, (err, row) => {
+            WHERE p.created_at >= ? AND p.created_at < ?
+              AND LOWER(TRIM(COALESCE(u.name, ''))) NOT IN (${excludedNames})
+              AND LOWER(TRIM(COALESCE(u.username, ''))) NOT IN (${excludedUsernames})`, [startStr, endStr], (err, row) => {
       resolve(err ? 0 : parseInt(row?.total || '0'));
     });
   });
+};
+
+const getProjectBalance = () => {
+  return getPeriodBalance('1970-01-01 00:00:00', '9999-12-31 23:59:59');
 };
 
 // Команда /top - Топ 10 за все время
@@ -2755,8 +2760,8 @@ bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       topText += formatTopLine(user, user.daily_total, index);
     });
 
-    getProjectBalance().then(balance => {
-      topText += `\n${formatCashLine(balance)}`;
+    getPeriodBalance(startStr, endStr).then(balance => {
+      topText += `\n${formatCashLine(balance, 'Касса за день')}`;
       bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
         console.error('Error sending topd message:', err);
       });
@@ -2797,8 +2802,8 @@ bot.onText(/\/(topm|топм|m)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       topText += formatTopLine(user, user.monthly_total, index);
     });
 
-    getProjectBalance().then(balance => {
-      topText += `\n${formatCashLine(balance)}`;
+    getPeriodBalance(startStr, endStr).then(balance => {
+      topText += `\n${formatCashLine(balance, 'Касса за месяц')}`;
       bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
         console.error('Error sending topm message:', err);
       });
