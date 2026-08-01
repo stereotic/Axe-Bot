@@ -2,6 +2,7 @@ const db = require('./database');
 
 const RASS_TIMES = ['07:00', '10:00', '13:00', '16:00', '19:00', '21:00', '00:00'];
 const SEND_DELAY_MS = 90;
+const DEFAULT_CHAT_TARGET = '-1003986505552';
 
 const rassEdit = {};
 const rassPanelMsg = {};
@@ -164,15 +165,16 @@ function renderPanel(bot, chatId, userId) {
     const opts = { parse_mode: 'HTML', disable_web_page_preview: true, reply_markup: keyboard };
 
     if (rassPanelMsg[userId]) {
-      bot.editMessageText(text, { chat_id: chatId, message_id: rassPanelMsg[userId], ...opts }).catch(() => {
+      bot.editMessageText(text, { chat_id: chatId, message_id: rassPanelMsg[userId], ...opts }).catch((e) => {
+        console.error('[rass] panel edit failed:', e.message);
         bot.sendMessage(chatId, text, opts).then(m => {
           rassPanelMsg[userId] = m.message_id;
-        }).catch(() => {});
+        }).catch((e2) => console.error('[rass] panel send failed:', e2.message));
       });
     } else {
       bot.sendMessage(chatId, text, opts).then(m => {
         rassPanelMsg[userId] = m.message_id;
-      }).catch(() => {});
+      }).catch((e) => console.error('[rass] panel send failed:', e.message));
     }
   });
 }
@@ -320,23 +322,6 @@ function setupRassSystem(bot, adminIds) {
           state.step = 'target';
           askTarget(bot, chatId, userId, state.time);
         });
-      return;
-    }
-
-    if (state.step === 'target_chat') {
-      const target = (msg.text || '').trim();
-      if (!target) return;
-
-      db.run('UPDATE scheduled_broadcasts SET target = ? WHERE time = ?', [target, state.time], (err) => {
-        if (err) {
-          console.error('[rass] error saving target:', err);
-          bot.sendMessage(chatId, '❌ Ошибка сохранения цели');
-          return;
-        }
-        delete rassEdit[userId];
-        bot.sendMessage(chatId, `✅ Рассылка в <b>${state.time}</b> будет отправлена в чат <b>${target}</b>.`, { parse_mode: 'HTML' });
-        renderPanel(bot, chatId, userId);
-      });
     }
   });
 
@@ -394,12 +379,16 @@ function setupRassSystem(bot, adminIds) {
 
     // Цель: чат
     if (action === 'tgt_chat') {
-      if (!rassEdit[userId] || rassEdit[userId].time !== time) {
-        rassEdit[userId] = { time, step: 'target_chat' };
-      } else {
-        rassEdit[userId].step = 'target_chat';
-      }
-      bot.sendMessage(chatId, `💬 Отправь ID чата или @username, куда отправить рассылку в <b>${time}</b>.`, { parse_mode: 'HTML' });
+      db.run('UPDATE scheduled_broadcasts SET target = ? WHERE time = ?', [DEFAULT_CHAT_TARGET, time], (err) => {
+        delete rassEdit[userId];
+        if (err) {
+          console.error('[rass] error saving target:', err);
+          bot.sendMessage(chatId, '❌ Ошибка сохранения цели');
+          return;
+        }
+        bot.sendMessage(chatId, `✅ Рассылка в <b>${time}</b> будет отправлена только в чат <b>${DEFAULT_CHAT_TARGET}</b>.`, { parse_mode: 'HTML' });
+        renderPanel(bot, chatId, userId);
+      });
       return;
     }
 
