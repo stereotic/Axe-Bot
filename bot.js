@@ -56,7 +56,7 @@ const mentors = [
 • Четкий план работы.`
   },
   {
-    username: 'alprazalam',
+    username: 'Arachnophob_AXE',
     userId: null,
     banner: 'mentor_alprazalam.jpg',
     service: 'Кардинг, Букмекер',

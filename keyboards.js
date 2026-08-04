@@ -44,8 +44,8 @@ const keyboards = {
   get menu() {
     const battlePassUrl = getBattlePassUrl();
     const battlePassButton = battlePassUrl
-      ? { text: 'AXE PASS🎁', web_app: { url: battlePassUrl } }
-      : { text: 'AXE PASS🎁', callback_data: 'battlepass_unavailable' };
+      ? { text: 'AXE PASS', icon_custom_emoji_id: '5445088267181531740', web_app: { url: battlePassUrl } }
+      : { text: 'AXE PASS', icon_custom_emoji_id: '5445088267181531740', callback_data: 'battlepass_unavailable' };
 
     return {
       inline_keyboard: [
@@ -63,8 +63,8 @@ const keyboards = {
           { text: 'Feedback', callback_data: 'feedback' },
           { text: 'Настройки', callback_data: 'settings' }
         ],
-        [{ text: 'AXE SMS🔥', url: 'https://t.me/AXE_SMS_xBot' }],
-        [{ text: 'AXE DICE🎲', url: 'https://t.me/AXE_DICE_xBot' }]
+        [{ text: 'AXE SMS', icon_custom_emoji_id: '5447245070908564837', url: 'https://t.me/AXE_SMS_xBot' }],
+        [{ text: 'AXE DICE', icon_custom_emoji_id: '5447414344159631158', url: 'https://t.me/AXE_DICE_xBot' }]
       ]
     };
   },
