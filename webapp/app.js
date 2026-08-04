@@ -97,7 +97,6 @@ function render(state) {
           <div class="card-body">
             <span class="lvl-badge">LVL ${lvl.level}</span>
             <h2 class="title">${esc(lvl.title)}</h2>
-            <p class="desc">${esc(lvl.description)}</p>
             <div class="card-req">${reqText}</div>
             ${linkHtml}
           </div>

@@ -202,13 +202,6 @@ body {
   letter-spacing: .01em;
 }
 
-.desc {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-
 .card-req {
   margin-top: 12px;
   font-size: 12px;

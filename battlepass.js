@@ -9,16 +9,16 @@ const XP_PER_STEP = 0.5;
 // Стоимость КАЖДОГО уровня в XP. Уровни 1-5 по 1 XP, уровни 6-10 по 2 XP.
 // Полный пасс = 5*1 + 5*2 = 15 XP = 300.000₽ кассы.
 const LEVELS = [
-  { level: 1,  xpCost: 1, title: 'Физ номер',                 description: 'Описание приза — заменить', image: 'img/gift_1.jpg',  link: null },
-  { level: 2,  xpCost: 1, title: 'Instant Ramen',             description: 'Описание приза — заменить', image: 'img/gift_2.jpg',  link: 'https://t.me/nft/InstantRamen-384646' },
-  { level: 3,  xpCost: 1, title: 'TG Premium 1 месяц',        description: 'Описание приза — заменить', image: 'img/gift_3.jpg',  link: null },
-  { level: 4,  xpCost: 1, title: 'Swag bag',                  description: 'Описание приза — заменить', image: 'img/gift_4.jpg',  link: 'https://t.me/nft/SwagBag-13402' },
-  { level: 5,  xpCost: 1, title: '3 физ номера',              description: 'Описание приза — заменить', image: 'img/gift_5.jpg',  link: null },
-  { level: 6,  xpCost: 2, title: 'TG Premium · 3 месяца',     description: 'Описание приза — заменить', image: 'img/gift_6.jpg',  link: null },
-  { level: 7,  xpCost: 2, title: 'Vintage Cigar',             description: 'Описание приза — заменить', image: 'img/gift_7.jpg',  link: 'https://t.me/nft/VintageCigar-11995' },
-  { level: 8,  xpCost: 2, title: 'Swiss Watch',               description: 'Описание приза — заменить', image: 'img/gift_8.jpg',  link: 'https://t.me/nft/SwissWatch-23130' },
-  { level: 9,  xpCost: 4,  title: 'Билет на розыгрыш 1000$',   description: 'Описание приза — заменить', image: 'img/gift_9.jpg',  link: null, ticketName: '1000' },
-  { level: 10, xpCost: 10, title: 'Билет на MacBook Air M4',   description: 'Описание приза — заменить', image: 'img/gift_10.jpg', link: null, ticketName: 'MacBook AIR m4' }
+  { level: 1,  xpCost: 1, title: 'Физ номер',                 image: 'img/gift_1.jpg',  link: null },
+  { level: 2,  xpCost: 1, title: 'Instant Ramen',             image: 'img/gift_2.jpg',  link: 'https://t.me/nft/InstantRamen-384646' },
+  { level: 3,  xpCost: 1, title: 'TG Premium 1 месяц',        image: 'img/gift_3.jpg',  link: null },
+  { level: 4,  xpCost: 1, title: 'Swag bag',                  image: 'img/gift_4.jpg',  link: 'https://t.me/nft/SwagBag-13402' },
+  { level: 5,  xpCost: 1, title: '3 физ номера',              image: 'img/gift_5.jpg',  link: null },
+  { level: 6,  xpCost: 2, title: 'TG Premium · 3 месяца',     image: 'img/gift_6.jpg',  link: null },
+  { level: 7,  xpCost: 2, title: 'Vintage Cigar',             image: 'img/gift_7.jpg',  link: 'https://t.me/nft/VintageCigar-11995' },
+  { level: 8,  xpCost: 2, title: 'Swiss Watch',               image: 'img/gift_8.jpg',  link: 'https://t.me/nft/SwissWatch-23130' },
+  { level: 9,  xpCost: 4,  title: 'Билет на розыгрыш 1000$',   image: 'img/gift_9.jpg',  link: null, ticketName: '1000' },
+  { level: 10, xpCost: 10, title: 'Билет на MacBook Air M4',   image: 'img/gift_10.jpg', link: null, ticketName: 'MacBook AIR m4' }
 ];
 
 // Накопительные пороги: [1, 2, 3, 4, 5, 7, 9, 11, 13, 15]
@@ -69,7 +69,6 @@ function buildState(totalEarned) {
     levels: LEVELS.map((lvl, i) => ({
       level: lvl.level,
       title: lvl.title,
-      description: lvl.description,
       image: lvl.image,
       link: lvl.link,
       xpCost: lvl.xpCost,
