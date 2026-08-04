@@ -27,13 +27,13 @@ const users = [
 let fakeId = 1000000001;
 
 function findUser(name, callback) {
-  const clean = name.replace(/^#/, '');
+  const clean = name.replace(/^[#@]/, '');
   db.get('SELECT user_id, name, username FROM users WHERE username = ? OR name = ? OR name = ?',
-    [clean, name, '#' + clean], callback);
+    [clean, name, '@' + clean], callback);
 }
 
 function createUser(name, callback) {
-  const clean = name.replace(/^#/, '');
+  const clean = name.replace(/^[#@]/, '');
   const id = fakeId++;
   db.run(
     'INSERT INTO users (user_id, username, name, application_approved, welcome_keyboard_sent, profile_hidden) VALUES (?, ?, ?, 1, 1, 1)',

@@ -13,6 +13,7 @@ db.serialize(() => {
     status TEXT DEFAULT 'NEW',
     balance INTEGER DEFAULT 0,
     total_earned INTEGER DEFAULT 0,
+    battlepass_earned INTEGER DEFAULT 0,
     profit_count INTEGER DEFAULT 0,
     profile_hidden INTEGER DEFAULT 0,
     curator TEXT,
@@ -26,6 +27,11 @@ db.serialize(() => {
   db.run(`ALTER TABLE users ADD COLUMN profit_count INTEGER DEFAULT 0`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
       console.error('Error adding profit_count column:', err);
+    }
+  });
+  db.run(`ALTER TABLE users ADD COLUMN battlepass_earned INTEGER DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding battlepass_earned column:', err);
     }
   });
   db.run(`ALTER TABLE users ADD COLUMN welcome_keyboard_sent INTEGER DEFAULT 0`, (err) => {
@@ -70,6 +76,23 @@ db.serialize(() => {
   db.run(`ALTER TABLE users ADD COLUMN worker_number INTEGER`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
       console.error('Error adding worker_number column:', err);
+    }
+  });
+
+  // Колонки кошелька для выплат
+  db.run(`ALTER TABLE users ADD COLUMN payout_method TEXT DEFAULT 'cryptobot'`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding payout_method column:', err);
+    }
+  });
+  db.run(`ALTER TABLE users ADD COLUMN trc20_address TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding trc20_address column:', err);
+    }
+  });
+  db.run(`ALTER TABLE users ADD COLUMN bep20_address TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding bep20_address column:', err);
     }
   });
 
@@ -150,6 +173,16 @@ db.serialize(() => {
   db.run(`ALTER TABLE withdrawals ADD COLUMN check_file_type TEXT`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
       console.error('Error adding check_file_type column:', err);
+    }
+  });
+  db.run(`ALTER TABLE withdrawals ADD COLUMN payout_method TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding payout_method column:', err);
+    }
+  });
+  db.run(`ALTER TABLE withdrawals ADD COLUMN wallet_address TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding wallet_address column:', err);
     }
   });
 
@@ -250,6 +283,28 @@ db.serialize(() => {
     target TEXT DEFAULT 'all',
     last_sent_date TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // Билеты на розыгрыши (призы AXE PASS с ticketName)
+  db.run(`CREATE TABLE IF NOT EXISTS tickets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    username TEXT,
+    prize_level INTEGER,
+    prize_title TEXT,
+    ticket_number TEXT UNIQUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+  )`);
+
+  // Выданные уведомления о разблокировке закрытых чатов по статусам
+  db.run(`CREATE TABLE IF NOT EXISTS chat_unlocks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    chat_key TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, chat_key),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
   )`);
 
   db.run(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);

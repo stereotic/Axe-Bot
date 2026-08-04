@@ -2,6 +2,7 @@ const { createCanvas, loadImage, registerFont } = require('canvas');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const { Worker, isMainThread, parentPort } = require('worker_threads');
 
 const TEMPLATE_PATHS = [
   path.join(__dirname, 'assets', 'templates', 'profile_bg.jpg'),
@@ -318,14 +319,90 @@ async function getTelegramAvatarBuffer(bot, userId) {
 
 function formatName(rawName) {
   const name = String(rawName || 'UNKNOWN').trim().toUpperCase();
-  return name.startsWith('#') ? name : `#${name}`;
+  return name.startsWith('@') ? name : `@${name}`;
 }
 
 function formatCount(value) {
   return (Number(value) || 0).toLocaleString('ru-RU');
 }
 
+// ─── Вынос отрисовки в worker_threads ───────────────────────────────────────
+// Рендер canvas (~230мс) блокирует event loop в главном потоке. В main-потоке
+// renderProfileBanner отправляет задачу воркеру; в воркере этот же файл
+// исполняется синхронно. При сбое воркера — синхронный фолбэк.
+
+let renderWorker = null;
+let renderQueue = [];
+let renderBusy = false;
+
+function ensureRenderWorker() {
+  if (renderWorker) return renderWorker;
+  renderWorker = new Worker(__filename);
+  renderWorker.on('message', (res) => {
+    renderBusy = false;
+    const pending = renderQueue.shift();
+    if (!pending) return;
+    if (res && res.error) {
+      pending.reject(new Error(res.error));
+    } else {
+      // structured clone возвращает Uint8Array — возвращаем настоящий Buffer
+      pending.resolve(res && res.buffer ? Buffer.from(res.buffer) : res.buffer);
+    }
+    pumpRenderQueue();
+  });
+  renderWorker.on('error', (err) => failRenderWorker(err));
+  renderWorker.on('exit', () => failRenderWorker(new Error('render worker exited')));
+  return renderWorker;
+}
+
+function failRenderWorker(err) {
+  renderBusy = false;
+  if (renderWorker) {
+    renderWorker.removeAllListeners();
+    renderWorker = null;
+  }
+  const pending = renderQueue.shift();
+  if (pending) pending.reject(err);
+}
+
+function pumpRenderQueue() {
+  if (renderBusy || renderQueue.length === 0) return;
+  const worker = ensureRenderWorker();
+  if (!worker) return;
+  renderBusy = true;
+  worker.postMessage(renderQueue[0].profile);
+}
+
+function renderInWorker(profile) {
+  return new Promise((resolve, reject) => {
+    renderQueue.push({ profile, resolve, reject });
+    pumpRenderQueue();
+  });
+}
+
+if (!isMainThread) {
+  parentPort.on('message', async (profile) => {
+    try {
+      if (profile && profile.avatarBuffer) {
+        profile.avatarBuffer = Buffer.from(profile.avatarBuffer);
+      }
+      const buffer = await renderProfileBanner(profile);
+      parentPort.postMessage({ buffer });
+    } catch (error) {
+      parentPort.postMessage({ error: error.message || String(error) });
+    }
+  });
+}
+
 async function renderProfileBanner(profile) {
+  if (isMainThread && process.env.AXE_DISABLE_WORKER !== '1') {
+    try {
+      return await renderInWorker(profile);
+    } catch (error) {
+      console.error('Render worker failed, falling back to sync render:', error.message);
+    }
+  }
+
   const template = await loadTemplate();
   const canvas = createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
   const ctx = canvas.getContext('2d');

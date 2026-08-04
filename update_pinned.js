@@ -1,5 +1,30 @@
 const db = require('./database');
 const { topExclusionWhere } = require('./utils');
+const fs = require('fs');
+const path = require('path');
+
+// URL мини-аппа AXE PASS из .env. Кэш 30с: перезапущенный туннель подхватывается,
+// но .env не читается с диска при каждом обновлении закрепа.
+const BATTLEPASS_CACHE_TTL = 30000;
+let battlePassCache = { url: null, at: 0 };
+
+function getBattlePassUrl() {
+  const now = Date.now();
+  if (battlePassCache.url !== null && now - battlePassCache.at < BATTLEPASS_CACHE_TTL) {
+    return battlePassCache.url;
+  }
+
+  try {
+    const env = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
+    const m = env.match(/^BATTLEPASS_URL=(.*)$/m);
+    let url = '';
+    if (m && /^https:\/\//.test(m[1].trim())) url = m[1].trim();
+    battlePassCache = { url, at: now };
+    return url;
+  } catch (e) { /* .env нет — пункт без ссылки */ }
+  battlePassCache = { url: '', at: now };
+  return '';
+}
 
 let pinnedMessageId = null;
 
@@ -122,6 +147,8 @@ async function createPinnedMessageText() {
     ? `<b>🌶ТОП 1 ЗА СУТКИ</b> - <a href="${topWorkerLink}"><b>${topWorkerName}</b></a> - ${topWorkerAmount}₽`
     : '<b>🌶ТОП 1 ЗА СУТКИ</b> -';
 
+  const battlePassUrl = getBattlePassUrl();
+
   return `<b>🌸AXE TEAM🌸</b>
 
 <tg-emoji emoji-id="5258330865674494479">💰</tg-emoji><b>Касса проекта -</b> ${projectBalance.toLocaleString('ru-RU')}₽
@@ -135,20 +162,22 @@ ${topWorkerLine}
 ┣<b>Feedback</b> - <a href="https://t.me/FeedbackAXEbot"><b>ССЫЛКА</b></a>
 ┣<b>Материалы -</b> <a href="https://t.me/+GMixQrZvJkQ4ODE6"><b>ССЫЛКА</b></a>
 ┣<b>Профиты</b> - <a href="https://t.me/+euO9gzLMUMFhNmJi"><b>ССЫЛКА</b></a>
+┣<b>AXE SMS -</b> <a href="https://t.me/AXE_SMS_xBot"><b>ССЫЛКА</b></a>
 ┗<b>AXE NEWS -</b> <a href="https://t.me/+BO1F4O1KUd0zZTI6"><b>ССЫЛКА</b></a>
 
 <tg-emoji emoji-id="5931415565955503486">⌨️</tg-emoji><b>Команды чата</b>
+┣<b>Топ -</b> <b>/top</b>
 ┣<b>Профиль -</b> <b>/me</b>
 ┣<b>Администрация -</b> <b>/staff</b>
 ┣<b>Материалы -</b> <b>/materials</b>
-┣<b>Топ суток -</b> <b>/topd</b>
-┣<b>Топ месяца -</b> <b>/topm</b>
-┣<b>Топ за все время -</b> <b>/top</b>
 ┗<b>Актуальный реквизит -</b> <b>/card</b>
 
 <tg-emoji emoji-id="6008118472066732010">🎁</tg-emoji><b>Активные бонусы</b>
 <b>1.</b> #AXE в нике аккаунта +3% к выплате профита.
 <b>2.</b> Топ 1 суток +5% к выплате профита
+<b>3.</b> ${battlePassUrl ? `<a href="${battlePassUrl}"><b>AXE PASS</b></a>` : '<b>AXE PASS</b>'}
+
+<a href="https://t.me/boost?c=3986505552"><b>⚡️BOOST CHAT</b></a>
 
 <b>AXE TEAM</b> - "Все великие достижения требовали времени."`;
 }

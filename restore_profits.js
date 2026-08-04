@@ -37,7 +37,7 @@ function findUser(nameOrUsername, callback) {
   const clean = nameOrUsername.replace(/^#/, '').trim();
   db.get(
     'SELECT user_id, name, username FROM users WHERE username = ? OR name = ? OR name = ?',
-    [clean, nameOrUsername, '#' + clean],
+    [clean, nameOrUsername, '@' + clean],
     (err, user) => {
       if (err || !user) {
         callback(null, null);

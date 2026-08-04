@@ -45,14 +45,27 @@ function getStatusByTotal(totalEarned) {
  * Обновить статус воркера
  */
 function updateWorkerStatus(userId, callback) {
-  db.get('SELECT total_earned FROM users WHERE user_id = ?', [userId], (err, user) => {
+  db.get('SELECT status, total_earned FROM users WHERE user_id = ?', [userId], (err, user) => {
     if (err || !user) {
       if (callback) callback(err);
       return;
     }
 
+    const oldStatus = user.status || 'NEW';
     const newStatus = getStatusByTotal(user.total_earned);
-    db.run('UPDATE users SET status = ? WHERE user_id = ?', [newStatus, userId], callback);
+
+    if (newStatus === oldStatus) {
+      if (callback) callback(null, newStatus);
+      return;
+    }
+
+    db.run('UPDATE users SET status = ? WHERE user_id = ?', [newStatus, userId], (err) => {
+      if (err) {
+        if (callback) callback(err);
+        return;
+      }
+      if (callback) callback(null, newStatus, oldStatus);
+    });
   });
 }
 

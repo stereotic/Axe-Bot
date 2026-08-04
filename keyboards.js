@@ -1,3 +1,35 @@
+// Кнопка мини-аппа. Telegram принимает web_app только по https — иначе строку не рисуем.
+// URL читаем из .env при КАЖДОМ показе профиля: туннель перезапускается с новым адресом,
+// и кнопка подхватывает его без перезапуска бота.
+const fs = require('fs');
+const path = require('path');
+const PRODUCTION_BATTLEPASS_URL = 'https://axe.crystalcards.store';
+
+// URL мини-аппа кэшируем на 30с: перезапущенный туннель подхватывается без
+// перезапуска бота, но .env не читается с диска при каждом показе меню.
+const BATTLEPASS_CACHE_TTL = 30000;
+let battlePassCache = { url: null, at: 0 };
+
+function getBattlePassUrl() {
+  const now = Date.now();
+  if (battlePassCache.url !== null && now - battlePassCache.at < BATTLEPASS_CACHE_TTL) {
+    return battlePassCache.url;
+  }
+
+  try {
+    const env = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
+    const m = env.match(/^BATTLEPASS_URL=(.*)$/m);
+    let url = PRODUCTION_BATTLEPASS_URL;
+    if (m && /^https:\/\//.test(m[1].trim()) && !/\.trycloudflare\.com\/?$/.test(m[1].trim())) {
+      url = m[1].trim();
+    }
+    battlePassCache = { url, at: now };
+    return url;
+  } catch (e) { /* .env нет — кнопки не будет */ }
+  battlePassCache = { url: PRODUCTION_BATTLEPASS_URL, at: now };
+  return PRODUCTION_BATTLEPASS_URL;
+}
+
 const keyboards = {
   main: {
     keyboard: [
@@ -9,37 +41,45 @@ const keyboards = {
     one_time_keyboard: false
   },
 
-  info: {
-    inline_keyboard: [
-      [{ text: 'Чат 💬', url: 'https://t.me/+1EwzBdEWNQgxYWFi' }],
-      [
-        { text: '💸Профиты', url: 'https://t.me/+euO9gzLMUMFhNmJi' },
-        { text: '📢Новости', url: 'https://t.me/+BO1F4O1KUd0zZTI6' }
-      ],
-      [{ text: '📂Материалы', url: 'https://t.me/+GMixQrZvJkQ4ODE6' }]
-    ]
-  },
+  get menu() {
+    const battlePassUrl = getBattlePassUrl();
+    const battlePassButton = battlePassUrl
+      ? { text: 'AXE PASS🎁', web_app: { url: battlePassUrl } }
+      : { text: 'AXE PASS🎁', callback_data: 'battlepass_unavailable' };
 
-  menu: {
-    inline_keyboard: [
-      [{ text: 'Профиль', callback_data: 'profile' }],
-      [
-        { text: 'WORK', callback_data: 'work' },
-        { text: 'Обучение', callback_data: 'training' }
-      ],
-      [
-        { text: 'Карта', callback_data: 'card' },
-        { text: 'Комьюнити', callback_data: 'community' }
-      ],
-      [
-        { text: 'Feedback', callback_data: 'feedback' },
-        { text: 'Настройки', callback_data: 'settings' }
+    return {
+      inline_keyboard: [
+        [{ text: 'Профиль', callback_data: 'profile' }],
+        [battlePassButton],
+        [
+          { text: 'Букмекер', callback_data: 'card' },
+          { text: 'Кардинг', callback_data: 'work' }
+        ],
+        [
+          { text: 'Комьюнити', callback_data: 'community' },
+          { text: 'Обучение', callback_data: 'training' }
+        ],
+        [
+          { text: 'Feedback', callback_data: 'feedback' },
+          { text: 'Настройки', callback_data: 'settings' }
+        ],
+        [{ text: 'AXE SMS🔥', url: 'https://t.me/AXE_SMS_xBot' }],
+        [{ text: 'AXE DICE🎲', url: 'https://t.me/AXE_DICE_xBot' }]
       ]
-    ]
+    };
   },
 
   work: {
     inline_keyboard: [
+      [{ text: 'Материалы', url: 'https://t.me/+GMixQrZvJkQ4ODE6' }],
+      [{ text: 'Назад в меню', callback_data: 'back_to_menu' }]
+    ]
+  },
+
+  bookmaker: {
+    inline_keyboard: [
+      [{ text: 'Work-Панель', web_app: { url: 'https://epicbet.space/traffer_panel.php' } }],
+      [{ text: 'Расписание матчей', url: 'https://t.me/+fDxvm7h765ZjZDQy' }],
       [{ text: 'Материалы', url: 'https://t.me/+GMixQrZvJkQ4ODE6' }],
       [{ text: 'Назад в меню', callback_data: 'back_to_menu' }]
     ]
@@ -64,20 +104,32 @@ const keyboards = {
     ]
   },
 
-  profile: {
+  profile: () => ({
     inline_keyboard: [
       [{ text: 'Оформить выплату', callback_data: 'withdraw' }],
       [{ text: 'Настройки', callback_data: 'profile_settings' }],
       [{ text: 'Назад в меню', callback_data: 'back_to_menu' }]
     ]
-  },
+  }),
 
   profile_settings: (isHidden) => ({
     inline_keyboard: [
       [{ text: 'Изменить Name', callback_data: 'change_name' }],
       [{ text: isHidden ? 'Открыть профиль' : 'Скрыть профиль', callback_data: 'hide_profile' }],
+      [{ text: '💼 Кошелек для выплаты', callback_data: 'payout_wallet' }],
       [{ text: 'Перенести профиль', callback_data: 'transfer_profile' }],
       [{ text: 'Назад', callback_data: 'profile' }]
+    ]
+  }),
+
+  payout_wallet: (method) => ({
+    inline_keyboard: [
+      [{ text: method === 'cryptobot' ? 'СryptoBot✅' : 'СryptoBot', callback_data: 'wallet_set_cryptobot' }],
+      [
+        { text: method === 'trc20' ? 'TRC20✅' : 'TRC20', callback_data: 'wallet_set_trc20' },
+        { text: method === 'bep20' ? 'BEP20✅' : 'BEP20', callback_data: 'wallet_set_bep20' }
+      ],
+      [{ text: 'Назад', callback_data: 'profile_settings' }]
     ]
   }),
 

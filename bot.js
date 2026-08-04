@@ -5,16 +5,23 @@ const keyboards = require('./keyboards');
 const utils = require('./utils');
 const cardSystem = require('./card_system');
 const { setupCardHandlers } = require('./card_handlers');
-const { setupCardViewHandlers, openCardView, startCardRequestInPrivate, startCardCheckInPrivate } = require('./card_view_handlers');
+const { setupCardViewHandlers, startCardRequestInPrivate, startCardCheckInPrivate } = require('./card_view_handlers');
 const { setupCardRequestHandlers } = require('./card_request_handlers');
 const { setupCheckHandlers } = require('./check_handlers');
 const { setupProfitSystem } = require('./profit_system');
 const fs = require('fs');
 const path = require('path');
-const axios = require('axios');
 const profileBanner = require('./profile_banner');
 const { loadPinnedMessageId, updatePinnedMessage } = require('./update_pinned');
 const { setupRassSystem, isRassEditing, cancelRassEdit } = require('./rass');
+const { startBattlePassServer } = require('./battlepass_server');
+const battlepass = require('./battlepass');
+const statusChats = require('./status_chats');
+const { setupEpicbetProfits } = require('./epicbet_profits');
+const guard = require('./guard');
+const perf = require('./perf');
+const { parseProfitText, parseProfitCommand } = require('./profit_parser');
+const { acquire: acquireSingleInstance } = require('./single_instance');
 
 // Короткий текст, если нет картинки для меню (пустой sendMessage/caption Telegram отклоняет).
 const MENU_PANEL_FALLBACK = 'Выбери раздел:';
@@ -33,23 +40,59 @@ const profitData = {};
 global.profitData = profitData;
 
 // Данные куратора
-const mentorData = {
-  username: 'Henry_AXE',
-  userId: null, // ID будет установлен при первом взаимодействии
-  service: 'Кардинг',
-  monthsOnPosition: 0, // Количество месяцев на должности
-  currentStudents: 0, // Текущее количество учеников
-  percent: 20,
-  trainingProfits: 5, // Количество профитов для обучения
-  workingHours: '14:00 - 00:00',
-  description: `Активный воркер. Приучаю работать на качество, добиваюсь твоей стабильности в работе. Перед обращением ко мне обязательно знать теорию направления. За ручку не веду, иду сзади и корректирую каждый твой шаг. Большие профиты не покажутся тебе сказкой если, ты уделишь время моему курированию а так же проявишь усидчивость при работе.
-
-Что ты получаешь?:
-
-• Обучение без мануалов!
+const mentors = [
+  {
+    username: 'Henry_AXE',
+    userId: null, // ID будет установлен при первом взаимодействии
+    banner: 'mentor_henry.jpg',
+    service: 'Кардинг',
+    hiredAt: '20.05.2026', // Дата найма для подсчета «На должности»
+    percent: 20,
+    trainingProfits: 5, // Количество профитов для обучения
+    workingHours: '14:00 - 00:00',
+    description: `Активный воркер. Приучаю работать на качество, добиваюсь твоей стабильности в работе. Перед обращением ко мне обязательно знать теорию направления. За ручку не веду, иду сзади и корректирую каждый твой шаг. Большие профиты не покажутся тебе сказкой если, ты уделишь время моему курированию а так же проявишь усидчивость при работе.`,
+    benefits: `• Обучение без мануалов!
 • Материалы для работы за твой %
 • Четкий план работы.`
-};
+  },
+  {
+    username: 'alprazalam',
+    userId: null,
+    banner: 'mentor_alprazalam.jpg',
+    service: 'Кардинг, Букмекер',
+    hiredAt: '05.08.2026',
+    percent: 20,
+    trainingProfits: 5,
+    workingHours: '13:00 - 00:00',
+    description: `Активный и опытный воркер. Обучу работе с разнообразным трафиком, так же дам советы и актуальные способы в поиске трафика, доведу твои навыки до совершенства. Перед обучение просьба ознакомиться с базовым мануалом по кардингу. Найду индивидуальный подход к каждому воркеру, отвечу на каждый ваш вопрос и наставлю на четкую и профессиональную работу. Покажу на вашем примере, что если есть цель и желание, то большие профиты окажутся в ваших руках.`,
+    benefits: `• Обучение без мануалов!
+• Материалы для работы за твой %
+• Обучение по качественной обработке трафика
+• Психологические маневры для большего шанса успеха на профит`
+  }
+];
+
+const getMentorByIndex = (index) => mentors[index] || null;
+
+// Полные месяцы с даты найма (ДД.ММ.ГГГГ)
+function calcMonthsOnPosition(hiredAt) {
+  if (!hiredAt) return 0;
+  const [d, m, y] = String(hiredAt).split('.').map(Number);
+  if (!d || !m || !y) return 0;
+  const hired = new Date(y, m - 1, d);
+  const now = new Date();
+  let months = (now.getFullYear() - hired.getFullYear()) * 12 + (now.getMonth() - hired.getMonth());
+  if (now.getDate() < hired.getDate()) months -= 1;
+  return Math.max(0, months);
+}
+
+function monthsLabel(n) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${n} месяц`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${n} месяца`;
+  return `${n} месяцев`;
+}
 
 // Временное хранилище для заявок
 const applicationData = {};
@@ -76,20 +119,34 @@ if (telegramProxy) {
   console.log(`🌐 Telegram API через прокси: ${telegramProxy}`);
 }
 
+// Защита от нескольких запущенных экземпляров с одним BOT_TOKEN.
+const instanceLock = acquireSingleInstance();
+if (!instanceLock.ok) {
+  console.error('🛑 ' + instanceLock.message);
+  process.exit(1);
+}
+
 const bot = new TelegramBot(token, botOptions);
 
-// Отправляем JSON через axios
-const TELEGRAM_API = `https://api.telegram.org/bot${token}`;
-bot.sendMessage = function (chatId, text, extra = {}) {
-  return axios.post(`${TELEGRAM_API}/sendMessage`, {
-    chat_id: chatId,
-    text,
-    ...extra
-  }).then(res => {
-    if (!res.data.ok) throw new Error(`Telegram API error: ${res.data.description}`);
-    return res.data.result;
-  });
-};
+// Кэш file_id статичных картинок меню: первая отправка грузит файл,
+// последующие — пересылают по file_id без повторной загрузки на сервер Telegram.
+const photoFileIdCache = new Map();
+
+async function sendMenuPhoto(chatId, imagePath, extra = {}) {
+  const cachedFileId = photoFileIdCache.get(imagePath);
+  if (cachedFileId) {
+    return bot.sendPhoto(chatId, cachedFileId, extra);
+  }
+
+  const sent = await bot.sendPhoto(chatId, imagePath, extra);
+  try {
+    const photos = sent && sent.photo;
+    if (photos && photos.length) {
+      photoFileIdCache.set(imagePath, photos[photos.length - 1].file_id);
+    }
+  } catch (_) { /* кэш не критичен */ }
+  return sent;
+}
 
 // Подключаем обработчики системы реквизитов
 setupCardHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, CASH_CHANNEL_ID);
@@ -98,6 +155,9 @@ setupCardRequestHandlers(bot, adminIds);
 setupCheckHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, CASH_CHANNEL_ID);
 setupProfitSystem(bot, adminIds);
 setupRassSystem(bot, adminIds);
+setupEpicbetProfits(bot, adminIds);
+startBattlePassServer();
+statusChats.migrateExistingWorkers(bot);
 
 // Устанавливаем меню команд бота
 bot.setMyCommands([
@@ -105,8 +165,6 @@ bot.setMyCommands([
   { command: 'staff', description: 'Состав администрации' },
   { command: 'materials', description: 'Обучающие материалы' },
   { command: 'top', description: 'Топ воркеров за все время' },
-  { command: 'topd', description: 'Топ воркеров за день' },
-  { command: 'topm', description: 'Топ воркеров за месяц' },
   { command: 'card', description: 'Актуальные реквизиты' },
   { command: 'keyboard', description: 'Показать кнопки Меню и Информация' }
 ]).then(() => {
@@ -152,7 +210,7 @@ const INFO_BANNER = () => {
       return;
     }
 
-    const excludedNames = ['#sss','#Testovhik','#тестик','тестик','#testovhik','testovhik'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+    const excludedNames = ['@sss','@Testovhik','@тестик','тестик','@testovhik','testovhik'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
     const excludedUsernames = ['sss','freeobnall'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
 
     db.get(`SELECT COALESCE(SUM(p.amount), 0) as total, COUNT(p.id) as count
@@ -180,7 +238,7 @@ const INFO_BANNER = () => {
 <tg-emoji emoji-id="5258330865674494479">🏦</tg-emoji><b>Касса проекта: </b><b><i>${projectBalance.toLocaleString('en-US')}₽</i>
 ┗Кол-во профитов: </b><b><i>${totalProfits} шт</i></b>
 
-<tg-emoji emoji-id="5258419835922030550">📆</tg-emoji><b>Дата открытия проекта 05.05.2026.</b>`;
+<tg-emoji emoji-id="5258419835922030550">📆</tg-emoji><b>Дата открытия проекта 06.06.2026.</b>`;
 
       infoBannerCache = { text: banner, timestamp: now };
       resolve(banner);
@@ -202,24 +260,26 @@ const WORK_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji>С
 
 • <b>WORK-Панель</b>, <i>и  реферальная ссылка находится в </i><i><b>магазине</b> по команде</i> /bb`;
 
+const BOOKMAKER_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji>Сервис: Букмекер
+
+<tg-emoji emoji-id="5879585266426973039">🌐</tg-emoji>Сайт
+┗ https://epicbet.space/
+
+<tg-emoji emoji-id="5258513401784573443">👾</tg-emoji>Тех.Поддержка
+┣ [9-21] @Aether_AXE
+┗ [21-9] @Daryl_AXE
+
+<tg-emoji emoji-id="5258328383183396223">📚</tg-emoji> Мануал:
+┗ <a href="https://telegra.ph/Fejk-BK-06-21">Букмекер</a> ← Читать
+
+• WORK-Панель открывается в формате WEB и MiniApp</b>`;
+
 const FEEDBACK_INFO = `• <b>Feedback</b>
 
 <b><tg-emoji emoji-id="5260535596941582167">📨</tg-emoji>Связаться с администрацией</b>
 ┗ @FeedbackAXEbot`;
 
 
-
-// Функция получения курса доллара
-async function getUsdRate() {
-  try {
-    const response = await axios.get('https://www.cbr-xml-daily.ru/daily_json.js');
-    const usdRate = response.data.Valute.USD.Value;
-    return Math.round(usdRate * 100) / 100;
-  } catch (error) {
-    console.error('Error fetching USD rate:', error);
-    return 95.50; // Значение по умолчанию
-  }
-}
 
 // Функция получения топ 1 воркера за сутки
 function getTopWorkerToday(callback) {
@@ -301,7 +361,7 @@ function formatProfile(user, topPosition) {
 
 async function sendProfileMessage(chatId, user, topPosition, options = {}) {
   try {
-    const profileMedia = await profileBanner.buildProfileMedia(bot, user, topPosition);
+    const profileMedia = await perf.wrap('buildProfileMedia', profileBanner.buildProfileMedia.bind(profileBanner))(bot, user, topPosition);
 
     const sendOptions = {
       caption: profileMedia.caption,
@@ -314,7 +374,7 @@ async function sendProfileMessage(chatId, user, topPosition, options = {}) {
         sendOptions.reply_markup = options.reply_markup;
       }
     } else {
-      sendOptions.reply_markup = keyboards.profile;
+      sendOptions.reply_markup = keyboards.profile();
     }
 
     const message = await bot.sendPhoto(chatId, profileMedia.buffer, sendOptions);
@@ -333,7 +393,7 @@ async function sendProfileMessage(chatId, user, topPosition, options = {}) {
         sendOptions.reply_markup = options.reply_markup;
       }
     } else {
-      sendOptions.reply_markup = keyboards.profile;
+      sendOptions.reply_markup = keyboards.profile();
     }
 
     const message = await bot.sendMessage(chatId, profileBanner.buildProfileCaption(user, topPosition), sendOptions);
@@ -458,18 +518,19 @@ function isSubscribedChatMember(member) {
 
 const WELCOME_KEYBOARD_TEXT = '🦋 <b>Добро пожаловать в AXE TEAM</b>!';
 
-// Панель «Информация» — текст AXE TEAM и 4 inline-кнопки (без reply-клавиатуры).
-async function sendInfoPanel(chatId, options = {}) {
+// Панель «Информация» — текст AXE TEAM, общие чаты и закрытые по статусу кнопки.
+async function sendInfoPanel(chatId, userId, options = {}) {
   const banner = await INFO_BANNER();
   const imagePath = path.join(__dirname, 'images', 'menu.jpg');
+  const reply_markup = await statusChats.buildInfoKeyboardForUser(userId);
   const sendOpts = {
     parse_mode: 'HTML',
     disable_notification: options.disableNotification === true,
-    reply_markup: keyboards.info
+    reply_markup
   };
 
   if (fs.existsSync(imagePath)) {
-    return bot.sendPhoto(chatId, imagePath, { caption: banner, ...sendOpts });
+    return sendMenuPhoto(chatId, imagePath, { caption: banner, ...sendOpts });
   }
   return bot.sendMessage(chatId, banner, sendOpts);
 }
@@ -524,7 +585,7 @@ async function showWelcomeAfterApproval(chatId, userId) {
     await markWelcomeKeyboardSent(userId);
   }
 
-  await sendInfoPanel(chatId, { disableNotification: true });
+  await sendInfoPanel(chatId, userId, { disableNotification: true });
 }
 
 async function completeOnboardingAfterSubscription(chatId, userId, subscriptionMessageId) {
@@ -567,21 +628,54 @@ function replaceMenuMessage(chatId, messageId, sendPromise) {
     });
 }
 
-const callbackDebounce = new Map();
-
-// Функция для предотвращения дублирования callback (Баг 2)
+// Функция для предотвращения дублирования callback (единый guard)
 function shouldProcessCallback(userId, callbackData) {
-  const key = `${userId}_${callbackData}`;
-  const now = Date.now();
-  const lastCall = callbackDebounce.get(key) || 0;
-
-  if (now - lastCall < 1000) return false;
-  callbackDebounce.set(key, now);
-
-  // Очищаем старые записи
-  setTimeout(() => callbackDebounce.delete(key), 2000);
-  return true;
+  return guard.shouldProcessCallback(userId, callbackData);
 }
+const walletAddressInput = {};
+// Ожидание подтверждения адреса: userId -> { type, address }
+const walletPendingConfirm = {};
+
+const getPayoutLabel = (method) => {
+  if (method === 'trc20') return 'TRC20';
+  if (method === 'bep20') return 'BEP20';
+  return 'CryptoBot';
+};
+
+const buildWalletText = (user) => {
+  const method = user.payout_method || 'cryptobot';
+  const address = method === 'trc20' ? user.trc20_address : (method === 'bep20' ? user.bep20_address : '');
+  let text = '💼 Кошелек для выплаты\n\n';
+  text += `Текущий способ: ${getPayoutLabel(method)}`;
+  if (address) {
+    text += `\nАдрес: <code>${address}</code>`;
+  }
+  return text;
+};
+
+const showWalletScreen = (chatId, messageId, user, hasPhoto) => {
+  const walletText = buildWalletText(user);
+  const walletKeyboard = keyboards.payout_wallet(user.payout_method || 'cryptobot');
+  if (hasPhoto) {
+    bot.editMessageCaption(walletText, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: 'HTML',
+      reply_markup: walletKeyboard
+    }).catch(() => {
+      bot.sendMessage(chatId, walletText, { parse_mode: 'HTML', reply_markup: walletKeyboard }).catch(() => {});
+    });
+  } else {
+    bot.editMessageText(walletText, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: 'HTML',
+      reply_markup: walletKeyboard
+    }).catch(() => {
+      bot.sendMessage(chatId, walletText, { parse_mode: 'HTML', reply_markup: walletKeyboard }).catch(() => {});
+    });
+  }
+};
 
 // Функция переноса профиля
 function transferProfileData(sourceUserId, targetUserId, chatId) {
@@ -597,6 +691,7 @@ function transferProfileData(sourceUserId, targetUserId, chatId) {
       status = ?,
       balance = ?,
       total_earned = ?,
+      battlepass_earned = ?,
       profit_count = ?,
       profile_hidden = ?,
       curator = ?,
@@ -607,6 +702,7 @@ function transferProfileData(sourceUserId, targetUserId, chatId) {
         sourceUser.status,
         sourceUser.balance,
         sourceUser.total_earned,
+        sourceUser.battlepass_earned || 0,
         sourceUser.profit_count,
         sourceUser.profile_hidden,
         sourceUser.curator,
@@ -650,13 +746,104 @@ function handleProtectedCallback(query, data, chatId, userId) {
   const messageId = query.message.message_id;
   const hasPhoto = query.message.photo ? true : false;
 
+  // Карточка куратора
+  if (data.startsWith('show_mentor_')) {
+    const mentorIndex = parseInt(data.replace('show_mentor_', ''), 10);
+    const mentor = getMentorByIndex(mentorIndex);
+    if (!mentor) {
+      bot.answerCallbackQuery(query.id, { text: '❌ Куратор не найден', show_alert: true });
+      return;
+    }
+    bot.answerCallbackQuery(query.id);
+
+    // Получаем количество учеников куратора
+    db.get('SELECT COUNT(*) as count FROM users WHERE curator = ?', [mentor.username], (err, result) => {
+      const studentsCount = err ? 0 : result.count;
+      const monthsOnPosition = calcMonthsOnPosition(mentor.hiredAt);
+
+      const mentorText = `<tg-emoji emoji-id="5992157823838984339">👨‍🏫</tg-emoji><b>Куратор:</b> <b>@${mentor.username}</b>
+
+┏ <tg-emoji emoji-id="5956561916573782596">🏠</tg-emoji><b>Сервисы</b> - ${mentor.service}
+┣<tg-emoji emoji-id="5875291072225087249">⏰</tg-emoji><b>На должности</b> - ${monthsLabel(monthsOnPosition)}
+┣<tg-emoji emoji-id="5942877472163892475">🤵‍♂️</tg-emoji><b>Обучается</b> - ${studentsCount} чел
+┣<tg-emoji emoji-id="5879813604068298387">⚖️</tg-emoji><b>Процент с профита</b> - ${mentor.percent}%
+┣<tg-emoji emoji-id="5776213190387961618">📚</tg-emoji><b>Время обучения</b> - ${mentor.trainingProfits} профитов
+┗<tg-emoji emoji-id="5877396173135811032">⏳</tg-emoji><b>Рабочее время</b> - ${mentor.workingHours} Мск
+
+⚠️<b>Описание:</b>
+<i>${mentor.description}</i>
+
+❤️<b>Что ты получаешь?:</b>
+${mentor.benefits}`;
+
+      const mentorKeyboard = {
+        inline_keyboard: [
+          [{ text: 'Закрепиться за куратором', callback_data: `assign_mentor_${mentorIndex}` }],
+          [{ text: 'Назад', callback_data: 'training' }]
+        ]
+      };
+
+      const mentorBannerPath = path.join(__dirname, 'images', mentor.banner);
+
+      if (fs.existsSync(mentorBannerPath)) {
+        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, mentorBannerPath, {
+          caption: mentorText,
+          parse_mode: 'HTML',
+          reply_markup: mentorKeyboard
+        }));
+      } else {
+        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, mentorText, {
+          parse_mode: 'HTML',
+          reply_markup: mentorKeyboard
+        }));
+      }
+    });
+    return;
+  }
+
+  // Закрепление за куратором
+  if (data.startsWith('assign_mentor_')) {
+    const mentorIndex = parseInt(data.replace('assign_mentor_', ''), 10);
+    const mentor = getMentorByIndex(mentorIndex);
+    if (!mentor) {
+      bot.answerCallbackQuery(query.id, { text: '❌ Куратор не найден', show_alert: true });
+      return;
+    }
+    bot.answerCallbackQuery(query.id);
+
+    // Закрепляем пользователя за куратором
+    db.run('UPDATE users SET curator = ? WHERE user_id = ?', [mentor.username, userId], (err) => {
+      if (err) {
+        bot.sendMessage(chatId, '❌ Ошибка закрепления за куратором');
+        console.error('Error assigning mentor:', err);
+        return;
+      }
+
+      // Баг 3 исправлен: отправляем в личку пользователю (userId), а не в текущий чат (chatId)
+      bot.sendMessage(userId, `✅ Вы успешно закрепились за куратором @${mentor.username}!`).catch(err => {
+        console.error('Error sending to user:', err);
+      });
+
+      // Отправляем уведомление куратору (если у нас есть его ID)
+      if (mentor.userId) {
+        db.get('SELECT username FROM users WHERE user_id = ?', [userId], (err, user) => {
+          const username = user && user.username ? `@${user.username}` : `ID: ${userId}`;
+          bot.sendMessage(mentor.userId, `🎓 За тобой закрепился пользователь ${username}`).catch(err => {
+            console.error('Error sending to mentor:', err);
+          });
+        });
+      }
+    });
+    return;
+  }
+
   switch (data) {
     case 'back_to_menu':
       bot.answerCallbackQuery(query.id);
       const menuImagePath = path.join(__dirname, 'images', 'info.jpg');
 
       if (fs.existsSync(menuImagePath)) {
-        replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, menuImagePath, {
+        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, menuImagePath, {
           reply_markup: keyboards.menu
         }));
       } else {
@@ -688,13 +875,29 @@ function handleProtectedCallback(query, data, chatId, userId) {
       });
       break;
 
+    case 'battlepass_unavailable':
+      bot.answerCallbackQuery(query.id, {
+        text: 'AXE PASS временно недоступен. Попробуйте ещё раз позже.',
+        show_alert: true
+      });
+      break;
+
     case 'card':
       bot.answerCallbackQuery(query.id);
-      openCardView(bot, chatId, userId, {
-        deleteMessageId: messageId,
-        showBackToMenu: true,
-        chatType: query.message.chat.type
-      });
+      const bookmakerImagePath = path.join(__dirname, 'images', 'bookmaker.jpg');
+
+      if (fs.existsSync(bookmakerImagePath)) {
+        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, bookmakerImagePath, {
+          caption: BOOKMAKER_INFO,
+          reply_markup: keyboards.bookmaker,
+          parse_mode: 'HTML'
+        }));
+      } else {
+        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, BOOKMAKER_INFO, {
+          reply_markup: keyboards.bookmaker,
+          parse_mode: 'HTML'
+        }));
+      }
       break;
 
     case 'work':
@@ -702,7 +905,7 @@ function handleProtectedCallback(query, data, chatId, userId) {
       const workImagePath = path.join(__dirname, 'images', 'work.jpg');
 
       if (fs.existsSync(workImagePath)) {
-        replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, workImagePath, {
+        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, workImagePath, {
           caption: WORK_INFO,
           reply_markup: keyboards.work,
           parse_mode: 'HTML'
@@ -719,16 +922,16 @@ function handleProtectedCallback(query, data, chatId, userId) {
       bot.answerCallbackQuery(query.id);
       const trainingImagePath = path.join(__dirname, 'images', 'training.jpg');
 
-      // Создаем клавиатуру с куратором
+      // Создаем клавиатуру с кураторами
       const trainingKeyboard = {
         inline_keyboard: [
-          [{ text: `@${mentorData.username}  ${mentorData.percent}%`, callback_data: 'show_mentor' }],
+          ...mentors.map((m, i) => [{ text: `@${m.username}  ${m.percent}%`, callback_data: `show_mentor_${i}` }]),
           [{ text: 'Назад в меню', callback_data: 'back_to_menu' }]
         ]
       };
 
       if (fs.existsSync(trainingImagePath)) {
-        replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, trainingImagePath, {
+        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, trainingImagePath, {
           caption: '<b><i>Тег куратора • Процент</i></b>',
           parse_mode: 'HTML',
           reply_markup: trainingKeyboard
@@ -739,88 +942,6 @@ function handleProtectedCallback(query, data, chatId, userId) {
           reply_markup: trainingKeyboard
         }));
       }
-      break;
-
-    case 'show_mentor':
-      bot.answerCallbackQuery(query.id);
-
-      // Получаем количество учеников куратора
-      db.get('SELECT COUNT(*) as count FROM users WHERE curator = ?', [mentorData.username], (err, result) => {
-        const studentsCount = err ? 0 : result.count;
-
-        const mentorText = `<tg-emoji emoji-id="5992157823838984339">👨‍🏫</tg-emoji><b>Куратор:</b> <b>@${mentorData.username}</b>
-
-<tg-emoji emoji-id="5956561916573782596">🏠</tg-emoji><b>Сервис</b>
-┗  <b>${mentorData.service}</b>
-
-<tg-emoji emoji-id="5875291072225087249">⏰</tg-emoji><b>На должности</b>
-┗  ${mentorData.monthsOnPosition} месяцев
-
-<tg-emoji emoji-id="5942877472163892475">🤵‍♂️</tg-emoji><b>Обучается</b>
-┗  ${studentsCount}
-
-<tg-emoji emoji-id="5879813604068298387">⚖️</tg-emoji><b>Процент</b>
-┗  ${mentorData.percent}%
-
-<tg-emoji emoji-id="5776213190387961618">📚</tg-emoji><b>Время обучения</b>
-┗  ${mentorData.trainingProfits} профитов
-
-<tg-emoji emoji-id="5877396173135811032">⏳</tg-emoji><b>Рабочее время</b>
-┗  ${mentorData.workingHours}
-
-⚠️<b>Описание:</b>
-<i>${mentorData.description}</i>`;
-
-        const mentorKeyboard = {
-          inline_keyboard: [
-            [{ text: 'Закрепиться за куратором', callback_data: 'assign_mentor' }],
-            [{ text: 'Назад', callback_data: 'training' }]
-          ]
-        };
-
-        const mentorBannerPath = path.join(__dirname, 'images', 'mentor_banner.jpg');
-
-        if (fs.existsSync(mentorBannerPath)) {
-          replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, mentorBannerPath, {
-            caption: mentorText,
-            parse_mode: 'HTML',
-            reply_markup: mentorKeyboard
-          }));
-        } else {
-          replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, mentorText, {
-            parse_mode: 'HTML',
-            reply_markup: mentorKeyboard
-          }));
-        }
-      });
-      break;
-
-    case 'assign_mentor':
-      bot.answerCallbackQuery(query.id);
-
-      // Закрепляем пользователя за куратором
-      db.run('UPDATE users SET curator = ? WHERE user_id = ?', [mentorData.username, userId], (err) => {
-        if (err) {
-          bot.sendMessage(chatId, '❌ Ошибка закрепления за куратором');
-          console.error('Error assigning mentor:', err);
-          return;
-        }
-
-        // Баг 3 исправлен: отправляем в личку пользователю (userId), а не в текущий чат (chatId)
-        bot.sendMessage(userId, `✅ Вы успешно закрепились за куратором @${mentorData.username}!`).catch(err => {
-          console.error('Error sending to user:', err);
-        });
-
-        // Отправляем уведомление куратору (если у нас есть его ID)
-        if (mentorData.userId) {
-          db.get('SELECT username FROM users WHERE user_id = ?', [userId], (err, user) => {
-            const username = user && user.username ? `@${user.username}` : `ID: ${userId}`;
-            bot.sendMessage(mentorData.userId, `🎓 За тобой закрепился пользователь ${username}`).catch(err => {
-              console.error('Error sending to mentor:', err);
-            });
-          });
-        }
-      });
       break;
 
     case 'community':
@@ -836,7 +957,7 @@ function handleProtectedCallback(query, data, chatId, userId) {
       };
 
       if (fs.existsSync(communityImagePath)) {
-        replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, communityImagePath, {
+        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, communityImagePath, {
           caption: communityText,
           parse_mode: 'HTML',
           reply_markup: communityKeyboard
@@ -854,7 +975,7 @@ function handleProtectedCallback(query, data, chatId, userId) {
       const feedbackImagePath = path.join(__dirname, 'images', 'feedback.jpg');
 
       if (fs.existsSync(feedbackImagePath)) {
-        replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, feedbackImagePath, {
+        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, feedbackImagePath, {
           caption: FEEDBACK_INFO,
           parse_mode: 'HTML',
           reply_markup: keyboards.feedback
@@ -873,7 +994,7 @@ function handleProtectedCallback(query, data, chatId, userId) {
       const settingsText = '⚙️ Настройки';
 
       if (fs.existsSync(settingsImagePath)) {
-        replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, settingsImagePath, {
+        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, settingsImagePath, {
           reply_markup: keyboards.settings_menu
         }));
       } else {
@@ -889,7 +1010,7 @@ function handleProtectedCallback(query, data, chatId, userId) {
       const materialsText = '📂 Материалы\n\nЗдесь будут доступны обучающие материалы';
 
       if (fs.existsSync(materialsImagePath)) {
-        replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, materialsImagePath, {
+        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, materialsImagePath, {
           caption: materialsText
         }));
       } else {
@@ -909,7 +1030,7 @@ function handleProtectedCallback(query, data, chatId, userId) {
         const settingsText = '⚙️ Настройки профиля';
 
         if (fs.existsSync(settingsImagePath)) {
-          replaceMenuMessage(chatId, messageId, bot.sendPhoto(chatId, settingsImagePath, {
+          replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, settingsImagePath, {
             reply_markup: keyboards.profile_settings(user.profile_hidden)
           }));
         } else {
@@ -920,16 +1041,67 @@ function handleProtectedCallback(query, data, chatId, userId) {
       });
       break;
 
+    case 'payout_wallet':
+      bot.answerCallbackQuery(query.id);
+      getUser(userId, (err, user) => {
+        if (err || !user) {
+          bot.answerCallbackQuery(query.id, { text: '❌ Ошибка', show_alert: true });
+          return;
+        }
+        showWalletScreen(chatId, messageId, user, hasPhoto);
+      });
+      break;
+
+    case 'wallet_set_cryptobot':
+      bot.answerCallbackQuery(query.id, { text: '✅ CryptoBot установлен' });
+      db.run("UPDATE users SET payout_method = 'cryptobot' WHERE user_id = ?", [userId], (err) => {
+        if (err) {
+          console.error('Error setting payout_method:', err);
+          return;
+        }
+        getUser(userId, (err, user) => {
+          if (err || !user) return;
+          showWalletScreen(chatId, messageId, user, hasPhoto);
+        });
+      });
+      break;
+
+    case 'wallet_set_trc20':
+      bot.answerCallbackQuery(query.id);
+      walletAddressInput[userId] = { type: 'trc20' };
+      bot.sendMessage(chatId, '🔃Отправьте ваш адрес ТРС20', {
+        reply_markup: { inline_keyboard: [[{ text: 'Назад', callback_data: 'wallet_cancel_input' }]] }
+      }).catch(() => {});
+      break;
+
+    case 'wallet_set_bep20':
+      bot.answerCallbackQuery(query.id);
+      walletAddressInput[userId] = { type: 'bep20' };
+      bot.sendMessage(chatId, '🔃Отправьте ваш адрес BEP20', {
+        reply_markup: { inline_keyboard: [[{ text: 'Назад', callback_data: 'wallet_cancel_input' }]] }
+      }).catch(() => {});
+      break;
+
+    case 'wallet_cancel_input':
+      bot.answerCallbackQuery(query.id);
+      delete walletAddressInput[userId];
+      delete walletPendingConfirm[userId];
+      getUser(userId, (err, user) => {
+        if (err || !user) return;
+        showWalletScreen(chatId, messageId, user, hasPhoto);
+      });
+      break;
+
     case 'change_name':
       bot.answerCallbackQuery(query.id);
       // Для ввода данных отправляем новое сообщение
       bot.sendMessage(chatId, '✍️Введите новый ник:');
 
-      const nameListener = (msg) => {
+      guard.setPendingInput(userId, chatId, (msg) => {
         if (msg.chat.id !== chatId) return;
         if (!msg.text) return;
 
-        bot.removeListener('message', nameListener);
+        guard.clearPendingInput(userId);
 
         const newName = msg.text;
 
@@ -938,7 +1110,7 @@ function handleProtectedCallback(query, data, chatId, userId) {
           return;
         }
 
-        db.run('UPDATE users SET name = ? WHERE user_id = ?', [`#${newName}`, userId], (err) => {
+        db.run('UPDATE users SET name = ? WHERE user_id = ?', [`@${newName}`, userId], (err) => {
           if (err) {
             bot.sendMessage(chatId, '❌ Ошибка изменения имени');
           } else {
@@ -957,9 +1129,7 @@ function handleProtectedCallback(query, data, chatId, userId) {
             });
           }
         });
-      };
-
-      bot.once('message', nameListener);
+      });
       break;
 
     case 'hide_profile':
@@ -994,11 +1164,11 @@ function handleProtectedCallback(query, data, chatId, userId) {
       // Для ввода данных отправляем новое сообщение
       bot.sendMessage(chatId, '📨Отправьте id или @ аккаунта с которого желаете перенести профиль:');
 
-      const transferListener = (msg) => {
+      guard.setPendingInput(userId, chatId, (msg) => {
         if (msg.chat.id !== chatId) return;
         if (!msg.text) return;
 
-        bot.removeListener('message', transferListener);
+        guard.clearPendingInput(userId);
 
         let sourceUserId = msg.text.trim();
 
@@ -1022,9 +1192,7 @@ function handleProtectedCallback(query, data, chatId, userId) {
           }
           transferProfileData(sourceId, userId, chatId);
         }
-      };
-
-      bot.once('message', transferListener);
+      });
       break;
 
     case 'withdraw':
@@ -1040,15 +1208,20 @@ function handleProtectedCallback(query, data, chatId, userId) {
           return;
         }
 
-        const withdrawText = `📨Создание заявки на выплату!
-💸Сумма выплаты: ${user.balance.toLocaleString()}₽`;
+        const payoutMethod = user.payout_method || 'cryptobot';
+        const payoutAddress = payoutMethod === 'trc20' ? user.trc20_address : (payoutMethod === 'bep20' ? user.bep20_address : '');
+
+        const withdrawText = `<tg-emoji emoji-id="5951665980273858529">📨</tg-emoji><b>Создание заявки на выплату!</b>
+<tg-emoji emoji-id="5967390100357648692">💸</tg-emoji><b>Сумма выплаты: ${user.balance.toLocaleString()}₽</b>
+<b>⚙️Способ выплаты: ${getPayoutLabel(payoutMethod)}</b>${payoutAddress ? `\n<code>${payoutAddress}</code>` : ''}`;
 
         const withdrawKeyboard = {
           inline_keyboard: [
             [
-              { text: 'Создать', callback_data: `confirm_withdraw_${user.balance}` },
+              { text: 'Создать', callback_data: 'confirm_withdraw' },
               { text: 'Отменить', callback_data: 'cancel_withdraw' }
-            ]
+            ],
+            [{ text: '💼 Кошелек для выплаты', callback_data: 'payout_wallet' }]
           ]
         };
 
@@ -1057,17 +1230,19 @@ function handleProtectedCallback(query, data, chatId, userId) {
           bot.editMessageCaption(withdrawText, {
             chat_id: chatId,
             message_id: messageId,
+            parse_mode: 'HTML',
             reply_markup: withdrawKeyboard
           }).catch(() => {
-            bot.sendMessage(chatId, withdrawText, { reply_markup: withdrawKeyboard });
+            bot.sendMessage(chatId, withdrawText, { parse_mode: 'HTML', reply_markup: withdrawKeyboard });
           });
         } else {
           bot.editMessageText(withdrawText, {
             chat_id: chatId,
             message_id: messageId,
+            parse_mode: 'HTML',
             reply_markup: withdrawKeyboard
           }).catch(() => {
-            bot.sendMessage(chatId, withdrawText, { reply_markup: withdrawKeyboard });
+            bot.sendMessage(chatId, withdrawText, { parse_mode: 'HTML', reply_markup: withdrawKeyboard });
           });
         }
       });
@@ -1088,14 +1263,14 @@ function handleProtectedCallback(query, data, chatId, userId) {
               chat_id: chatId,
               message_id: messageId,
               parse_mode: 'HTML',
-              reply_markup: keyboards.profile
+              reply_markup: keyboards.profile()
             }).catch(() => {});
           } else {
             bot.editMessageText(profileText, {
               chat_id: chatId,
               message_id: messageId,
               parse_mode: 'HTML',
-              reply_markup: keyboards.profile
+              reply_markup: keyboards.profile()
             }).catch(() => {});
           }
         });
@@ -1176,7 +1351,7 @@ bot.onText(/\/start/, (msg) => {
         showProfileOrHidden(user);
       } else if (targetNameB64) {
         const cleanName = Buffer.from(targetNameB64, 'base64url').toString();
-        db.get('SELECT * FROM users WHERE (name = ? OR name = ?) AND profile_hidden = 0', [cleanName, '#' + cleanName], (err2, user2) => {
+        db.get('SELECT * FROM users WHERE (name = ? OR name = ?) AND profile_hidden = 0', [cleanName, '@' + cleanName], (err2, user2) => {
           showProfileOrHidden(user2);
         });
       } else {
@@ -1212,7 +1387,7 @@ bot.onText(/\/start/, (msg) => {
         if (isSubscribedChatMember(chatMember) && isSubscribedChatMember(channelMember)) {
           db.run('UPDATE users SET welcome_keyboard_sent = 1 WHERE user_id = ?', [userId], () => {});
           finalizeUserApproval(userId, () => {
-            sendInfoPanel(chatId).catch((err) => {
+            sendInfoPanel(chatId, userId).catch((err) => {
               console.error('/start info failed:', telegramErrorSummary(err));
               bot.sendMessage(chatId, '❌ Ошибка загрузки. Нажми /start ещё раз.').catch(() => {});
             });
@@ -1247,7 +1422,7 @@ bot.onText(/\/start/, (msg) => {
         }
 
         if (hasFullAccess(user)) {
-          sendInfoPanel(chatId).catch((err) => {
+          sendInfoPanel(chatId, userId).catch((err) => {
             console.error('/start info failed:', telegramErrorSummary(err));
             bot.sendMessage(chatId, '❌ Ошибка загрузки. Нажми /start ещё раз.').catch(() => {});
           });
@@ -1282,14 +1457,13 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // Команда для публикации профита: username сумма направление (для всех пользователей)
-bot.onText(/^(?!\/)([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) => {
+bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[12]/, (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
+  const parsed = parseProfitText(msg.text);
+  if (!parsed) return;
 
-  const workerUsername = match[1].replace(/^\/+/, '').replace(/@.+$/, '');
-  const amount = parseInt(match[2]);
-  const direction = parseInt(match[3]);
-  const mammothCount = match[4] ? parseInt(match[4]) : null;
+  const { username: workerUsername, amount, direction, mammothCount } = parsed;
 
   if (!workerUsername || !amount || ![1, 2].includes(direction)) {
     bot.sendMessage(chatId, '❌ Неверный формат. Используйте: username сумма направление\nПример: richvladwork 10000 1');
@@ -1305,16 +1479,16 @@ bot.onText(/^(?!\/)([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, mat
       workerData = {
         user_id: 0, // Временный ID
         username: workerUsername,
-        name: `#${workerUsername}`
+        name: `@${workerUsername}`
       };
     } else {
       workerData = user;
     }
 
-    // Normalize name — ensure # prefix
-    const displayName = workerData.name && workerData.name.startsWith('#')
+    // Normalize name — ensure @ prefix
+    const displayName = workerData.name && workerData.name.startsWith('@')
       ? workerData.name
-      : '#' + (workerData.name || workerData.username);
+      : '@' + (workerData.name || workerData.username);
 
     // Рассчитываем суммы
     const workerPayout = utils.calculateWorkerPayout(amount, direction);
@@ -1360,14 +1534,13 @@ bot.onText(/^(?!\/)([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, mat
 });
 
 // Команда для публикации профита: /name сумма направление (например /richvladwork 5000 1)
-bot.onText(/^\/([^\s]+)\s+(\d+)\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) => {
+bot.onText(/^\/(?:[^\s\/]+)\s+(\d+)\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
+  const parsed = parseProfitCommand(msg.text);
+  if (!parsed) return;
 
-  const workerName = match[1];
-  const amount = parseInt(match[2]);
-  const direction = parseInt(match[3]);
-  const mammothCount = match[4] ? parseInt(match[4]) : null;
+  const { username: workerName, amount, direction, mammothCount } = parsed;
 
   if (!workerName || !amount || ![1, 2].includes(direction)) {
     bot.sendMessage(chatId, '❌ Неверный формат. Используйте: /name сумма направление\nПример: /richvladwork 5000 1');
@@ -1383,15 +1556,15 @@ bot.onText(/^\/([^\s]+)\s+(\d+)\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) => {
       workerData = {
         user_id: 0,
         username: workerName,
-        name: `#${workerName}`
+        name: `@${workerName}`
       };
     } else {
       workerData = user;
     }
 
-    const displayName = workerData.name && workerData.name.startsWith('#')
+    const displayName = workerData.name && workerData.name.startsWith('@')
       ? workerData.name
-      : '#' + (workerData.name || workerData.username);
+      : '@' + (workerData.name || workerData.username);
 
     const workerPayout = utils.calculateWorkerPayout(amount, direction);
     const shares = utils.calculateProfitShares(amount);
@@ -1434,7 +1607,7 @@ bot.onText(/^\/([^\s]+)\s+(\d+)\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg, match) => {
 });
 
 // Обработка кнопок клавиатуры
-bot.on('message', async (msg) => {
+bot.on('message', perf.wrap('message_handler', async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const text = msg.text;
@@ -1442,6 +1615,42 @@ bot.on('message', async (msg) => {
 
   // Обновляем username пользователя при каждом сообщении
   updateUsername(userId, username);
+
+  // Ожидаемый текстовый ввод (сценарии change_name, transfer, заявка, карты)
+  // обрабатывается до общего разбора — один pending-обработчик на пользователя.
+  if (guard.dispatchPendingInput(msg)) {
+    return;
+  }
+
+  // Ввод адреса кошелька для выплат
+  if (walletAddressInput[userId]) {
+    const pending = walletAddressInput[userId];
+    if (!text || text.startsWith('/')) {
+      return;
+    }
+    delete walletAddressInput[userId];
+    const address = text.trim();
+    if (!address) {
+      bot.sendMessage(chatId, '❌ Адрес не может быть пустым. Отправьте адрес ещё раз.');
+      walletAddressInput[userId] = pending;
+      return;
+    }
+    walletPendingConfirm[userId] = { type: pending.type, address };
+    const typeLabel = pending.type === 'trc20' ? 'трс20' : 'bep20';
+    const confirmKeyboard = {
+      inline_keyboard: [
+        [
+          { text: 'Подтвердить', callback_data: `wallet_confirm_${pending.type}` },
+          { text: 'Назад', callback_data: 'wallet_cancel_input' }
+        ]
+      ]
+    };
+    bot.sendMessage(chatId, `📊Вы указали ${typeLabel}:\n- ${address}`, {
+      parse_mode: 'HTML',
+      reply_markup: confirmKeyboard
+    }).catch(() => {});
+    return;
+  }
 
   // Редактирование рассылки обрабатывается в rass.js
   if (isRassEditing(userId)) {
@@ -1533,7 +1742,7 @@ bot.on('message', async (msg) => {
     }
 
     if (text === '📖Информация📖') {
-      sendInfoPanel(chatId).catch((err) => {
+      sendInfoPanel(chatId, userId).catch((err) => {
         console.error('Error sending info panel:', err);
         bot.sendMessage(chatId, '❌ Ошибка получения информации');
       });
@@ -1542,7 +1751,7 @@ bot.on('message', async (msg) => {
       const imagePath = path.join(__dirname, 'images', 'info.jpg');
 
       if (fs.existsSync(imagePath)) {
-        bot.sendPhoto(chatId, imagePath, {
+        sendMenuPhoto(chatId, imagePath, {
           reply_markup: keyboards.menu
         });
       } else {
@@ -1553,10 +1762,10 @@ bot.on('message', async (msg) => {
       return;
     }
   });
-});
+}));
 
 // Обработка callback кнопок (единый обработчик)
-bot.on('callback_query', async (query) => {
+bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
   const chatId = query.message.chat.id;
   const userId = query.from.id;
   const data = query.data;
@@ -1571,6 +1780,96 @@ bot.on('callback_query', async (query) => {
   // Обновляем username пользователя при каждом callback
   updateUsername(userId, username);
 
+  // Уведомление воркеру о профите и прогрессе АХЕ PASS
+  const formatXp = (xp) => String(Math.round(xp * 100) / 100).replace('.', ',');
+
+  const sendAxePassNotification = (workerId, profitAmount, oldTotal, newTotal) => {
+    const oldLevel = battlepass.buildState(oldTotal).level;
+    const state = battlepass.buildState(newTotal);
+    const xpGained = battlepass.xpFromEarned(newTotal) - battlepass.xpFromEarned(oldTotal);
+
+    let text = `<b><tg-emoji emoji-id="5217822164362739968">👑</tg-emoji>Профит на сумму: ${utils.formatAmount(profitAmount)}₽
+Получено: ${formatXp(xpGained)}xp
+У вас ${state.level} уровень АХЕ PASS</b>`;
+
+    if (state.level > oldLevel) {
+      text += `\n\n<b>Получите новый подарок! 🎁</b>`;
+    }
+
+    bot.sendMessage(workerId, text, { parse_mode: 'HTML' }).catch(() => {});
+  };
+
+  // Генерация номера билета вида #Hd1001 — уникальный в таблице tickets
+  const generateTicketNumber = (callback) => {
+    const letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const pick = (n, set) => {
+      let s = '';
+      for (let i = 0; i < n; i++) s += set[Math.floor(Math.random() * set.length)];
+      return s;
+    };
+    const candidate = () => `#${pick(2 + (Math.random() < 0.5 ? 1 : 0), letters)}${pick(4, '0123456789')}`;
+
+    const tryGen = (attempt) => {
+      if (attempt > 15) return callback(new Error('Не удалось сгенерировать уникальный номер билета'));
+      const num = candidate();
+      db.get('SELECT id FROM tickets WHERE ticket_number = ?', [num], (err, row) => {
+        if (err) return callback(err);
+        if (row) return tryGen(attempt + 1);
+        callback(null, num);
+      });
+    };
+    tryGen(0);
+  };
+
+  // Уведомления о призах при переходе на новые уровни пасса
+  const sendPrizeNotifications = (workerId, workerUsername, workerName, oldTotal, newTotal) => {
+    const oldLevel = battlepass.buildState(oldTotal).level;
+    const newLevel = battlepass.buildState(newTotal).level;
+    if (newLevel <= oldLevel) return;
+
+    const mention = workerUsername ? `@${workerUsername}` : (workerName || 'без имени');
+
+    for (let lvl = oldLevel + 1; lvl <= newLevel; lvl++) {
+      const prize = battlepass.LEVELS[lvl - 1];
+      if (!prize) continue;
+
+      if (prize.ticketName) {
+        generateTicketNumber((err, ticket) => {
+          if (err) {
+            console.error('Error generating ticket:', err);
+            return;
+          }
+          db.run(
+            'INSERT INTO tickets (user_id, username, prize_level, prize_title, ticket_number) VALUES (?, ?, ?, ?, ?)',
+            [workerId, workerUsername || null, lvl, prize.title, ticket],
+            (dbErr) => { if (dbErr) console.error('Error saving ticket:', dbErr); }
+          );
+
+          bot.sendMessage(workerId,
+            `<tg-emoji emoji-id="5994502837327892086">🎉</tg-emoji>Поздравляем \n` +
+            `<tg-emoji emoji-id="5963213811597970978">🎟️</tg-emoji>Ты получил билет на розыгрыш: ${prize.ticketName} <tg-emoji emoji-id="5190855056848615312">🎁</tg-emoji>\n\n` +
+            `<tg-emoji emoji-id="5987917196469213507">🎫</tg-emoji>Номер билета: ${ticket}`,
+            { parse_mode: 'HTML' }).catch(() => {});
+
+          adminIds.forEach((adminId) => {
+            bot.sendMessage(adminId,
+              `<b>${mention}</b> получил билет на розыгрыш: <b>${prize.ticketName}</b>\nНомер билета: ${ticket}`,
+              { parse_mode: 'HTML' }
+            ).catch(() => {});
+          });
+        });
+      } else {
+        const workerTag = workerName && workerName !== '#' ? workerName : (workerUsername ? `@${workerUsername}` : 'без имени');
+        adminIds.forEach((adminId) => {
+          bot.sendMessage(adminId,
+            `<b>${workerTag}</b> получил новую награду: <b>${prize.title}</b>`,
+            { parse_mode: 'HTML' }
+          ).catch(() => {});
+        });
+      }
+    }
+  };
+
   // Обработка profit system
   if (data.startsWith('send_profit_accounting_') || (data.startsWith('send_profit_') && !data.startsWith('send_profit_accounting_'))) {
       const profitId = data.startsWith('send_profit_accounting_') ? data.replace('send_profit_accounting_', '') : data.replace('send_profit_', '');
@@ -1582,6 +1881,13 @@ bot.on('callback_query', async (query) => {
       }
 
       bot.answerCallbackQuery(query.id);
+
+      // Idempotency: профит сохраняется в БД ровно один раз, даже если
+      // кнопку нажали повторно (двойной клик, ретрай Telegram).
+      if (profit._saved) {
+        return;
+      }
+      profit._saved = true;
 
       const saveProfitAndUpdateUser = (targetUserId) => {
         db.run('INSERT INTO profits (user_id, amount, amount_to_pay, direction) VALUES (?, ?, ?, ?)',
@@ -1603,46 +1909,56 @@ bot.on('callback_query', async (query) => {
               );
             }
 
-              db.run(`UPDATE users SET
-              balance = balance + ?,
-              total_earned = total_earned + ?,
-              profit_count = profit_count + 1
-              WHERE user_id = ?`,
-              [profit.workerPayout, profit.amount, targetUserId],
-              (err) => {
-                if (err) {
-                  console.error('Error updating user:', err);
-                } else {
-                  console.log(`✅ Updated balance for user ${targetUserId}: +${profit.workerPayout}₽`);
-                  utils.updateWorkerStatus(targetUserId, () => {
-                    db.get('SELECT status, total_earned FROM users WHERE user_id = ?', [targetUserId], (err, updatedUser) => {
-                      if (!err && updatedUser) {
-                        const currentStatus = updatedUser.status || 'NEW';
-                        const currentTotal = updatedUser.total_earned || 0;
-                        const nextThreshold = utils.STATUS_THRESHOLDS.find(t => t.threshold > currentTotal);
-                        const nextLevelAmount = nextThreshold ? nextThreshold.threshold : null;
-                        let nextLevelText = '';
-                        if (nextLevelAmount) {
-                          const remaining = nextLevelAmount - currentTotal;
-                          nextLevelText = `До нового уровня ${remaining.toLocaleString()}₽`;
-                        } else {
-                          nextLevelText = 'Максимальный уровень достигнут';
-                        }
-                        const profitMessage = `🎉<b>Успешный профит </b>🎉
+              db.get('SELECT battlepass_earned FROM users WHERE user_id = ?', [targetUserId], (err, preUser) => {
+                const oldPassTotal = (!err && preUser) ? (preUser.battlepass_earned || 0) : 0;
+                const newPassTotal = oldPassTotal + profit.amount;
 
-┏ 🏠<b>Сервис: ${profit.directionName}
-</b>┣ 🏦<b>На сумму: ${profit.amount.toLocaleString()}₽
-┣ <tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>Твой статус: ${currentStatus}
-┗ 🍾${nextLevelText} </b>
-
-⚠️<i>Подать заявку на выплату можно в профиле. Напоминаем период выплаты каждые 3 часа.</i>`;
-                        bot.sendMessage(targetUserId, profitMessage, { parse_mode: 'HTML' }).catch(() => {});
+                db.run(`UPDATE users SET
+                balance = balance + ?,
+                total_earned = total_earned + ?,
+                battlepass_earned = COALESCE(battlepass_earned, 0) + ?,
+                profit_count = profit_count + 1
+                WHERE user_id = ?`,
+                [profit.workerPayout, profit.amount, profit.amount, targetUserId],
+                (err) => {
+                  if (err) {
+                    console.error('Error updating user:', err);
+                  } else {
+                    console.log(`✅ Updated balance for user ${targetUserId}: +${profit.workerPayout}₽`);
+                    utils.updateWorkerStatus(targetUserId, (statusErr, newStatus) => {
+                      if (!statusErr && newStatus) {
+                        statusChats.sendPendingUnlocks(bot, targetUserId, newStatus);
                       }
+                      db.get('SELECT status, total_earned FROM users WHERE user_id = ?', [targetUserId], (err, updatedUser) => {
+                        if (!err && updatedUser) {
+                          const currentStatus = updatedUser.status || 'NEW';
+                          const currentTotal = updatedUser.total_earned || 0;
+                          const nextThreshold = utils.STATUS_THRESHOLDS.find(t => t.threshold > currentTotal);
+                          const nextLevelAmount = nextThreshold ? nextThreshold.threshold : null;
+                          let nextLevelText = '';
+                          if (nextLevelAmount) {
+                            const remaining = nextLevelAmount - currentTotal;
+                            nextLevelText = `До нового уровня ${remaining.toLocaleString()}₽`;
+                          } else {
+                            nextLevelText = 'Максимальный уровень достигнут';
+                          }
+                          const profitMessage = `<tg-emoji emoji-id="5994502837327892086">🎉</tg-emoji><b>Успешный профит </b>
+
+┏ <tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji><b>Сервис: ${profit.directionName}
+</b>┣ <tg-emoji emoji-id="5769403330761593044">💸</tg-emoji><b>На сумму: ${profit.amount.toLocaleString()}₽
+┣ Твой статус: ${currentStatus}
+┗ <tg-emoji emoji-id="5967688845397855939">🍾</tg-emoji>${nextLevelText} </b>
+
+<tg-emoji emoji-id="5276240711795107620">⚠️</tg-emoji><i>Подать заявку на выплату можно в профиле.</i>`;
+                          bot.sendMessage(targetUserId, profitMessage, { parse_mode: 'HTML' }).catch(() => {});
+                          sendAxePassNotification(targetUserId, profit.amount, oldPassTotal, newPassTotal);
+                          sendPrizeNotifications(targetUserId, profit.username, profit.name, oldPassTotal, newPassTotal);
+                        }
+                      });
                     });
-                  });
-                }
-              }
-            );
+                  }
+                });
+              });
 
             // Обновляем статистику проекта и закреп после сохранения профита в БД
             utils.updateProjectStats(profit.amount, (err) => {
@@ -1747,6 +2063,9 @@ bot.on('callback_query', async (query) => {
 
       bot.answerCallbackQuery(query.id);
 
+      if (profit._sent) return;
+      profit._sent = true;
+
       // Отправляем в бухгалтерию
       const accountingText = `<b>🚀${profit.directionName}
 <tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${profit.username}
@@ -1780,7 +2099,7 @@ bot.on('callback_query', async (query) => {
         hasError = true;
       }
 
-      try {
+try {
         await bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true });
         cashOk = true;
       } catch (err) {
@@ -1799,7 +2118,7 @@ bot.on('callback_query', async (query) => {
       }
 
       updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((err) =>
-        console.error('Error updating pinned after send_all:', err)
+        console.error('Error updating pinned after send_public:', err)
       );
 
       delete profitData[profitId];
@@ -1829,6 +2148,9 @@ bot.on('callback_query', async (query) => {
 🍌Инвестор: ${profit.shares.investor.toLocaleString()}₽
 🧑‍💻Кодер: ${profit.shares.coder.toLocaleString()}₽</b>`;
 
+      if (profit._sent) return;
+      profit._sent = true;
+
       // Отправляем в бухгалтерию
       bot.sendMessage(ACCOUNTING_CHAT_ID, accountingText, { parse_mode: 'HTML' }).catch((err) => {
         console.error('Error sending to accounting:', err);
@@ -1850,6 +2172,9 @@ bot.on('callback_query', async (query) => {
 
       bot.answerCallbackQuery(query.id);
 
+      if (profit._sent) return;
+      profit._sent = true;
+
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
       let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
@@ -1865,7 +2190,7 @@ bot.on('callback_query', async (query) => {
       let hasError = false;
       let cashOk = false;
 
-      try {
+try {
         await bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true });
         cashOk = true;
       } catch (err) {
@@ -1884,7 +2209,7 @@ bot.on('callback_query', async (query) => {
       }
 
       updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((err) =>
-        console.error('Error updating pinned after send_public:', err)
+        console.error('Error updating pinned after send_profit:', err)
       );
 
       delete profitData[profitId];
@@ -1903,24 +2228,24 @@ bot.on('callback_query', async (query) => {
 
     bot.sendMessage(chatId, '<b>Вопрос №1:</b>\n<i>Занимался ли ты подобной деятельностью?</i>', { parse_mode: 'HTML' });
 
-    const question1Listener = (msg) => {
+    guard.setPendingInput(userId, chatId, (msg) => {
       if (msg.chat.id !== chatId) return;
       if (msg.from.id !== userId) return; // Проверяем что это тот же пользователь
       if (!msg.text || msg.text.startsWith('/')) return;
 
-      bot.removeListener('message', question1Listener);
+      guard.clearPendingInput(userId);
 
       applicationData[userId].question1 = msg.text;
       applicationData[userId].step = 2;
 
       bot.sendMessage(chatId, '<b>Вопрос №2:</b>\n<i>Если твой ответ на прошлый вопрос (да), то расскажи каков твой опыт, чем занимался?</i>', { parse_mode: 'HTML' });
 
-      const question2Listener = (msg) => {
+      guard.setPendingInput(userId, chatId, (msg) => {
         if (msg.chat.id !== chatId) return;
         if (msg.from.id !== userId) return; // Проверяем что это тот же пользователь
         if (!msg.text || msg.text.startsWith('/')) return;
 
-        bot.removeListener('message', question2Listener);
+        guard.clearPendingInput(userId);
 
         applicationData[userId].question2 = msg.text;
 
@@ -1957,12 +2282,10 @@ bot.on('callback_query', async (query) => {
           }
         );
         });
-      };
+      });
 
-      bot.once('message', question2Listener);
-    };
+    });
 
-    bot.once('message', question1Listener);
     return;
   }
 
@@ -2174,10 +2497,41 @@ bot.on('callback_query', async (query) => {
     return;
   }
 
-  // Обработка подтверждения вывода
-  if (data.startsWith('confirm_withdraw_')) {
+  // Подтверждение адреса кошелька
+  if (data.startsWith('wallet_confirm_')) {
     bot.answerCallbackQuery(query.id);
-    const amount = parseInt(data.replace('confirm_withdraw_', ''));
+    const pending = walletPendingConfirm[userId];
+    if (!pending) {
+      bot.sendMessage(chatId, '❌ Сессия истекла. Попробуйте ещё раз.');
+      return;
+    }
+    delete walletPendingConfirm[userId];
+    delete walletAddressInput[userId];
+
+    const column = pending.type === 'trc20' ? 'trc20_address' : 'bep20_address';
+    db.run(`UPDATE users SET ${column} = ?, payout_method = ? WHERE user_id = ?`,
+      [pending.address, pending.type, userId], (err) => {
+        if (err) {
+          console.error('Error saving wallet address:', err);
+          bot.sendMessage(chatId, '❌ Ошибка сохранения адреса');
+          return;
+        }
+        bot.sendMessage(chatId, '✅ Кошелек привязан!');
+        getUser(userId, (err, user) => {
+          if (err || !user) return;
+          const walletText = buildWalletText(user);
+          bot.sendMessage(chatId, walletText, {
+            parse_mode: 'HTML',
+            reply_markup: keyboards.payout_wallet(user.payout_method || 'cryptobot')
+          }).catch(() => {});
+        });
+      });
+    return;
+  }
+
+  // Обработка подтверждения вывода
+  if (data === 'confirm_withdraw') {
+    bot.answerCallbackQuery(query.id);
 
     getUser(userId, (err, user) => {
       if (err || !user) {
@@ -2185,11 +2539,21 @@ bot.on('callback_query', async (query) => {
         return;
       }
 
+      const amount = Math.round(Number(user.balance) || 0);
+      if (amount <= 0) {
+        bot.sendMessage(chatId, '❌ Недостаточно средств для вывода');
+        return;
+      }
+
+      const payoutMethod = user.payout_method || 'cryptobot';
+      const payoutAddress = payoutMethod === 'trc20' ? (user.trc20_address || '') : (payoutMethod === 'bep20' ? (user.bep20_address || '') : '');
+
       // Создаем заявку на вывод
-      db.run('INSERT INTO withdrawals (user_id, amount, status) VALUES (?, ?, ?)',
-        [userId, amount, 'pending'],
+      db.run('INSERT INTO withdrawals (user_id, amount, status, payout_method, wallet_address) VALUES (?, ?, ?, ?, ?)',
+        [userId, amount, 'pending', payoutMethod, payoutAddress],
         function(err) {
           if (err) {
+            console.error('Error creating withdrawal:', err);
             bot.sendMessage(chatId, '❌ Ошибка создания заявки');
             return;
           }
@@ -2204,14 +2568,19 @@ bot.on('callback_query', async (query) => {
           });
 
           // Отправляем заявку админу
+          const walletLine = payoutMethod === 'cryptobot'
+            ? '⚪️Кошелек для выплаты: CryptoBot'
+            : `${payoutMethod === 'trc20' ? '🔴' : '🟢'}Кошелек для выплаты ${payoutMethod === 'trc20' ? 'трс20' : 'BEP20'}: <code>${payoutAddress}</code>`;
+
           const adminText = `✅Новая заявка на выплату!
 🌶Воркер: @${user.username || 'unknown'}
 <tg-emoji emoji-id="5936017305585586269">🪪</tg-emoji>Никнейм: ${user.name}
-<tg-emoji emoji-id="5260268501515377807">💌</tg-emoji>Сумма выплаты: ${amount.toLocaleString()}₽`;
+<tg-emoji emoji-id="5260268501515377807">💌</tg-emoji>Сумма выплаты: ${amount.toLocaleString()}₽
+${walletLine}`;
 
           const adminKeyboard = {
             inline_keyboard: [
-              [{ text: 'Выплатить', callback_data: `process_withdrawal_${withdrawalId}` }]
+              [{ text: 'Выплатить✅', callback_data: `process_withdrawal_${withdrawalId}` }]
             ]
           };
 
@@ -2256,75 +2625,28 @@ bot.on('callback_query', async (query) => {
 
         bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
 
-        const checkText = `📥Отправьте чек на сумму: ${withdrawal.amount.toLocaleString()}₽`;
-        const cancelKeyboard = {
-          inline_keyboard: [
-            [{ text: 'Отменить', callback_data: `cancel_withdrawal_${withdrawalId}` }]
-          ]
-        };
-
-        bot.sendMessage(chatId, checkText, { reply_markup: cancelKeyboard });
-
-        // Ждем чек от админа
-        const checkListener = (msg) => {
-          if (msg.chat.id !== chatId) return;
-          if (!msg.text && !msg.caption && !msg.photo && !msg.document) {
-            bot.sendMessage(chatId, '❌ Пожалуйста, отправьте чек текстом, фотографией или документом').catch(() => {});
-            return;
-          }
-
-          bot.removeListener('message', checkListener);
-
-          const checkMessage = msg.text || msg.caption || '';
-          let checkFileId = null;
-          let checkFileType = null;
-
-          if (msg.photo && msg.photo.length > 0) {
-            checkFileId = msg.photo[msg.photo.length - 1].file_id;
-            checkFileType = 'photo';
-          } else if (msg.document) {
-            checkFileId = msg.document.file_id;
-            checkFileType = 'document';
-          }
-
-          // Сохраняем чек
-          db.run('UPDATE withdrawals SET check_message = ?, check_file_id = ?, check_file_type = ? WHERE id = ?',
-            [checkMessage, checkFileId, checkFileType, withdrawalId], (err) => {
+        db.run('UPDATE withdrawals SET status = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?',
+          ['completed', withdrawalId],
+          (err) => {
             if (err) {
-              console.error('Error saving check:', err);
+              console.error('Error completing withdrawal:', err);
+              bot.sendMessage(chatId, '❌ Ошибка обновления статуса');
+              return;
             }
-          });
 
-          // Отправляем подтверждение
-          const confirmText = `✅Выплата!
-🌶Воркер: @${withdrawal.username || 'unknown'}
-<tg-emoji emoji-id="5936017305585586269">🪪</tg-emoji>Никнейм: ${withdrawal.name}
-<tg-emoji emoji-id="5260268501515377807">💌</tg-emoji>Сумма выплаты: ${withdrawal.amount.toLocaleString()}₽
-${checkMessage ? `Чек: ${checkMessage}` : ''}`;
+            bot.sendMessage(chatId, `✅Выплата: ${withdrawal.amount.toLocaleString()}₽ отправлена воркеру @${withdrawal.username || 'unknown'}`);
 
-          const confirmKeyboard = {
-            inline_keyboard: [
-              [
-                { text: 'Подтвердить', callback_data: `confirm_payout_${withdrawalId}` },
-                { text: 'Отменить', callback_data: `cancel_withdrawal_${withdrawalId}` }
-              ]
-            ]
-          };
+            // Уведомляем воркера
+            const payoutLabel = getPayoutLabel(withdrawal.payout_method || 'cryptobot');
+            const workerText = `✅Успешный вывод
+<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>Сумма к выплате: ${withdrawal.amount.toLocaleString()}₽
+⚙️Способ выплаты: ${payoutLabel}`;
 
-          if (checkFileId && checkFileType === 'photo') {
-            bot.sendPhoto(chatId, checkFileId, { caption: confirmText, parse_mode: 'HTML', reply_markup: confirmKeyboard }).catch(() => {
-              bot.sendMessage(chatId, confirmText, { reply_markup: confirmKeyboard });
+            bot.sendMessage(withdrawal.user_id, workerText, { parse_mode: 'HTML' }).catch((err) => {
+              console.error('Error notifying worker:', err);
             });
-          } else if (checkFileId && checkFileType === 'document') {
-            bot.sendDocument(chatId, checkFileId, { caption: confirmText, parse_mode: 'HTML', reply_markup: confirmKeyboard }).catch(() => {
-              bot.sendMessage(chatId, confirmText, { reply_markup: confirmKeyboard });
-            });
-          } else {
-            bot.sendMessage(chatId, confirmText, { reply_markup: confirmKeyboard });
           }
-        };
-
-        bot.on('message', checkListener);
+        );
       }
     );
     return;
@@ -2424,11 +2746,11 @@ ${withdrawal.check_message || ''}`;
       bot.answerCallbackQuery(query.id);
       bot.sendMessage(chatId, '➕ Отправьте реквизит для добавления:');
 
-      const addCardListener = (msg) => {
+      guard.setPendingInput(userId, chatId, (msg) => {
         if (msg.chat.id !== chatId) return;
         if (!msg.text) return;
 
-        bot.removeListener('message', addCardListener);
+        guard.clearPendingInput(userId);
 
         const cardInfo = msg.text;
         db.run('INSERT INTO cards (card_info) VALUES (?)', [cardInfo], (err) => {
@@ -2438,9 +2760,7 @@ ${withdrawal.check_message || ''}`;
             bot.sendMessage(chatId, '✅ Реквизит добавлен!');
           }
         });
-      };
-
-      bot.once('message', addCardListener);
+      });
       return;
     } else if (data === 'admin_delete_card') {
       bot.answerCallbackQuery(query.id);
@@ -2457,11 +2777,11 @@ ${withdrawal.check_message || ''}`;
 
         bot.sendMessage(chatId, cardText);
 
-        const deleteCardListener = (msg) => {
+        guard.setPendingInput(userId, chatId, (msg) => {
           if (msg.chat.id !== chatId) return;
           if (!msg.text) return;
 
-          bot.removeListener('message', deleteCardListener);
+          guard.clearPendingInput(userId);
 
           const cardIndex = parseInt(msg.text) - 1;
           if (cardIndex >= 0 && cardIndex < cards.length) {
@@ -2475,9 +2795,7 @@ ${withdrawal.check_message || ''}`;
           } else {
             bot.sendMessage(chatId, '❌ Неверный номер');
           }
-        };
-
-        bot.once('message', deleteCardListener);
+        });
       });
       return;
     }
@@ -2488,9 +2806,11 @@ ${withdrawal.check_message || ''}`;
   const protectedCallbacks = ['profile', 'work', 'training', 'card', 'community', 'feedback', 'settings',
                                'materials', 'profile_settings', 'change_name', 'hide_profile',
                                'transfer_profile', 'withdraw', 'cancel_withdraw', 'back_to_menu',
-                               'show_mentor', 'assign_mentor'];
+                               'payout_wallet', 'wallet_set_cryptobot', 'wallet_set_trc20',
+                               'wallet_set_bep20', 'wallet_cancel_input'];
 
-  if (protectedCallbacks.includes(data) || data.startsWith('confirm_withdraw_')) {
+  if (protectedCallbacks.includes(data) || data.startsWith('wallet_confirm_') ||
+      data.startsWith('show_mentor_') || data.startsWith('assign_mentor_')) {
     db.get('SELECT application_approved FROM users WHERE user_id = ?', [userId], (err, user) => {
       if (err || !user || Number(user.application_approved) !== 1) {
         bot.answerCallbackQuery(query.id, { text: '❌ Доступ запрещен. Пройдите процесс регистрации.' });
@@ -2509,11 +2829,11 @@ ${withdrawal.check_message || ''}`;
       bot.answerCallbackQuery(query.id);
       bot.sendMessage(chatId, '➕ Отправьте реквизит для добавления:');
 
-      const addCardListener = (msg) => {
+      guard.setPendingInput(userId, chatId, (msg) => {
         if (msg.chat.id !== chatId) return;
         if (!msg.text) return;
 
-        bot.removeListener('message', addCardListener);
+        guard.clearPendingInput(userId);
 
         const cardInfo = msg.text;
         db.run('INSERT INTO cards (card_info) VALUES (?)', [cardInfo], (err) => {
@@ -2523,9 +2843,7 @@ ${withdrawal.check_message || ''}`;
             bot.sendMessage(chatId, '✅ Реквизит добавлен!');
           }
         });
-      };
-
-      bot.once('message', addCardListener);
+      });
       return;
     } else if (data === 'admin_delete_card') {
       bot.answerCallbackQuery(query.id);
@@ -2542,11 +2860,11 @@ ${withdrawal.check_message || ''}`;
 
         bot.sendMessage(chatId, cardText);
 
-        const deleteCardListener = (msg) => {
+        guard.setPendingInput(userId, chatId, (msg) => {
           if (msg.chat.id !== chatId) return;
           if (!msg.text) return;
 
-          bot.removeListener('message', deleteCardListener);
+          guard.clearPendingInput(userId);
 
           const cardIndex = parseInt(msg.text) - 1;
           if (cardIndex >= 0 && cardIndex < cards.length) {
@@ -2560,9 +2878,7 @@ ${withdrawal.check_message || ''}`;
           } else {
             bot.sendMessage(chatId, '❌ Неверный номер');
           }
-        };
-
-        bot.once('message', deleteCardListener);
+        });
       });
       return;
     }
@@ -2570,7 +2886,7 @@ ${withdrawal.check_message || ''}`;
 
   // Обработка неизвестных callback
   bot.answerCallbackQuery(query.id);
-});
+}));
 
 // Восстановление reply-клавиатуры (если после регистрации кнопки не появились)
 bot.onText(/\/keyboard/, (msg) => {
@@ -2677,7 +2993,7 @@ const formatCashLine = (balance, label = 'Касса проекта') => {
 
 const getPeriodBalance = (startStr, endStr) => {
   return new Promise((resolve) => {
-    const excludedNames = ['#sss','#Testovhik','#тестик','тестик','#testovhik','testovhik'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+    const excludedNames = ['@sss','@Testovhik','@тестик','тестик','@testovhik','testovhik'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
     const excludedUsernames = ['sss','freeobnall'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
     db.get(`SELECT COALESCE(SUM(p.amount), 0) as total
             FROM profits p JOIN users u ON p.user_id = u.user_id
@@ -2689,126 +3005,124 @@ const getPeriodBalance = (startStr, endStr) => {
   });
 };
 
-const getProjectBalance = () => {
-  return getPeriodBalance('1970-01-01 00:00:00', '9999-12-31 23:59:59');
+// Топ воркеров: периоды all | day | month, переключение по кнопкам (editMessageText)
+const TOP_KEYBOARDS = {
+  all: { inline_keyboard: [[
+    { text: 'Месяц', callback_data: 'top_show_month' },
+    { text: 'День', callback_data: 'top_show_day' }
+  ]]},
+  day: { inline_keyboard: [[
+    { text: 'За все время', callback_data: 'top_show_all' },
+    { text: 'Месяц', callback_data: 'top_show_month' }
+  ]]},
+  month: { inline_keyboard: [[
+    { text: 'За все время', callback_data: 'top_show_all' },
+    { text: 'День', callback_data: 'top_show_day' }
+  ]]}
 };
 
-// Команда /top - Топ 10 за все время
-bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
-  const chatId = msg.chat.id;
+const buildTopContent = (period) => new Promise((resolve) => {
+  const now = new Date();
+  let dateClause = '';
+  let title = '🏆<b>Топ 10</b>\n\n';
+  let emptyText = '📊 Топ пуст';
+  let cashLabel = 'Касса проекта';
+  const params = [];
 
-  db.all(`SELECT u.*, COALESCE(SUM(p.amount), 0) as total_profit
-          FROM users u
-          JOIN profits p ON u.user_id = p.user_id
-          WHERE ${utils.topExclusionWhere('u')}
+  if (period === 'day') {
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    dateClause = 'p.created_at >= ? AND p.created_at < ? AND ';
+    params.push(dayStart.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ''));
+    params.push(dayEnd.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ''));
+    title = '🌶<b>Топ 10 за сутки.</b>\n\n';
+    emptyText = '📊 Топ дня пуст';
+    cashLabel = 'Касса за день';
+  } else if (period === 'month') {
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    dateClause = 'p.created_at >= ? AND p.created_at < ? AND ';
+    params.push(monthStart.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ''));
+    params.push(monthEnd.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ''));
+    title = '📆<b>Топ 10 за месяц</b>\n\n';
+    emptyText = '📊 Топ месяца пуст';
+    cashLabel = 'Касса за месяц';
+  }
+
+  const periodStart = params[0] || '1970-01-01 00:00:00';
+  const periodEnd = params[1] || '9999-12-31 23:59:59';
+
+  db.all(`SELECT u.user_id, u.username, u.name, u.profile_hidden, COALESCE(SUM(p.amount), 0) as total_profit
+          FROM profits p
+          JOIN users u ON p.user_id = u.user_id
+          WHERE ${dateClause}${utils.topExclusionWhere('u')}
           GROUP BY u.user_id
           HAVING total_profit > 0
           ORDER BY total_profit DESC, u.user_id ASC
-          LIMIT 10`, (err, users) => {
+          LIMIT 10`, params, (err, users) => {
     if (err || !users || users.length === 0) {
-      bot.sendMessage(chatId, '📊 Топ пуст').catch(err => {
-        console.error('Error sending top message:', err);
-      });
+      if (err) console.error('Error in top query:', err);
+      resolve({ text: emptyText, reply_markup: TOP_KEYBOARDS[period] });
       return;
     }
 
-    let topText = '🏆<b>Топ 10</b>\n\n';
-
+    let topText = title;
     users.forEach((user, index) => {
       topText += formatTopLine(user, user.total_profit, index);
     });
 
-    getProjectBalance().then(balance => {
-      topText += `\n${formatCashLine(balance)}`;
-      bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
-        console.error('Error sending top message:', err);
-      });
+    getPeriodBalance(periodStart, periodEnd).then(balance => {
+      topText += `\n${formatCashLine(balance, cashLabel)}`;
+      resolve({ text: topText, reply_markup: TOP_KEYBOARDS[period] });
     });
   });
 });
 
-// Команда /topd - Топ 10 за сутки
-bot.onText(/\/(topd|топд)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
+// Команда /top - Топ 10 за все время (переключение периодов по кнопкам)
+bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
   const chatId = msg.chat.id;
 
-  const now = new Date();
-  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const startStr = dayStart.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
-  const endStr = dayEnd.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
-
-  db.all(`SELECT u.user_id, u.username, u.name, u.profile_hidden, COALESCE(SUM(p.amount), 0) as daily_total
-          FROM profits p
-          JOIN users u ON p.user_id = u.user_id
-          WHERE p.created_at >= ? AND p.created_at < ?
-            AND ${utils.topExclusionWhere('u')}
-          GROUP BY u.user_id
-          HAVING daily_total > 0
-          ORDER BY daily_total DESC
-          LIMIT 10`, [startStr, endStr], (err, results) => {
-    if (err || !results || results.length === 0) {
-      if (err) console.error('Error in topd query:', err);
-      bot.sendMessage(chatId, '📊 Топ дня пуст').catch(err => {
-        console.error('Error sending topd message:', err);
-      });
-      return;
-    }
-
-    let topText = '🌶<b>Топ 10 за сутки.</b>\n\n';
-
-    results.forEach((user, index) => {
-      topText += formatTopLine(user, user.daily_total, index);
-    });
-
-    getPeriodBalance(startStr, endStr).then(balance => {
-      topText += `\n${formatCashLine(balance, 'Касса за день')}`;
-      bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
-        console.error('Error sending topd message:', err);
-      });
+  buildTopContent('all').then(({ text, reply_markup }) => {
+    bot.sendMessage(chatId, text, { parse_mode: 'HTML', disable_web_page_preview: true, reply_markup }).catch(err => {
+      console.error('Error sending top message:', err);
     });
   });
 });
 
-// Команда /topm и /m - Топ 10 за месяц
-bot.onText(/\/(topm|топм|m)(?:@[\w_]+)?(?:\s|$)/, (msg) => {
-  const chatId = msg.chat.id;
+// Переключение периодов топа по кнопкам — редактируем сообщение, не переотправляем
+bot.on('callback_query', (query) => {
+  const data = query.data || '';
+  if (!data.startsWith('top_show_')) return;
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const startStr = monthStart.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
-  const endStr = monthEnd.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const period = data.replace('top_show_', '');
+  if (!['all', 'day', 'month'].includes(period)) return;
 
-  db.all(`SELECT u.user_id, u.username, u.name, u.profile_hidden, COALESCE(SUM(p.amount), 0) as monthly_total
-          FROM profits p
-          JOIN users u ON p.user_id = u.user_id
-          WHERE p.created_at >= ? AND p.created_at < ?
-            AND ${utils.topExclusionWhere('u')}
-          GROUP BY u.user_id
-          HAVING monthly_total > 0
-          ORDER BY monthly_total DESC
-          LIMIT 10`, [startStr, endStr], (err, results) => {
-    if (err || !results || results.length === 0) {
-      if (err) console.error('Error in topm query:', err);
-      bot.sendMessage(chatId, '📊 Топ месяца пуст').catch(err => {
-        console.error('Error sending topm message:', err);
-      });
-      return;
-    }
+  bot.answerCallbackQuery(query.id).catch(() => {});
+  const chatId = query.message.chat.id;
+  const messageId = query.message.message_id;
 
-    let topText = '📆<b>Топ 10 за месяц</b>\n\n';
-
-    results.forEach((user, index) => {
-      topText += formatTopLine(user, user.monthly_total, index);
-    });
-
-    getPeriodBalance(startStr, endStr).then(balance => {
-      topText += `\n${formatCashLine(balance, 'Касса за месяц')}`;
-      bot.sendMessage(chatId, topText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
-        console.error('Error sending topm message:', err);
-      });
+  buildTopContent(period).then(({ text, reply_markup }) => {
+    bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      reply_markup
+    }).catch(err => {
+      console.error('Error editing top message:', err);
     });
   });
+});
+
+// Клик по закрытому чату — полноэкранное уведомление о требуемом статусе
+bot.on('callback_query', (query) => {
+  const data = query.data || '';
+  if (!data.startsWith('chat_locked_')) return;
+
+  const chat = statusChats.getChatByKey(data.replace('chat_locked_', ''));
+  if (!chat) return;
+
+  bot.answerCallbackQuery(query.id, { text: `Данный чат доступен при статусе ${chat.label}`, show_alert: true }).catch(() => {});
 });
 
 // Команда /materials

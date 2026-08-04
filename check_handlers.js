@@ -386,9 +386,10 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
         db.run(`UPDATE users SET
           balance = balance + ?,
           total_earned = total_earned + ?,
+          battlepass_earned = COALESCE(battlepass_earned, 0) + ?,
           profit_count = profit_count + 1
           WHERE user_id = ?`,
-          [workerPayout, amount, check.user_id],
+          [workerPayout, amount, amount, check.user_id],
           (err) => {
             if (err) {
               console.error('Error updating user:', err);
@@ -418,7 +419,7 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
         });
 
         // Отправляем в общую кассу и чат
-        const workerName = user.name && user.name.startsWith('#') ? user.name : '#' + (user.name || user.username);
+        const workerName = user.name && user.name.startsWith('@') ? user.name : '@' + (user.name || user.username);
         const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
         let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸
 

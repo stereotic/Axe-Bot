@@ -22,9 +22,12 @@ db.run('INSERT INTO profits (user_id, amount, amount_to_pay, direction, created_
     if (err) { console.error('❌ Ошибка:', err); db.close(); return; }
     console.log(`✅ Профит ${amount}₽ добавлен юзеру ${userId}`);
     
-    // Обновляем total_earned
-    db.run('UPDATE users SET total_earned = COALESCE(total_earned, 0) + ? WHERE user_id = ?',
-      [amount, userId],
+    // Ручной новый профит также учитывается в прогрессе AXE PASS.
+    db.run(`UPDATE users SET
+        total_earned = COALESCE(total_earned, 0) + ?,
+        battlepass_earned = COALESCE(battlepass_earned, 0) + ?
+        WHERE user_id = ?`,
+      [amount, amount, userId],
       function(err2) {
         if (err2) console.error('❌ Ошибка total_earned:', err2);
         else console.log(`✅ total_earned +${amount}₽`);

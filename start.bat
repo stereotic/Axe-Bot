@@ -1,12 +1,8 @@
 @echo off
-echo Starting AXE TEAM Bot System...
+chcp 65001 >nul
+title AXE TEAM Bot
+echo Starting AXE TEAM Bot...
+node bot.js
 echo.
-echo Starting Main Bot...
-start "AXE Bot" cmd /k "node bot.js"
-timeout /t 2 /nobreak >nul
-echo Starting Profit System...
-start "Profit System" cmd /k "node profit_system.js"
-echo.
-echo Both bots are running!
-echo Close this window to keep bots running.
+echo Bot stopped.
 pause

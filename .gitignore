@@ -3,3 +3,7 @@ node_modules/
 database.db
 database.db-shm
 database.db-wal
+*.log
+*.bak
+bot.lock
+profit_list.txt

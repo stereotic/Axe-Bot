@@ -26,7 +26,7 @@ const run = () => {
   if (i >= updates.length) { console.log('✅ Готово'); db.close(); return; }
   const [name, count] = updates[i++];
   db.run('UPDATE users SET profit_count = ? WHERE (name = ? OR name = ?)',
-    [count, name, '#' + name.replace(/^#/, '')],
+    [count, name, '@' + name.replace(/^[#@]/, '')],
     function(err) {
       if (err) console.error(`❌ ${name}:`, err);
       else if (this.changes === 0) console.log(`❌ ${name} — не найден`);

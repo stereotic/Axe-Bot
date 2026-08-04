@@ -19,7 +19,7 @@ db.get('SELECT name, username FROM users WHERE user_id = ?', [fromId], (err, fak
   if (err) { console.error('❌ Ошибка:', err); db.close(); return; }
   if (!fake) { console.log('❌ Фейковый юзер не найден'); db.close(); return; }
 
-  const newName = fake.name?.startsWith('#') ? fake.name : '#' + (fake.name || fake.username || '');
+  const newName = fake.name?.startsWith('@') ? fake.name : '@' + (fake.name || fake.username || '');
   db.run('UPDATE users SET name = ? WHERE user_id = ?', [newName, toId], function(err2) {
     if (err2) console.error('❌ Ошибка обновления name:', err2);
     else console.log(`✅ Имя для ${toId}: ${newName}`);
