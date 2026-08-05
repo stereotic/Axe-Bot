@@ -53,6 +53,12 @@ function entitiesToHtml(text, entities) {
         openTag = `<a href="${escapeHtml(entity.url)}">`; closeTag = '</a>'; break;
       case 'text_mention':
         openTag = `<a href="tg://user?id=${entity.user.id}">`; closeTag = '</a>'; break;
+      case 'custom_emoji':
+        openTag = `<tg-emoji emoji-id="${entity.custom_emoji_id}">`; closeTag = '</tg-emoji>'; break;
+      case 'blockquote':
+        openTag = '<blockquote>'; closeTag = '</blockquote>'; break;
+      case 'expandable_blockquote':
+        openTag = '<blockquote expandable>'; closeTag = '</blockquote>'; break;
       default:
         continue;
     }
@@ -89,6 +95,13 @@ function buildRowFromMessage(msg) {
       text: entitiesToHtml(msg.caption, msg.caption_entities)
     };
   }
+  if (msg.animation) {
+    return {
+      content_type: 'animation',
+      file_id: msg.animation.file_id,
+      text: entitiesToHtml(msg.caption, msg.caption_entities)
+    };
+  }
   if (msg.video) {
     return {
       content_type: 'video',
@@ -100,6 +113,34 @@ function buildRowFromMessage(msg) {
     return {
       content_type: 'document',
       file_id: msg.document.file_id,
+      text: entitiesToHtml(msg.caption, msg.caption_entities)
+    };
+  }
+  if (msg.sticker) {
+    return {
+      content_type: 'sticker',
+      file_id: msg.sticker.file_id,
+      text: null
+    };
+  }
+  if (msg.video_note) {
+    return {
+      content_type: 'video_note',
+      file_id: msg.video_note.file_id,
+      text: null
+    };
+  }
+  if (msg.audio) {
+    return {
+      content_type: 'audio',
+      file_id: msg.audio.file_id,
+      text: entitiesToHtml(msg.caption, msg.caption_entities)
+    };
+  }
+  if (msg.voice) {
+    return {
+      content_type: 'voice',
+      file_id: msg.voice.file_id,
       text: entitiesToHtml(msg.caption, msg.caption_entities)
     };
   }
@@ -123,8 +164,23 @@ function sendBroadcastContent(bot, chatId, row) {
   if (row.content_type === 'video') {
     return bot.sendVideo(chatId, row.file_id, caption ? { ...opts, caption } : opts);
   }
+  if (row.content_type === 'animation') {
+    return bot.sendAnimation(chatId, row.file_id, caption ? { ...opts, caption } : opts);
+  }
   if (row.content_type === 'document') {
     return bot.sendDocument(chatId, row.file_id, caption ? { ...opts, caption } : opts);
+  }
+  if (row.content_type === 'sticker') {
+    return bot.sendSticker(chatId, row.file_id);
+  }
+  if (row.content_type === 'video_note') {
+    return bot.sendVideoNote(chatId, row.file_id);
+  }
+  if (row.content_type === 'audio') {
+    return bot.sendAudio(chatId, row.file_id, caption ? { ...opts, caption } : opts);
+  }
+  if (row.content_type === 'voice') {
+    return bot.sendVoice(chatId, row.file_id, caption ? { ...opts, caption } : opts);
   }
   if (row.content_type === 'text' && row.text) {
     return bot.sendMessage(chatId, row.text, opts);
@@ -145,7 +201,7 @@ function renderPanel(bot, chatId, userId) {
     let text = '📢 <b>Рассылки</b>\n\n';
     text += RASS_TIMES.map(t => {
       const r = byTime[t];
-      const status = r && r.text ? '✅' : '⏰';
+      const status = r && r.content_type ? '✅' : '⏰';
       const targetMark = r && r.target && r.target !== 'all' ? ' 💬' : '';
       return `${t} ${status}${targetMark}`;
     }).join('\n');
@@ -154,7 +210,7 @@ function renderPanel(bot, chatId, userId) {
     const keyboard = { inline_keyboard: [] };
     RASS_TIMES.forEach(t => {
       const r = byTime[t];
-      const status = r && r.text ? '✅' : '⏰';
+      const status = r && r.content_type ? '✅' : '⏰';
       keyboard.inline_keyboard.push([
         { text: `${t} ${status}`, callback_data: `rass_sel_${t}` },
         { text: '✏️', callback_data: `rass_edit_${t}` },
@@ -183,12 +239,12 @@ function startContentEdit(bot, chatId, userId, time) {
   rassEdit[userId] = { time, step: 'content' };
 
   db.get('SELECT * FROM scheduled_broadcasts WHERE time = ?', [time], (err, row) => {
-    if (!err && row && row.text) {
+    if (!err && row && row.content_type) {
       bot.sendMessage(chatId, `✏️ Текущее сообщение рассылки в <b>${time}</b>. Отправь новое вместо него:`, { parse_mode: 'HTML' }).then(() => {
         sendBroadcastContent(bot, chatId, row).catch(() => {});
       }).catch(() => {});
     } else {
-      bot.sendMessage(chatId, `✏️ Отправь сообщение для рассылки в <b>${time}</b>.\n\nПоддерживаются: текст (с форматированием), фото, видео, документы.\nОтмена: /cancel`, { parse_mode: 'HTML' }).catch(() => {});
+      bot.sendMessage(chatId, `✏️ Отправь сообщение для рассылки в <b>${time}</b>.\n\nПоддерживаются: текст (с форматированием), фото, гифки, видео, документ, стикер, кружок, аудио, голос.\nОтмена: /cancel`, { parse_mode: 'HTML' }).catch(() => {});
     }
   });
 }
@@ -343,7 +399,7 @@ function setupRassSystem(bot, adminIds) {
     // Посмотреть текущее сообщение
     if (action === 'sel') {
       db.get('SELECT * FROM scheduled_broadcasts WHERE time = ?', [time], (err, row) => {
-        if (err || !row || !row.text) {
+        if (err || !row || !row.content_type) {
           bot.sendMessage(chatId, `⏰ <b>${time}</b> — сообщение ещё не задано. Нажми ✏️.`, { parse_mode: 'HTML' });
           return;
         }

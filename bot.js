@@ -463,6 +463,12 @@ function entitiesToHtml(text, entities) {
         openTag = `<a href="${escapeHtml(entity.url)}">`; closeTag = '</a>'; break;
       case 'text_mention':
         openTag = `<a href="tg://user?id=${entity.user.id}">`; closeTag = '</a>'; break;
+      case 'custom_emoji':
+        openTag = `<tg-emoji emoji-id="${entity.custom_emoji_id}">`; closeTag = '</tg-emoji>'; break;
+      case 'blockquote':
+        openTag = '<blockquote>'; closeTag = '</blockquote>'; break;
+      case 'expandable_blockquote':
+        openTag = '<blockquote expandable>'; closeTag = '</blockquote>'; break;
       default:
         continue;
     }
@@ -1690,18 +1696,28 @@ bot.on('message', perf.wrap('message_handler', async (msg) => {
         return new Promise((resolve) => {
           setTimeout(async () => {
             try {
-              // Определяем тип сообщения и отправляем соответствующим методом
+              // Определяем тип сообщения и отправляем соответствующим методом.
+              const mediaCaption = entitiesToHtml(msg.caption, msg.caption_entities);
+              const mediaOpts = mediaCaption ? { caption: mediaCaption, parse_mode: 'HTML' } : {};
+
               if (msg.photo) {
-                const photo = msg.photo[msg.photo.length - 1].file_id;
-                await bot.sendPhoto(user.user_id, photo, { caption: entitiesToHtml(msg.caption, msg.caption_entities), parse_mode: 'HTML' });
+                await bot.sendPhoto(user.user_id, msg.photo[msg.photo.length - 1].file_id, mediaOpts);
+              } else if (msg.animation) {
+                await bot.sendAnimation(user.user_id, msg.animation.file_id, mediaOpts);
               } else if (msg.video) {
-                await bot.sendVideo(user.user_id, msg.video.file_id, { caption: entitiesToHtml(msg.caption, msg.caption_entities), parse_mode: 'HTML' });
+                await bot.sendVideo(user.user_id, msg.video.file_id, mediaOpts);
               } else if (msg.document) {
-                await bot.sendDocument(user.user_id, msg.document.file_id, { caption: entitiesToHtml(msg.caption, msg.caption_entities), parse_mode: 'HTML' });
+                await bot.sendDocument(user.user_id, msg.document.file_id, mediaOpts);
               } else if (msg.sticker) {
                 await bot.sendSticker(user.user_id, msg.sticker.file_id);
+              } else if (msg.video_note) {
+                await bot.sendVideoNote(user.user_id, msg.video_note.file_id);
+              } else if (msg.audio) {
+                await bot.sendAudio(user.user_id, msg.audio.file_id, mediaOpts);
+              } else if (msg.voice) {
+                await bot.sendVoice(user.user_id, msg.voice.file_id, mediaOpts);
               } else if (msg.text) {
-                await bot.sendMessage(user.user_id, entitiesToHtml(msg.text, msg.entities), { parse_mode: 'HTML' });
+                await bot.sendMessage(user.user_id, entitiesToHtml(msg.text, msg.entities), { parse_mode: 'HTML', disable_web_page_preview: true });
               }
               successCount++;
             } catch (error) {

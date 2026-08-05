@@ -144,20 +144,20 @@ async function createPinnedMessageText() {
     : '0';
 
   const topWorkerLine = topWorker && Number(topWorker.total_earned) > 0
-    ? `<b>🌶ТОП 1 ЗА СУТКИ</b> - <a href="${topWorkerLink}"><b>${topWorkerName}</b></a> - ${topWorkerAmount}₽`
-    : '<b>🌶ТОП 1 ЗА СУТКИ</b> -';
+    ? `<tg-emoji emoji-id="5447351568917636032">🌶</tg-emoji><b>ТОП 1 ЗА СУТКИ</b> - <a href="${topWorkerLink}"><b>${topWorkerName}</b></a> - ${topWorkerAmount}₽`
+    : `<tg-emoji emoji-id="5447351568917636032">🌶</tg-emoji><b>ТОП 1 ЗА СУТКИ</b> -`;
 
   const battlePassUrl = getBattlePassUrl();
 
-  return `<b>🌸AXE TEAM🌸</b>
+  return `<tg-emoji emoji-id="5445088267181531740">🪓</tg-emoji><b>AXE TEAM</b><tg-emoji emoji-id="5445088267181531740">🪓</tg-emoji>
 
-<tg-emoji emoji-id="5258330865674494479">💰</tg-emoji><b>Касса проекта -</b> ${projectBalance.toLocaleString('ru-RU')}₽
-<tg-emoji emoji-id="5258391025281408576">📊</tg-emoji><b>Касса за сутки -</b> ${dailyTotal.toLocaleString('ru-RU')}₽
-<tg-emoji emoji-id="5897958754267174109">💵</tg-emoji><b>Курс USD/RUB:</b> ${usdRate}₽
+<tg-emoji emoji-id="5445152270784178138">💰</tg-emoji><b>Касса проекта -</b> ${projectBalance.toLocaleString('ru-RU')}₽
+<tg-emoji emoji-id="5445164597340316440">📊</tg-emoji><b>Касса за сутки -</b> ${dailyTotal.toLocaleString('ru-RU')}₽
+<tg-emoji emoji-id="5445368135840475106">💵</tg-emoji><b>Курс USD/RUB:</b> ${usdRate}₽
 
 ${topWorkerLine}
 
-<tg-emoji emoji-id="5807868868886009920">🏗️</tg-emoji><b>Инфраструктура</b>
+<tg-emoji emoji-id="5445361044849467275">🏗️</tg-emoji><b>Инфраструктура</b>
 ┣<b>Основной бот -</b> <a href="https://t.me/AXE_xBot"><b>ССЫЛКА</b></a>
 ┣<b>Feedback</b> - <a href="https://t.me/FeedbackAXEbot"><b>ССЫЛКА</b></a>
 ┣<b>Материалы -</b> <a href="https://t.me/+GMixQrZvJkQ4ODE6"><b>ССЫЛКА</b></a>
@@ -165,19 +165,19 @@ ${topWorkerLine}
 ┣<b>AXE SMS -</b> <a href="https://t.me/AXE_SMS_xBot"><b>ССЫЛКА</b></a>
 ┗<b>AXE NEWS -</b> <a href="https://t.me/+BO1F4O1KUd0zZTI6"><b>ССЫЛКА</b></a>
 
-<tg-emoji emoji-id="5931415565955503486">⌨️</tg-emoji><b>Команды чата</b>
+<tg-emoji emoji-id="5445080531945432925">⌨️</tg-emoji><b>Команды чата</b>
 ┣<b>Топ -</b> <b>/top</b>
 ┣<b>Профиль -</b> <b>/me</b>
 ┣<b>Администрация -</b> <b>/staff</b>
 ┣<b>Материалы -</b> <b>/materials</b>
 ┗<b>Актуальный реквизит -</b> <b>/card</b>
 
-<tg-emoji emoji-id="6008118472066732010">🎁</tg-emoji><b>Активные бонусы</b>
+<tg-emoji emoji-id="5447245070908564837">🎁</tg-emoji><b>Активные бонусы</b>
 <b>1.</b> #AXE в нике аккаунта +3% к выплате профита.
 <b>2.</b> Топ 1 суток +5% к выплате профита
 <b>3.</b> ${battlePassUrl ? `<a href="${battlePassUrl}"><b>AXE PASS</b></a>` : '<b>AXE PASS</b>'}
 
-<a href="https://t.me/boost?c=3986505552"><b>⚡️BOOST CHAT</b></a>
+<a href="https://t.me/boost?c=3986505552"><b><tg-emoji emoji-id="5445101435551261855">⚡️</tg-emoji>BOOST CHAT</b></a>
 
 <b>AXE TEAM</b> - "Все великие достижения требовали времени."`;
 }
