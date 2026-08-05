@@ -27,7 +27,7 @@ function entitiesToHtml(text, entities) {
   if (!text) return '';
   if (!entities || !entities.length) return escapeHtml(text);
 
-  const tagAtPos = [];
+  const events = [];
 
   for (const entity of entities) {
     const offset = entity.offset;
@@ -63,27 +63,41 @@ function entitiesToHtml(text, entities) {
         continue;
     }
 
-    tagAtPos.push({ pos: offset, tag: openTag, order: 0 });
-    tagAtPos.push({ pos: offset + length, tag: closeTag, order: 1 });
+    events.push({ pos: offset, open: true, tag: openTag, closeTag, entity });
+    events.push({ pos: offset + length, open: false, tag: closeTag, entity });
   }
 
-  tagAtPos.sort((a, b) => a.pos - b.pos || a.order - b.order);
+  // По позиции; на одной позиции закрытия идут раньше открытий.
+  events.sort((a, b) => a.pos - b.pos || (a.open ? 1 : 0) - (b.open ? 1 : 0));
 
+  const stack = [];
   let result = '';
   let lastPos = 0;
 
-  for (const t of tagAtPos) {
-    if (t.pos > lastPos) {
-      result += escapeHtml(text.slice(lastPos, t.pos));
+  for (const ev of events) {
+    if (ev.pos > lastPos) {
+      result += escapeHtml(text.slice(lastPos, ev.pos));
+      lastPos = ev.pos;
     }
-    result += t.tag;
-    lastPos = t.pos;
+
+    if (ev.open) {
+      result += ev.tag;
+      stack.push(ev);
+      continue;
+    }
+
+    let idx = -1;
+    for (let i = stack.length - 1; i >= 0; i--) {
+      if (stack[i].entity === ev.entity) { idx = i; break; }
+    }
+    if (idx === -1) continue;
+
+    while (stack.length > idx) {
+      result += stack.pop().closeTag;
+    }
   }
 
-  if (lastPos < text.length) {
-    result += escapeHtml(text.slice(lastPos));
-  }
-
+  if (lastPos < text.length) result += escapeHtml(text.slice(lastPos));
   return result;
 }
 

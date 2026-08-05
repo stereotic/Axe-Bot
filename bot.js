@@ -437,7 +437,7 @@ function entitiesToHtml(text, entities) {
   if (!text) return '';
   if (!entities || !entities.length) return escapeHtml(text);
 
-  const tagAtPos = [];
+  const events = [];
 
   for (const entity of entities) {
     const offset = entity.offset;
@@ -473,27 +473,44 @@ function entitiesToHtml(text, entities) {
         continue;
     }
 
-    tagAtPos.push({ pos: offset, tag: openTag, order: 0 });
-    tagAtPos.push({ pos: offset + length, tag: closeTag, order: 1 });
+    events.push({ pos: offset, open: true, tag: openTag, closeTag, entity });
+    events.push({ pos: offset + length, open: false, tag: closeTag, entity });
   }
 
-  tagAtPos.sort((a, b) => a.pos - b.pos || a.order - b.order);
+  // По позиции; на одной позиции закрытия идут раньше открытий.
+  events.sort((a, b) => a.pos - b.pos || (a.open ? 1 : 0) - (b.open ? 1 : 0));
 
+  const stack = [];
   let result = '';
   let lastPos = 0;
 
-  for (const t of tagAtPos) {
-    if (t.pos > lastPos) {
-      result += escapeHtml(text.slice(lastPos, t.pos));
+  for (const ev of events) {
+    if (ev.pos > lastPos) {
+      result += escapeHtml(text.slice(lastPos, ev.pos));
+      lastPos = ev.pos;
     }
-    result += t.tag;
-    lastPos = t.pos;
+
+    if (ev.open) {
+      result += ev.tag;
+      stack.push(ev);
+      continue;
+    }
+
+    // Находим открытие этой сущности в стеке; сущности в Telegram не
+    // пересекаются, только вложены — поэтому всё, что лежит выше, закрываем
+    // первым (LIFO). Это чинит вложенные жирный+эмодзи и одинаковые позиции.
+    let idx = -1;
+    for (let i = stack.length - 1; i >= 0; i--) {
+      if (stack[i].entity === ev.entity) { idx = i; break; }
+    }
+    if (idx === -1) continue;
+
+    while (stack.length > idx) {
+      result += stack.pop().closeTag;
+    }
   }
 
-  if (lastPos < text.length) {
-    result += escapeHtml(text.slice(lastPos));
-  }
-
+  if (lastPos < text.length) result += escapeHtml(text.slice(lastPos));
   return result;
 }
 
@@ -1692,37 +1709,16 @@ bot.on('message', perf.wrap('message_handler', async (msg) => {
       const totalUsers = users.length;
 
       // Функция для отправки сообщения с задержкой.
-      // Только HTML-форвард, без деградации в текст: если Telegram
-      // режет — первая ошибка уходит админу в чат, чтобы было видно,
-      // какая сущность не поддерживается.
+      // Используем copyMessage: Telegram сам переносит сообщение целиком —
+      // все сущности (жирный, курсив, премиум-эмодзи, цитаты), медиа,
+      // стикеры, гифки — нативно, без ручной сборки HTML. Никакого
+      // кривого парсинга в принципе.
       let firstError = null;
       const sendWithDelay = async (user, index) => {
         return new Promise((resolve) => {
           setTimeout(async () => {
             try {
-              const uid = user.user_id;
-              const htmlCaption = entitiesToHtml(msg.caption, msg.caption_entities);
-              const mediaOpts = htmlCaption ? { caption: htmlCaption, parse_mode: 'HTML' } : {};
-
-              if (msg.photo) {
-                await bot.sendPhoto(uid, msg.photo[msg.photo.length - 1].file_id, mediaOpts);
-              } else if (msg.animation) {
-                await bot.sendAnimation(uid, msg.animation.file_id, mediaOpts);
-              } else if (msg.video) {
-                await bot.sendVideo(uid, msg.video.file_id, mediaOpts);
-              } else if (msg.document) {
-                await bot.sendDocument(uid, msg.document.file_id, mediaOpts);
-              } else if (msg.sticker) {
-                await bot.sendSticker(uid, msg.sticker.file_id);
-              } else if (msg.video_note) {
-                await bot.sendVideoNote(uid, msg.video_note.file_id);
-              } else if (msg.audio) {
-                await bot.sendAudio(uid, msg.audio.file_id, mediaOpts);
-              } else if (msg.voice) {
-                await bot.sendVoice(uid, msg.voice.file_id, mediaOpts);
-              } else if (msg.text) {
-                await bot.sendMessage(uid, entitiesToHtml(msg.text, msg.entities), { parse_mode: 'HTML', disable_web_page_preview: true });
-              }
+              await bot.copyMessage(user.user_id, chatId, msg.message_id);
               successCount++;
             } catch (error) {
               console.error(`Failed to send to user ${user.user_id}:`, error.message);
