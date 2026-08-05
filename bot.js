@@ -468,7 +468,7 @@ function entitiesToHtml(text, entities) {
       case 'blockquote':
         openTag = '<blockquote>'; closeTag = '</blockquote>'; break;
       case 'expandable_blockquote':
-        openTag = '<blockquote expandable>'; closeTag = '</blockquote>'; break;
+        openTag = '<blockquote>'; closeTag = '</blockquote>'; break;
       default:
         continue;
     }
@@ -1691,37 +1691,75 @@ bot.on('message', perf.wrap('message_handler', async (msg) => {
       let failCount = 0;
       const totalUsers = users.length;
 
-      // Функция для отправки сообщения с задержкой
+      // Функция для отправки сообщения с задержкой.
+      // Каждый тип идёт в две попытки: сначала с HTML-форматированием,
+      // не вышло — тем же как чистый текст без парсинга. Доставка > формат.
       const sendWithDelay = async (user, index) => {
         return new Promise((resolve) => {
           setTimeout(async () => {
-            try {
-              // Определяем тип сообщения и отправляем соответствующим методом.
-              const mediaCaption = entitiesToHtml(msg.caption, msg.caption_entities);
-              const mediaOpts = mediaCaption ? { caption: mediaCaption, parse_mode: 'HTML' } : {};
+            const uid = user.user_id;
+            const rawCaption = msg.caption || '';
+            const plainCaption = escapeHtml(rawCaption);
+            const htmlCaption = entitiesToHtml(msg.caption, msg.caption_entities);
+            const attempts = [];
 
-              if (msg.photo) {
-                await bot.sendPhoto(user.user_id, msg.photo[msg.photo.length - 1].file_id, mediaOpts);
-              } else if (msg.animation) {
-                await bot.sendAnimation(user.user_id, msg.animation.file_id, mediaOpts);
-              } else if (msg.video) {
-                await bot.sendVideo(user.user_id, msg.video.file_id, mediaOpts);
-              } else if (msg.document) {
-                await bot.sendDocument(user.user_id, msg.document.file_id, mediaOpts);
-              } else if (msg.sticker) {
-                await bot.sendSticker(user.user_id, msg.sticker.file_id);
-              } else if (msg.video_note) {
-                await bot.sendVideoNote(user.user_id, msg.video_note.file_id);
-              } else if (msg.audio) {
-                await bot.sendAudio(user.user_id, msg.audio.file_id, mediaOpts);
-              } else if (msg.voice) {
-                await bot.sendVoice(user.user_id, msg.voice.file_id, mediaOpts);
-              } else if (msg.text) {
-                await bot.sendMessage(user.user_id, entitiesToHtml(msg.text, msg.entities), { parse_mode: 'HTML', disable_web_page_preview: true });
+            if (msg.photo) {
+              const fileId = msg.photo[msg.photo.length - 1].file_id;
+              attempts.push(
+                () => bot.sendPhoto(uid, fileId, htmlCaption ? { caption: htmlCaption, parse_mode: 'HTML' } : {}),
+                () => bot.sendPhoto(uid, fileId, plainCaption ? { caption: plainCaption } : {})
+              );
+            } else if (msg.animation) {
+              attempts.push(
+                () => bot.sendAnimation(uid, msg.animation.file_id, htmlCaption ? { caption: htmlCaption, parse_mode: 'HTML' } : {}),
+                () => bot.sendAnimation(uid, msg.animation.file_id, plainCaption ? { caption: plainCaption } : {})
+              );
+            } else if (msg.video) {
+              attempts.push(
+                () => bot.sendVideo(uid, msg.video.file_id, htmlCaption ? { caption: htmlCaption, parse_mode: 'HTML' } : {}),
+                () => bot.sendVideo(uid, msg.video.file_id, plainCaption ? { caption: plainCaption } : {})
+              );
+            } else if (msg.document) {
+              attempts.push(
+                () => bot.sendDocument(uid, msg.document.file_id, htmlCaption ? { caption: htmlCaption, parse_mode: 'HTML' } : {}),
+                () => bot.sendDocument(uid, msg.document.file_id, plainCaption ? { caption: plainCaption } : {})
+              );
+            } else if (msg.sticker) {
+              attempts.push(() => bot.sendSticker(uid, msg.sticker.file_id));
+            } else if (msg.video_note) {
+              attempts.push(() => bot.sendVideoNote(uid, msg.video_note.file_id));
+            } else if (msg.audio) {
+              attempts.push(
+                () => bot.sendAudio(uid, msg.audio.file_id, htmlCaption ? { caption: htmlCaption, parse_mode: 'HTML' } : {}),
+                () => bot.sendAudio(uid, msg.audio.file_id, plainCaption ? { caption: plainCaption } : {})
+              );
+            } else if (msg.voice) {
+              attempts.push(
+                () => bot.sendVoice(uid, msg.voice.file_id, htmlCaption ? { caption: htmlCaption, parse_mode: 'HTML' } : {}),
+                () => bot.sendVoice(uid, msg.voice.file_id, plainCaption ? { caption: plainCaption } : {})
+              );
+            } else if (msg.text) {
+              attempts.push(
+                () => bot.sendMessage(uid, entitiesToHtml(msg.text, msg.entities), { parse_mode: 'HTML', disable_web_page_preview: true }),
+                () => bot.sendMessage(uid, msg.text, { disable_web_page_preview: true })
+              );
+            }
+
+            let sent = false;
+            for (const attempt of attempts) {
+              try {
+                await attempt();
+                sent = true;
+                break;
+              } catch (error) {
+                console.error(`Send failed to user ${uid}, retrying plain:`, error.message);
               }
+            }
+
+            if (sent) {
               successCount++;
-            } catch (error) {
-              console.error(`Failed to send to user ${user.user_id}:`, error.message);
+            } else {
+              console.error(`Both attempts failed for user ${uid}`);
               failCount++;
             }
             resolve();
