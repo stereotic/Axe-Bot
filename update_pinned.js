@@ -177,7 +177,7 @@ ${topWorkerLine}
 <b>2.</b> Топ 1 суток +5% к выплате профита
 <b>3.</b> ${battlePassUrl ? `<a href="${battlePassUrl}"><b>AXE PASS</b></a>` : '<b>AXE PASS</b>'}
 
-<a href="https://t.me/boost?c=3986505552"><b><tg-emoji emoji-id="5445101435551261855">⚡️</tg-emoji>BOOST CHAT</b></a>
+<tg-emoji emoji-id="5445101435551261855">⚡️</tg-emoji><a href="https://t.me/boost?c=3986505552"><b>BOOST CHAT</b></a>
 
 <b>AXE TEAM</b> - "Все великие достижения требовали времени."`;
 }
