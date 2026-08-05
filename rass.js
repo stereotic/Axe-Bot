@@ -155,35 +155,20 @@ function buildRowFromMessage(msg) {
 }
 
 function sendBroadcastContent(bot, chatId, row) {
-  // Две попытки: сначала с HTML-форматированием, не вышло — чистый текст.
-  const plainText = row.text ? row.text.replace(/<\/(p|blockquote|code|pre|tg-spoiler|tg-emoji)>/g, ' ')
-    .replace(/<[^>]*>/g, '') : '';
+  const caption = row.text ? row.text : undefined;
   const opts = { parse_mode: 'HTML', disable_web_page_preview: true };
-  const plainOpts = { disable_web_page_preview: true };
-
-  const sendMedia = (method, fileId, html) => {
-    const first = () => method(chatId, fileId, html ? { ...opts, caption: html } : opts);
-    const second = () => method(chatId, fileId, plainText ? { ...plainOpts, caption: plainText } : plainOpts);
-    return first().catch(() => second());
-  };
 
   if (row.content_type === 'photo') {
-    return sendMedia(bot.sendPhoto.bind(bot), row.file_id, row.text);
+    return bot.sendPhoto(chatId, row.file_id, caption ? { ...opts, caption } : opts);
   }
   if (row.content_type === 'video') {
-    return sendMedia(bot.sendVideo.bind(bot), row.file_id, row.text);
+    return bot.sendVideo(chatId, row.file_id, caption ? { ...opts, caption } : opts);
   }
   if (row.content_type === 'animation') {
-    return sendMedia(bot.sendAnimation.bind(bot), row.file_id, row.text);
+    return bot.sendAnimation(chatId, row.file_id, caption ? { ...opts, caption } : opts);
   }
   if (row.content_type === 'document') {
-    return sendMedia(bot.sendDocument.bind(bot), row.file_id, row.text);
-  }
-  if (row.content_type === 'audio') {
-    return sendMedia(bot.sendAudio.bind(bot), row.file_id, row.text);
-  }
-  if (row.content_type === 'voice') {
-    return sendMedia(bot.sendVoice.bind(bot), row.file_id, row.text);
+    return bot.sendDocument(chatId, row.file_id, caption ? { ...opts, caption } : opts);
   }
   if (row.content_type === 'sticker') {
     return bot.sendSticker(chatId, row.file_id);
@@ -191,10 +176,14 @@ function sendBroadcastContent(bot, chatId, row) {
   if (row.content_type === 'video_note') {
     return bot.sendVideoNote(chatId, row.file_id);
   }
+  if (row.content_type === 'audio') {
+    return bot.sendAudio(chatId, row.file_id, caption ? { ...opts, caption } : opts);
+  }
+  if (row.content_type === 'voice') {
+    return bot.sendVoice(chatId, row.file_id, caption ? { ...opts, caption } : opts);
+  }
   if (row.content_type === 'text' && row.text) {
-    const first = bot.sendMessage(chatId, row.text, opts);
-    const second = () => bot.sendMessage(chatId, plainText, plainOpts);
-    return first.catch(() => second());
+    return bot.sendMessage(chatId, row.text, opts);
   }
   return Promise.resolve();
 }
