@@ -347,7 +347,7 @@ function updateUsername(userId, username) {
 
 // Функция форматирования профиля
 function formatProfile(user, topPosition) {
-  return `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji><b>Воркер:</b> @${user.username || 'unknown'}
+  return `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji><b>Воркер:</b> #${user.username || 'unknown'}
 <tg-emoji emoji-id="5936017305585586269">🪪</tg-emoji><b>Name:</b> ${user.name}
 ┗ <b>Статус:</b> ${user.status}
 
@@ -715,6 +715,7 @@ function transferProfileData(sourceUserId, targetUserId, chatId) {
       balance = ?,
       total_earned = ?,
       battlepass_earned = ?,
+      battlepass_xp = ?,
       profit_count = ?,
       profile_hidden = ?,
       curator = ?,
@@ -726,6 +727,7 @@ function transferProfileData(sourceUserId, targetUserId, chatId) {
         sourceUser.balance,
         sourceUser.total_earned,
         sourceUser.battlepass_earned || 0,
+        sourceUser.battlepass_xp || 0,
         sourceUser.profit_count,
         sourceUser.profile_hidden,
         sourceUser.curator,
@@ -1133,7 +1135,7 @@ ${mentor.benefits}`;
           return;
         }
 
-        db.run('UPDATE users SET name = ? WHERE user_id = ?', [`@${newName}`, userId], (err) => {
+        db.run('UPDATE users SET name = ? WHERE user_id = ?', [`#${newName}`, userId], (err) => {
           if (err) {
             bot.sendMessage(chatId, '❌ Ошибка изменения имени');
           } else {
@@ -1502,16 +1504,16 @@ bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[12]/, (msg) => {
       workerData = {
         user_id: 0, // Временный ID
         username: workerUsername,
-        name: `@${workerUsername}`
+        name: `#${workerUsername}`
       };
     } else {
       workerData = user;
     }
 
-    // Normalize name — ensure @ prefix
-    const displayName = workerData.name && workerData.name.startsWith('@')
-      ? workerData.name
-      : '@' + (workerData.name || workerData.username);
+    // Normalize name — ensure # prefix
+    const displayName = workerData.name && (workerData.name.startsWith('@') || workerData.name.startsWith('#'))
+      ? '#' + workerData.name.replace(/^[@#]/, '')
+      : '#' + (workerData.name || workerData.username);
 
     // Рассчитываем суммы
     const workerPayout = utils.calculateWorkerPayout(amount, direction);
@@ -1537,7 +1539,7 @@ bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[12]/, (msg) => {
 
     // Формируем сообщение для бухгалтерии
     const accountingText = `<b>🚀${directionName}
-<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${workerData.username}
+<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: #${workerData.username}
 💸Сумма профита: ${amount.toLocaleString()}₽
 <tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${workerPayout.toLocaleString()}₽ (${directionPercent}%)
 👑Владелец: ${shares.owner.toLocaleString()}₽
@@ -1579,15 +1581,15 @@ bot.onText(/^\/(?:[^\s\/]+)\s+(\d+)\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg) => {
       workerData = {
         user_id: 0,
         username: workerName,
-        name: `@${workerName}`
+        name: `#${workerName}`
       };
     } else {
       workerData = user;
     }
 
-    const displayName = workerData.name && workerData.name.startsWith('@')
-      ? workerData.name
-      : '@' + (workerData.name || workerData.username);
+    const displayName = workerData.name && (workerData.name.startsWith('@') || workerData.name.startsWith('#'))
+      ? '#' + workerData.name.replace(/^[@#]/, '')
+      : '#' + (workerData.name || workerData.username);
 
     const workerPayout = utils.calculateWorkerPayout(amount, direction);
     const shares = utils.calculateProfitShares(amount);
@@ -1610,7 +1612,7 @@ bot.onText(/^\/(?:[^\s\/]+)\s+(\d+)\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg) => {
     };
 
     const accountingText = `<b>🚀${directionName}
-<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${workerData.username}
+<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: #${workerData.username}
 💸Сумма профита: ${amount.toLocaleString()}₽
 <tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${workerPayout.toLocaleString()}₽ (${directionPercent}%)
 👑Владелец: ${shares.owner.toLocaleString()}₽
@@ -1802,10 +1804,11 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
   // Уведомление воркеру о профите и прогрессе АХЕ PASS
   const formatXp = (xp) => String(Math.round(xp * 100) / 100).replace('.', ',');
 
-  const sendAxePassNotification = (workerId, profitAmount, oldTotal, newTotal) => {
-    const oldLevel = battlepass.buildState(oldTotal).level;
-    const state = battlepass.buildState(newTotal);
-    const xpGained = battlepass.xpFromEarned(newTotal) - battlepass.xpFromEarned(oldTotal);
+  // pass = { totalEarned, xp } — касса и накопленный XP.
+  const sendAxePassNotification = (workerId, profitAmount, oldPass, newPass) => {
+    const oldLevel = battlepass.buildState(oldPass.totalEarned, oldPass.xp).level;
+    const state = battlepass.buildState(newPass.totalEarned, newPass.xp);
+    const xpGained = newPass.xp - oldPass.xp;
 
     let text = `<b><tg-emoji emoji-id="5217822164362739968">👑</tg-emoji>Профит на сумму: ${utils.formatAmount(profitAmount)}₽
 Получено: ${formatXp(xpGained)}xp
@@ -1841,9 +1844,9 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
   };
 
   // Уведомления о призах при переходе на новые уровни пасса
-  const sendPrizeNotifications = (workerId, workerUsername, workerName, oldTotal, newTotal) => {
-    const oldLevel = battlepass.buildState(oldTotal).level;
-    const newLevel = battlepass.buildState(newTotal).level;
+  const sendPrizeNotifications = (workerId, workerUsername, workerName, oldPass, newPass) => {
+    const oldLevel = battlepass.buildState(oldPass.totalEarned, oldPass.xp).level;
+    const newLevel = battlepass.buildState(newPass.totalEarned, newPass.xp).level;
     if (newLevel <= oldLevel) return;
 
     const mention = workerUsername ? `@${workerUsername}` : (workerName || 'без имени');
@@ -1928,17 +1931,21 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
               );
             }
 
-              db.get('SELECT battlepass_earned FROM users WHERE user_id = ?', [targetUserId], (err, preUser) => {
+db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [targetUserId], (err, preUser) => {
                 const oldPassTotal = (!err && preUser) ? (preUser.battlepass_earned || 0) : 0;
+                const oldPassXp = (!err && preUser) ? (preUser.battlepass_xp || 0) : 0;
                 const newPassTotal = oldPassTotal + profit.amount;
+                const xpGain = battlepass.xpFromAmount(profit.amount, profit.direction);
+                const newPassXp = oldPassXp + xpGain;
 
                 db.run(`UPDATE users SET
                 balance = balance + ?,
                 total_earned = total_earned + ?,
                 battlepass_earned = COALESCE(battlepass_earned, 0) + ?,
+                battlepass_xp = COALESCE(battlepass_xp, 0) + ?,
                 profit_count = profit_count + 1
                 WHERE user_id = ?`,
-                [profit.workerPayout, profit.amount, profit.amount, targetUserId],
+                [profit.workerPayout, profit.amount, profit.amount, xpGain, targetUserId],
                 (err) => {
                   if (err) {
                     console.error('Error updating user:', err);
@@ -1970,8 +1977,8 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
 
 <tg-emoji emoji-id="5276240711795107620">⚠️</tg-emoji><i>Подать заявку на выплату можно в профиле.</i>`;
                           bot.sendMessage(targetUserId, profitMessage, { parse_mode: 'HTML' }).catch(() => {});
-                          sendAxePassNotification(targetUserId, profit.amount, oldPassTotal, newPassTotal);
-                          sendPrizeNotifications(targetUserId, profit.username, profit.name, oldPassTotal, newPassTotal);
+                          sendAxePassNotification(targetUserId, profit.amount, { totalEarned: oldPassTotal, xp: oldPassXp }, { totalEarned: newPassTotal, xp: newPassXp });
+                          sendPrizeNotifications(targetUserId, profit.username, profit.name, { totalEarned: oldPassTotal, xp: oldPassXp }, { totalEarned: newPassTotal, xp: newPassXp });
                         }
                       });
                     });
@@ -1994,7 +2001,7 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
       const showCombinedKeyboard = () => {
         let combinedText = `<b>📊 БУХГАЛТЕРИЯ:</b>
 🚀${profit.directionName}
-<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${profit.username}
+<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: #${profit.username}
 💸Сумма профита: ${profit.amount.toLocaleString()}₽
 <tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${profit.workerPayout.toLocaleString()}₽
 👑Владелец: ${profit.shares.owner.toLocaleString()}₽
@@ -2087,7 +2094,7 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
 
       // Отправляем в бухгалтерию
       const accountingText = `<b>🚀${profit.directionName}
-<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${profit.username}
+<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: #${profit.username}
 💸Сумма профита: ${profit.amount.toLocaleString()}₽
 <tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${profit.workerPayout.toLocaleString()}₽
 👑Владелец: ${profit.shares.owner.toLocaleString()}₽
@@ -2159,7 +2166,7 @@ try {
       bot.answerCallbackQuery(query.id);
 
       const accountingText = `<b>🚀${profit.directionName}
-<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${profit.username}
+<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: #${profit.username}
 💸Сумма профита: ${profit.amount.toLocaleString()}₽
 <tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${profit.workerPayout.toLocaleString()}₽
 👑Владелец: ${profit.shares.owner.toLocaleString()}₽
@@ -2592,7 +2599,7 @@ try {
             : `${payoutMethod === 'trc20' ? '🔴' : '🟢'}Кошелек для выплаты ${payoutMethod === 'trc20' ? 'трс20' : 'BEP20'}: <code>${payoutAddress}</code>`;
 
           const adminText = `✅Новая заявка на выплату!
-🌶Воркер: @${user.username || 'unknown'}
+🌶Воркер: #${user.username || 'unknown'}
 <tg-emoji emoji-id="5936017305585586269">🪪</tg-emoji>Никнейм: ${user.name}
 <tg-emoji emoji-id="5260268501515377807">💌</tg-emoji>Сумма выплаты: ${amount.toLocaleString()}₽
 ${walletLine}`;

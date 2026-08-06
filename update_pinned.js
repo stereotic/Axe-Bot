@@ -134,7 +134,7 @@ async function createPinnedMessageText() {
   const usdRate = await getUsdRate();
   const botUsername = process.env.BOT_USERNAME || 'AXE_xBOT';
   const topWorkerName = topWorker && Number(topWorker.total_earned) > 0
-    ? (topWorker.name && topWorker.name !== '#' ? topWorker.name : `@${topWorker.username}`)
+    ? (topWorker.name && topWorker.name !== '#' ? topWorker.name : `#${topWorker.username}`)
     : '';
   const topWorkerLink = topWorker && Number(topWorker.total_earned) > 0
     ? `https://t.me/${botUsername}?start=profile_${topWorker.user_id}`

@@ -1,4 +1,5 @@
 const db = require('./database');
+const battlepass = require('./battlepass');
 
 const args = process.argv.slice(2);
 if (args.length < 2) {
@@ -23,11 +24,13 @@ db.run('INSERT INTO profits (user_id, amount, amount_to_pay, direction, created_
     console.log(`✅ Профит ${amount}₽ добавлен юзеру ${userId}`);
     
     // Ручной новый профит также учитывается в прогрессе AXE PASS.
+    const xpGain = battlepass.xpFromAmount(amount, 1); // direction 1 = Кардинг
     db.run(`UPDATE users SET
         total_earned = COALESCE(total_earned, 0) + ?,
-        battlepass_earned = COALESCE(battlepass_earned, 0) + ?
+        battlepass_earned = COALESCE(battlepass_earned, 0) + ?,
+        battlepass_xp = COALESCE(battlepass_xp, 0) + ?
         WHERE user_id = ?`,
-      [amount, amount, userId],
+      [amount, amount, xpGain, userId],
       function(err2) {
         if (err2) console.error('❌ Ошибка total_earned:', err2);
         else console.log(`✅ total_earned +${amount}₽`);

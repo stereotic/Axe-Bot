@@ -2,9 +2,11 @@ const db = require('./database');
 
 // ─── Экономика ────────────────────────────────────────────────────────────────
 // За каждые полные RUB_PER_STEP рублей кассы воркера начисляется XP_PER_STEP.
-// 30.000₽ -> floor(30000/10000) = 3 шага -> 3 * 0.5 = 1.5 XP
+// 30.000 ₽ -> floor(30000/10000) = 3 шага -> 3 * 0.5 = 1.5 XP
 const RUB_PER_STEP = 10000;
 const XP_PER_STEP = 0.5;
+// «Прямой» сервис (направление != 1) идёт по пониженной ставке: 0.2 XP за 10.000 ₽.
+const DIRECT_XP_PER_STEP = 0.2;
 
 // Стоимость КАЖДОГО уровня в XP. Уровни 1-5 по 1 XP, уровни 6-10 по 2 XP.
 // Полный пасс = 5*1 + 5*2 = 15 XP = 300.000₽ кассы.
@@ -34,11 +36,19 @@ function xpFromEarned(totalEarned) {
   return steps * XP_PER_STEP;
 }
 
+// XP за один профит по направлению. «Кардинг» (1) — базовая ставка,
+// «Прямой» (всё остальное) — пониженная 0.2 XP за 10.000 ₽.
+function xpFromAmount(amount, direction) {
+  const perStep = (direction === 1) ? XP_PER_STEP : DIRECT_XP_PER_STEP;
+  return (Math.max(0, Number(amount) || 0) / RUB_PER_STEP) * perStep;
+}
+
 /**
- * Синхронный расчёт состояния пасса по сумме кассы.
+ * Синхронный расчёт состояния пасса по сумме кассы и накопленному XP.
+ * Если xp не передан — считается от кассы по базовой ставке (обратная совместимость).
  */
-function buildState(totalEarned) {
-  const xp = xpFromEarned(totalEarned);
+function buildState(totalEarned, passXp) {
+  const xp = (typeof passXp === 'number' && !Number.isNaN(passXp)) ? passXp : xpFromEarned(totalEarned);
 
   let level = 0;
   for (let i = 0; i < THRESHOLDS.length; i++) {
@@ -84,13 +94,13 @@ function buildState(totalEarned) {
  */
 function getStateForUser(userId, callback) {
   db.get(
-    'SELECT user_id, username, name, status, battlepass_earned FROM users WHERE user_id = ?',
+    'SELECT user_id, username, name, status, battlepass_earned, battlepass_xp FROM users WHERE user_id = ?',
     [userId],
     (err, user) => {
       if (err) return callback(err);
       if (!user) return callback(null, null);
 
-      const state = buildState(user.battlepass_earned || 0);
+      const state = buildState(user.battlepass_earned || 0, user.battlepass_xp || 0);
       state.user = {
         userId: user.user_id,
         username: user.username || null,
@@ -108,7 +118,9 @@ module.exports = {
   MAX_XP,
   RUB_PER_STEP,
   XP_PER_STEP,
+  DIRECT_XP_PER_STEP,
   xpFromEarned,
+  xpFromAmount,
   buildState,
   getStateForUser
 };

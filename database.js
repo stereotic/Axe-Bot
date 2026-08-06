@@ -34,6 +34,22 @@ db.serialize(() => {
       console.error('Error adding battlepass_earned column:', err);
     }
   });
+  db.run(`ALTER TABLE users ADD COLUMN battlepass_xp REAL DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding battlepass_xp column:', err);
+    }
+    // Миграция: накопленный прогресс считаем по старой ставке (0.5 XP / 10к),
+    // чтобы никто не потерял уже заработанное.
+    db.run(
+      `UPDATE users SET battlepass_xp = CAST(COALESCE(battlepass_earned, 0) / 10000 AS INTEGER) * 0.5
+       WHERE COALESCE(battlepass_xp, 0) = 0`,
+      (migrateErr) => {
+        if (migrateErr) {
+          console.error('Error seeding battlepass_xp:', migrateErr);
+        }
+      }
+    );
+  });
   db.run(`ALTER TABLE users ADD COLUMN welcome_keyboard_sent INTEGER DEFAULT 0`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
       console.error('Error adding welcome_keyboard_sent column:', err);

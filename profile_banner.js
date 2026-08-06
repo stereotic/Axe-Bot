@@ -319,7 +319,7 @@ async function getTelegramAvatarBuffer(bot, userId) {
 
 function formatName(rawName) {
   const name = String(rawName || 'UNKNOWN').trim().toUpperCase();
-  return name.startsWith('@') ? name : `@${name}`;
+  return name.startsWith('@') || name.startsWith('#') ? '#' + name.replace(/^[@#]/, '') : `#${name}`;
 }
 
 function formatCount(value) {
@@ -452,7 +452,7 @@ async function renderProfileBanner(profile) {
 function buildProfileCaption(user, topPosition) {
   const level = getLevel(user.total_earned);
 
-  return `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji><b>Воркер:</b> @${user.username || 'unknown'}
+  return `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji><b>Воркер:</b> #${user.username || 'unknown'}
 <tg-emoji emoji-id="5936017305585586269">🪪</tg-emoji><b>Name:</b> ${user.name}
 └ <b>Статус:</b> ${user.status || level.current.name}
 
