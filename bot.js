@@ -3173,8 +3173,8 @@ bot.onText(/\/staff/, (msg) => {
   const staffText = `<tg-emoji emoji-id="5357069174512303778">🦺</tg-emoji><b>Лица администрации</b>
 
 ┏ <tg-emoji emoji-id="5992157823838984339">👨‍🏫</tg-emoji><b>Кураторы</b>
-┗  @Henry_AXE
-┣  @Arachnophob_Axe
+┣  @Henry_AXE
+┗  @Arachnophob_Axe
 
 ┏<tg-emoji emoji-id="5960714428394507968">👁</tg-emoji><b>Модераторы</b>
 ┗ @Aether_AXE
