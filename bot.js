@@ -1280,52 +1280,67 @@ if (fs.existsSync(bookmakerImagePath)) {
 
     case 'change_name':
       bot.answerCallbackQuery(query.id);
-      // Для ввода данных отправляем новое сообщение
-      bot.sendMessage(chatId, '✍️Введите новый ник:').then((sent) => {
-        const questionMessageId = sent.message_id;
 
-        guard.setPendingInput(userId, chatId, (msg) => {
-          if (msg.chat.id !== chatId) return;
-          if (!msg.text) return;
+      const askName = () => {
+        // Для ввода данных отправляем новое сообщение
+        bot.sendMessage(chatId, '✍️Введите новый ник:').then((sent) => {
+          const questionMessageId = sent.message_id;
 
-          guard.clearPendingInput(userId);
+          guard.setPendingInput(userId, chatId, (msg) => {
+            if (msg.chat.id !== chatId) return;
+            if (!msg.text) return;
 
-          const newName = msg.text;
+            guard.clearPendingInput(userId);
 
-          if (!utils.validateWorkerName(newName)) {
-            bot.sendMessage(chatId, '❌ Недопустимое имя. Используйте только русские/английские буквы, цифры, _, !, ?, $, ₽ (от 3 до 20 символов)');
-            return;
-          }
+            const newName = msg.text;
 
-          db.run('UPDATE users SET name = ? WHERE user_id = ?', [`#${newName}`, userId], (err) => {
-            if (err) {
-              bot.sendMessage(chatId, '❌ Ошибка изменения имени');
-            } else {
-              getUser(userId, async (err, user) => {
-                if (err || !user) {
-                  bot.sendMessage(chatId, '✅ Имя успешно изменено!');
-                  return;
-                }
+            if (!utils.validateWorkerName(newName)) {
+              // Убираем неверный ответ и ошибку, затем переспрашиваем
+              if (msg.message_id) bot.deleteMessage(chatId, msg.message_id).catch(() => {});
+              if (questionMessageId) bot.deleteMessage(chatId, questionMessageId).catch(() => {});
+              bot.sendMessage(chatId, '❌ Недопустимое имя. Используйте только русские/английские буквы, цифры, _, !, ?, $, ₽ (от 3 до 20 символов)')
+                .then((errorMsg) => {
+                  setTimeout(() => {
+                    bot.deleteMessage(chatId, errorMsg.message_id).catch(() => {});
+                  }, 2500);
+                  askName();
+                })
+                .catch(() => {});
+              return;
+            }
 
-                utils.getTopPosition(userId, async (err, position) => {
-                  const topPosition = err ? 0 : position;
+            db.run('UPDATE users SET name = ? WHERE user_id = ?', [`#${newName}`, userId], (err) => {
+              if (err) {
+                bot.sendMessage(chatId, '❌ Ошибка изменения имени');
+              } else {
+                getUser(userId, async (err, user) => {
+                  if (err || !user) {
+                    bot.sendMessage(chatId, '✅ Имя успешно изменено!');
+                    return;
+                  }
 
-                  bot.sendMessage(chatId, '✅ Имя успешно изменено!');
-                  await sendProfileMessage(chatId, user, topPosition);
+                  utils.getTopPosition(userId, async (err, position) => {
+                    const topPosition = err ? 0 : position;
+
+                    bot.sendMessage(chatId, '✅ Имя успешно изменено!');
+                    await sendProfileMessage(chatId, user, topPosition);
+                  });
                 });
-              });
-            }
+              }
 
-            // Удаляем сообщение с вопросом и ответ пользователя
-            if (msg.message_id) {
-              bot.deleteMessage(chatId, msg.message_id).catch(() => {});
-            }
-            if (questionMessageId) {
-              bot.deleteMessage(chatId, questionMessageId).catch(() => {});
-            }
+              // Удаляем сообщение с вопросом и ответ пользователя
+              if (msg.message_id) {
+                bot.deleteMessage(chatId, msg.message_id).catch(() => {});
+              }
+              if (questionMessageId) {
+                bot.deleteMessage(chatId, questionMessageId).catch(() => {});
+              }
+            });
           });
         });
-      });
+      };
+
+      askName();
       break;
 
     case 'hide_profile':
