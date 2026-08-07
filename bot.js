@@ -2476,65 +2476,78 @@ try {
 
     applicationData[userId] = { step: 1 };
 
-    bot.sendMessage(chatId, '<b>Вопрос №1:</b>\n<i>Занимался ли ты подобной деятельностью?</i>', { parse_mode: 'HTML' });
+    const questions = [
+      '<b>Вопрос №1:</b>\n<i>Занимался ли ты подобной деятельностью?</i>',
+      '<b>Вопрос №2:</b>\n<i>Если твой ответ на прошлый вопрос (да), то расскажи каков свой опыт, чем занимался?</i>'
+    ];
+    let step = 1;
 
-    guard.setPendingInput(userId, chatId, (msg) => {
-      if (msg.chat.id !== chatId) return;
-      if (msg.from.id !== userId) return; // Проверяем что это тот же пользователь
-      if (!msg.text || msg.text.startsWith('/')) return;
+    const askQuestion = () => {
+      bot.sendMessage(chatId, questions[step - 1], { parse_mode: 'HTML' }).then((sent) => {
+        const questionMessageId = sent.message_id;
 
-      guard.clearPendingInput(userId);
+        guard.setPendingInput(userId, chatId, (msg) => {
+          if (msg.chat.id !== chatId) return;
+          if (msg.from.id !== userId) return; // Проверяем что это тот же пользователь
+          if (!msg.text || msg.text.startsWith('/')) return;
 
-      applicationData[userId].question1 = msg.text;
-      applicationData[userId].step = 2;
+          guard.clearPendingInput(userId);
 
-      bot.sendMessage(chatId, '<b>Вопрос №2:</b>\n<i>Если твой ответ на прошлый вопрос (да), то расскажи каков твой опыт, чем занимался?</i>', { parse_mode: 'HTML' });
+          if (step === 1) {
+            applicationData[userId].question1 = msg.text;
+            applicationData[userId].step = 2;
+          } else {
+            applicationData[userId].question2 = msg.text;
+          }
 
-      guard.setPendingInput(userId, chatId, (msg) => {
-        if (msg.chat.id !== chatId) return;
-        if (msg.from.id !== userId) return; // Проверяем что это тот же пользователь
-        if (!msg.text || msg.text.startsWith('/')) return;
+          // Удаляем сообщение с вопросом и ответ пользователя
+          if (msg.message_id) bot.deleteMessage(chatId, msg.message_id).catch(() => {});
+          if (questionMessageId) bot.deleteMessage(chatId, questionMessageId).catch(() => {});
 
-        guard.clearPendingInput(userId);
+          if (step === 1) {
+            step = 2;
+            askQuestion();
+            return;
+          }
 
-        applicationData[userId].question2 = msg.text;
+          // Сохраняем заявку в БД
+          resetOnboardingProgress(userId, () => {
+          db.run('INSERT INTO applications (user_id, username, question1, question2, status) VALUES (?, ?, ?, ?, ?)',
+            [userId, msg.from.username || '', applicationData[userId].question1, applicationData[userId].question2, 'pending'],
+            function(err) {
+              if (err) {
+                console.error('Error saving application:', err);
+                bot.sendMessage(chatId, '❌ Ошибка отправки заявки');
+                return;
+              }
 
-        // Сохраняем заявку в БД
-        resetOnboardingProgress(userId, () => {
-        db.run('INSERT INTO applications (user_id, username, question1, question2, status) VALUES (?, ?, ?, ?, ?)',
-          [userId, msg.from.username || '', applicationData[userId].question1, applicationData[userId].question2, 'pending'],
-          function(err) {
-            if (err) {
-              console.error('Error saving application:', err);
-              bot.sendMessage(chatId, '❌ Ошибка отправки заявки');
-              return;
-            }
+              const applicationId = this.lastID;
 
-            const applicationId = this.lastID;
+              bot.sendMessage(chatId, '<b><tg-emoji emoji-id="5843843420468024653">📨</tg-emoji> Твоя заявка отправлена на рассмотрение!</b>', { parse_mode: 'HTML' });
 
-            bot.sendMessage(chatId, '<b><tg-emoji emoji-id="5843843420468024653">📨</tg-emoji> Твоя заявка отправлена на рассмотрение!</b>', { parse_mode: 'HTML' });
-
-            // Отправляем заявку админам
-            const adminText = `Заявка от @${msg.from.username || 'unknown'} (ID: ${userId})
+              // Отправляем заявку админам
+              const adminText = `Заявка от @${msg.from.username || 'unknown'} (ID: ${userId})
 
 1. ${applicationData[userId].question1}
 2. ${applicationData[userId].question2}`;
 
-            adminIds.forEach(adminId => {
-              bot.sendMessage(adminId, adminText, {
-                reply_markup: keyboards.admin_application(applicationId)
-              }).catch(err => {
-                console.error('Error sending to admin:', err);
+              adminIds.forEach(adminId => {
+                bot.sendMessage(adminId, adminText, {
+                  reply_markup: keyboards.admin_application(applicationId)
+                }).catch(err => {
+                  console.error('Error sending to admin:', err);
+                });
               });
-            });
 
-            delete applicationData[userId];
-          }
-        );
+              delete applicationData[userId];
+            }
+          );
+          });
         });
-      });
+      }).catch(() => {});
+    };
 
-    });
+    askQuestion();
 
     return;
   }
