@@ -11,10 +11,11 @@ const KNOWN_COMMANDS = [
 ];
 
 // Формат без слэша: username сумма направление (мамонт) — «richvladwork 10000 1»
-const TEXT_RE = /^(?!\/)([^\s]+)\s+(\d+)₽?\s+([12])(?:\s+\(?(\d+)\)?)?$/;
+// Направления: 1 — Кардинг, 2 — Прямой, 3 — Букмекер.
+const TEXT_RE = /^(?!\/)([^\s]+)\s+(\d+)₽?\s+([123])(?:\s+\(?(\d+)\)?)?$/;
 
-// Формат со слэшем: /username сумма направление (мамонт) — «/richvladwork 5000 1»
-const COMMAND_RE = /^\/([^\s]+)\s+(\d+)\s+([12])(?:\s+\(?(\d+)\)?)?$/;
+// Формат со слышом: /username сумма направление (мамонт) — «/richvladwork 5000 1»
+const COMMAND_RE = /^\/([^\s]+)\s+(\d+)\s+([123])(?:\s+\(?(\d+)\)?)?$/;
 
 function parseProfitText(text) {
   if (typeof text !== 'string') return null;

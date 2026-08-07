@@ -252,7 +252,7 @@ function sendRequestToAdmins(bot, adminIds, workerId, requestId, state) {
 
     const adminText = `💳 <b>Новый запрос на реквизиты!</b>
 
-💷Воркер: #${username}
+💷Воркер: @${username}
 👤Пол: ${genderText}
 💸Сумма: ${state.amount.toLocaleString()}₽
 ⏰Холд: ${state.hold_hours}ч`;

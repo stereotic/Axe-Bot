@@ -30,10 +30,14 @@ test('parseProfitText: служебная команда со слэшем не 
   assert.strictEqual(parseProfitText('/top 5000 1'), null);
 });
 
+test('parseProfitText: направление 3 (Букмекер) парсится', () => {
+  assert.deepStrictEqual(parseProfitText('name 5000 3'), { username: 'name', amount: 5000, direction: 3, mammothCount: null });
+});
+
 test('parseProfitText: неверный формат возвращает null', () => {
   assert.strictEqual(parseProfitText('justname'), null);
   assert.strictEqual(parseProfitText(''), null);
-  assert.strictEqual(parseProfitText('name 100 3'), null);
+  assert.strictEqual(parseProfitText('name 100 4'), null);
   assert.strictEqual(parseProfitText('name abc 1'), null);
   assert.strictEqual(parseProfitText(null), null);
   assert.strictEqual(parseProfitText(123), null);

@@ -13,7 +13,8 @@ const STATUS_THRESHOLDS = [
 // Проценты по направлениям
 const DIRECTION_PERCENTAGES = {
   1: 80, // Кардинг
-  2: 75  // Прямик
+  2: 75, // Прямой
+  3: 70  // Букмекер
 };
 
 // Распределение долей
@@ -183,7 +184,7 @@ function updateProjectStats(profitAmount, callback) {
  * Получить название направления
  */
 function getDirectionName(direction) {
-  return direction === 1 ? 'Кардинг' : 'Прямой';
+  return direction === 1 ? 'Кардинг' : direction === 3 ? 'Букмекер' : 'Прямой';
 }
 
 // Исключения из топов (тестовые / служебные аккаунты)

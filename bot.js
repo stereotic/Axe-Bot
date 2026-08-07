@@ -11,6 +11,7 @@ const { setupCheckHandlers } = require('./check_handlers');
 const { setupProfitSystem } = require('./profit_system');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const profileBanner = require('./profile_banner');
 const { loadPinnedMessageId, updatePinnedMessage } = require('./update_pinned');
 const { setupRassSystem, isRassEditing, cancelRassEdit } = require('./rass');
@@ -130,7 +131,31 @@ const bot = new TelegramBot(token, botOptions);
 
 // Кэш file_id статичных картинок меню: первая отправка грузит файл,
 // последующие — пересылают по file_id без повторной загрузки на сервер Telegram.
-const photoFileIdCache = new Map();
+// Сухранём на диск: file_id глобальны для бота, а правка меню на месте (editMessageMedia)
+// требует file_id — значит кэш должен переживать рестарт.
+const PHOTO_CACHE_FILE = path.join(__dirname, '.photo_file_id_cache.json');
+
+function loadPhotoCache() {
+  try {
+    if (fs.existsSync(PHOTO_CACHE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(PHOTO_CACHE_FILE, 'utf8'));
+      if (data && typeof data === 'object') return new Map(Object.entries(data));
+    }
+  } catch (err) {
+    console.error('Photo cache load failed:', err);
+  }
+  return new Map();
+}
+
+function savePhotoCache() {
+  try {
+    fs.writeFileSync(PHOTO_CACHE_FILE, JSON.stringify(Object.fromEntries(photoFileIdCache)), 'utf8');
+  } catch (err) {
+    console.error('Photo cache save failed:', err);
+  }
+}
+
+const photoFileIdCache = loadPhotoCache();
 
 async function sendMenuPhoto(chatId, imagePath, extra = {}) {
   const cachedFileId = photoFileIdCache.get(imagePath);
@@ -143,6 +168,7 @@ async function sendMenuPhoto(chatId, imagePath, extra = {}) {
     const photos = sent && sent.photo;
     if (photos && photos.length) {
       photoFileIdCache.set(imagePath, photos[photos.length - 1].file_id);
+      savePhotoCache();
     }
   } catch (_) { /* кэш не критичен */ }
   return sent;
@@ -402,9 +428,55 @@ async function sendProfileMessage(chatId, user, topPosition, options = {}) {
   }
 }
 
-async function updateProfileMessage(chatId, messageId, user, topPosition) {
-  await bot.deleteMessage(chatId, messageId).catch(() => {});
-  return sendProfileMessage(chatId, user, topPosition);
+async function updateProfileMessage(chatId, messageId, user, topPosition, options = {}) {
+  const replyMarkup = options.reply_markup !== undefined ? options.reply_markup : keyboards.profile();
+
+  let profileMedia;
+  try {
+    profileMedia = await perf.wrap('buildProfileMedia', profileBanner.buildProfileMedia.bind(profileBanner))(bot, user, topPosition);
+  } catch (error) {
+    console.error('Profile banner render error:', error);
+    return bot.editMessageText(profileBanner.buildProfileCaption(user, topPosition), {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: 'HTML',
+      reply_markup: replyMarkup
+    }).catch(() => {});
+  }
+
+  // Правка на месте: свежий баннер грузим во временный файл и подменяем медиа
+  // через editMessageMedia. iOS не пикает уведомление при edit, только при send.
+  const tmpPath = path.join(os.tmpdir(), `axe_profile_${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`);
+  fs.writeFileSync(tmpPath, profileMedia.buffer);
+
+  try {
+    await bot.editMessageMedia({
+      type: 'photo',
+      media: 'attach://' + tmpPath,
+      caption: profileMedia.caption,
+      parse_mode: 'HTML'
+    }, {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: replyMarkup
+    });
+  } catch (mediaErr) {
+    // Сообщение может быть текстовым (фолбэк без картинки) — правим текст.
+    try {
+      await bot.editMessageText(profileMedia.caption, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup
+      });
+    } catch (textErr) {
+      console.error('Profile in-place edit failed, resend fallback:', telegramErrorSummary(mediaErr), telegramErrorSummary(textErr));
+      await sendProfileMessage(chatId, user, topPosition, { reply_markup: replyMarkup });
+      await bot.deleteMessage(chatId, messageId).catch(() => {});
+    }
+  } finally {
+    fs.unlink(tmpPath, () => {});
+  }
 }
 
 function telegramErrorSummary(err) {
@@ -641,10 +713,59 @@ function finalizeUserApproval(userId, callback) {
   });
 }
 
-// Сначала отправляем новый экран, потом удаляем меню (чтобы не оставлять чат пустым).
-function replaceMenuMessage(chatId, messageId, sendPromise) {
-  return Promise.resolve(sendPromise)
-    .then(() => bot.deleteMessage(chatId, messageId).catch(() => {}))
+// Редактируем текущий экран на месте вместо «отправить новое + удалить старое»,
+// чтобы кнопки меню не спам-Uп. opts: { type: 'photo', imagePath, caption | caption },
+// либо { type: 'text', text, ... }; общий shape: { reply_markup, parse_mode }.
+// Если редактирование не вышло (фото↔текст, нет кэшированного file_id и т.п.) —
+// падаем на старое поведение: отправить новый экран и удалить прежний.
+function replaceMenuMessage(chatId, messageId, opts) {
+  const renderNew = () => {
+    if (opts.type === 'photo') {
+      return sendMenuPhoto(chatId, opts.imagePath, {
+        caption: opts.caption,
+        parse_mode: opts.parse_mode,
+        reply_markup: opts.reply_markup
+      });
+    }
+    return bot.sendMessage(chatId, opts.text, {
+      parse_mode: opts.parse_mode,
+      reply_markup: opts.reply_markup
+    });
+  };
+
+  const editInPlace = () => {
+    if (opts.type === 'photo') {
+      const fileId = photoFileIdCache.get(opts.imagePath);
+      // file_id в кэше — пересылка без загрузки. Кэш холодный (после рестарта) —
+      // грузим файл заново через attach:// прямо в edit, без delete+resend.
+      const media = fileId ? fileId : 'attach://' + opts.imagePath;
+      return bot.editMessageMedia(
+        {
+          type: 'photo',
+          media,
+          caption: opts.caption,
+          parse_mode: opts.parse_mode
+        },
+        {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: opts.reply_markup
+        }
+      );
+    }
+    return bot.editMessageText(opts.text, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: opts.parse_mode,
+      reply_markup: opts.reply_markup
+    });
+  };
+
+  return Promise.resolve(editInPlace())
+    .catch((err) => {
+      console.error(`editMenu failed for ${chatId}, fallback to resend:`, telegramErrorSummary(err));
+      return renderNew().then(() => bot.deleteMessage(chatId, messageId).catch(() => {}));
+    })
     .catch((err) => {
       console.error(`replaceMenuMessage failed for ${chatId}:`, telegramErrorSummary(err));
       return bot.sendMessage(chatId, '❌ Не удалось открыть раздел. Попробуйте ещё раз.').catch(() => {});
@@ -811,16 +932,20 @@ ${mentor.benefits}`;
       const mentorBannerPath = path.join(__dirname, 'images', mentor.banner);
 
       if (fs.existsSync(mentorBannerPath)) {
-        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, mentorBannerPath, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'photo',
+          imagePath: mentorBannerPath,
           caption: mentorText,
           parse_mode: 'HTML',
           reply_markup: mentorKeyboard
-        }));
+        });
       } else {
-        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, mentorText, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'text',
+          text: mentorText,
           parse_mode: 'HTML',
           reply_markup: mentorKeyboard
-        }));
+        });
       }
     });
     return;
@@ -868,13 +993,17 @@ ${mentor.benefits}`;
       const menuImagePath = path.join(__dirname, 'images', 'info.jpg');
 
       if (fs.existsSync(menuImagePath)) {
-        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, menuImagePath, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'photo',
+          imagePath: menuImagePath,
           reply_markup: keyboards.menu
-        }));
+        });
       } else {
-        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, MENU_PANEL_FALLBACK, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'text',
+          text: MENU_PANEL_FALLBACK,
           reply_markup: keyboards.menu
-        }));
+        });
       }
       break;
 
@@ -890,8 +1019,7 @@ ${mentor.benefits}`;
           const topPosition = err ? 0 : position;
 
           try {
-            await sendProfileMessage(chatId, user, topPosition);
-            await bot.deleteMessage(chatId, messageId).catch(() => {});
+            await updateProfileMessage(chatId, messageId, user, topPosition);
           } catch (error) {
             console.error('Profile menu navigation error:', error);
             bot.sendMessage(chatId, '❌ Не удалось открыть профиль. Попробуйте ещё раз.').catch(() => {});
@@ -911,17 +1039,21 @@ ${mentor.benefits}`;
       bot.answerCallbackQuery(query.id);
       const bookmakerImagePath = path.join(__dirname, 'images', 'bookmaker.jpg');
 
-      if (fs.existsSync(bookmakerImagePath)) {
-        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, bookmakerImagePath, {
+if (fs.existsSync(bookmakerImagePath)) {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'photo',
+          imagePath: bookmakerImagePath,
           caption: BOOKMAKER_INFO,
           reply_markup: keyboards.bookmaker,
           parse_mode: 'HTML'
-        }));
+        });
       } else {
-        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, BOOKMAKER_INFO, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'text',
+          text: BOOKMAKER_INFO,
           reply_markup: keyboards.bookmaker,
           parse_mode: 'HTML'
-        }));
+        });
       }
       break;
 
@@ -930,16 +1062,20 @@ ${mentor.benefits}`;
       const workImagePath = path.join(__dirname, 'images', 'work.jpg');
 
       if (fs.existsSync(workImagePath)) {
-        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, workImagePath, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'photo',
+          imagePath: workImagePath,
           caption: WORK_INFO,
           reply_markup: keyboards.work,
           parse_mode: 'HTML'
-        }));
+        });
       } else {
-        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, WORK_INFO, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'text',
+          text: WORK_INFO,
           reply_markup: keyboards.work,
           parse_mode: 'HTML'
-        }));
+        });
       }
       break;
 
@@ -956,16 +1092,20 @@ ${mentor.benefits}`;
       };
 
       if (fs.existsSync(trainingImagePath)) {
-        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, trainingImagePath, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'photo',
+          imagePath: trainingImagePath,
           caption: '<b><i>Тег куратора • Процент</i></b>',
           parse_mode: 'HTML',
           reply_markup: trainingKeyboard
-        }));
+        });
       } else {
-        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, '<b>Обучение</b>\n\n<b><i>Тег куратора • Процент</i></b>', {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'text',
+          text: '<b>Обучение</b>\n\n<b><i>Тег куратора • Процент</i></b>',
           parse_mode: 'HTML',
           reply_markup: trainingKeyboard
-        }));
+        });
       }
       break;
 
@@ -982,16 +1122,20 @@ ${mentor.benefits}`;
       };
 
       if (fs.existsSync(communityImagePath)) {
-        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, communityImagePath, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'photo',
+          imagePath: communityImagePath,
           caption: communityText,
           parse_mode: 'HTML',
           reply_markup: communityKeyboard
-        }));
+        });
       } else {
-        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, communityText, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'text',
+          text: communityText,
           parse_mode: 'HTML',
           reply_markup: communityKeyboard
-        }));
+        });
       }
       break;
 
@@ -1000,16 +1144,20 @@ ${mentor.benefits}`;
       const feedbackImagePath = path.join(__dirname, 'images', 'feedback.jpg');
 
       if (fs.existsSync(feedbackImagePath)) {
-        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, feedbackImagePath, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'photo',
+          imagePath: feedbackImagePath,
           caption: FEEDBACK_INFO,
           parse_mode: 'HTML',
           reply_markup: keyboards.feedback
-        }));
+        });
       } else {
-        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, FEEDBACK_INFO, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'text',
+          text: FEEDBACK_INFO,
           parse_mode: 'HTML',
           reply_markup: keyboards.feedback
-        }));
+        });
       }
       break;
 
@@ -1019,13 +1167,17 @@ ${mentor.benefits}`;
       const settingsText = '⚙️ Настройки';
 
       if (fs.existsSync(settingsImagePath)) {
-        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, settingsImagePath, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'photo',
+          imagePath: settingsImagePath,
           reply_markup: keyboards.settings_menu
-        }));
+        });
       } else {
-        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, settingsText, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'text',
+          text: settingsText,
           reply_markup: keyboards.settings_menu
-        }));
+        });
       }
       break;
 
@@ -1035,11 +1187,16 @@ ${mentor.benefits}`;
       const materialsText = '📂 Материалы\n\nЗдесь будут доступны обучающие материалы';
 
       if (fs.existsSync(materialsImagePath)) {
-        replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, materialsImagePath, {
+        replaceMenuMessage(chatId, messageId, {
+          type: 'photo',
+          imagePath: materialsImagePath,
           caption: materialsText
-        }));
+        });
       } else {
-        replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, materialsText));
+        replaceMenuMessage(chatId, messageId, {
+          type: 'text',
+          text: materialsText
+        });
       }
       break;
 
@@ -1055,13 +1212,17 @@ ${mentor.benefits}`;
         const settingsText = '⚙️ Настройки профиля';
 
         if (fs.existsSync(settingsImagePath)) {
-          replaceMenuMessage(chatId, messageId, sendMenuPhoto(chatId, settingsImagePath, {
+          replaceMenuMessage(chatId, messageId, {
+            type: 'photo',
+            imagePath: settingsImagePath,
             reply_markup: keyboards.profile_settings(user.profile_hidden)
-          }));
+          });
         } else {
-          replaceMenuMessage(chatId, messageId, bot.sendMessage(chatId, settingsText, {
+          replaceMenuMessage(chatId, messageId, {
+            type: 'text',
+            text: settingsText,
             reply_markup: keyboards.profile_settings(user.profile_hidden)
-          }));
+          });
         }
       });
       break;
@@ -1481,14 +1642,52 @@ bot.onText(/\/start/, (msg) => {
   });
 });
 
+// Букмекер (направление 3) публикуется сразу: в чат/кассу и в бухгалтерию,
+// без кнопок подтверждения. Формат запрашивал Бобик — проценты фиксированные.
+function publishBookmakerProfit(bot, chatId, workerUsername, amount) {
+  const worker = String(workerUsername || '').trim().replace(/^[@#]+/, '');
+  const fmt = Number(amount).toLocaleString('de-DE');
+
+  const accountingText = `<b>⚽️ Букмекер
+<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${worker}
+💸Сумма профита: ${fmt}₽
+<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: 70%
+👥 Тп: 5%
+👑Владелец: 15%</b>`;
+
+  const publicText = `<b>🌸 УСПЕШНЫЙ ПРОФИТ🌸
+
+<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: Букмекер
+┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: #${worker}
+┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${fmt}₽</b>`;
+
+  bot.sendMessage(ACCOUNTING_CHAT_ID, accountingText, { parse_mode: 'HTML' }).catch((err) =>
+    console.error('Error sending bookmaker accounting:', err)
+  );
+  bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) =>
+    console.error('Error sending bookmaker cash:', err)
+  );
+  bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) =>
+    console.error('Error sending bookmaker chat:', err)
+  );
+
+  bot.sendMessage(chatId, '✅ Профит Букмекер опубликован (касса и бухгалтерия).').catch(() => {});
+}
+
 // Команда для публикации профита: username сумма направление (для всех пользователей)
-bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[12]/, (msg) => {
+bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const parsed = parseProfitText(msg.text);
   if (!parsed) return;
 
   const { username: workerUsername, amount, direction, mammothCount } = parsed;
+
+  // Букмекер (3) — авто-публикация без кнопок.
+  if (direction === 3) {
+    publishBookmakerProfit(bot, chatId, workerUsername, amount);
+    return true;
+  }
 
   if (!workerUsername || !amount || ![1, 2].includes(direction)) {
     bot.sendMessage(chatId, '❌ Неверный формат. Используйте: username сумма направление\nПример: richvladwork 10000 1');
@@ -1559,13 +1758,19 @@ bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[12]/, (msg) => {
 });
 
 // Команда для публикации профита: /name сумма направление (например /richvladwork 5000 1)
-bot.onText(/^\/(?:[^\s\/]+)\s+(\d+)\s+([12])(?:\s+\(?(\d+)\)?)?$/, (msg) => {
+bot.onText(/^\/(?:[^\s\/]+)\s+(\d+)\s+([123])(?:\s+\(?(\d+)\)?)?$/, (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const parsed = parseProfitCommand(msg.text);
   if (!parsed) return;
 
   const { username: workerName, amount, direction, mammothCount } = parsed;
+
+  // Букмекер (3) — авто-публикация без кнопок.
+  if (direction === 3) {
+    publishBookmakerProfit(bot, chatId, workerName, amount);
+    return true;
+  }
 
   if (!workerName || !amount || ![1, 2].includes(direction)) {
     bot.sendMessage(chatId, '❌ Неверный формат. Используйте: /name сумма направление\nПример: /richvladwork 5000 1');
@@ -2969,6 +3174,7 @@ bot.onText(/\/staff/, (msg) => {
 
 ┏ <tg-emoji emoji-id="5992157823838984339">👨‍🏫</tg-emoji><b>Кураторы</b>
 ┗  @Henry_AXE
+┣  @Arachnophob_Axe
 
 ┏<tg-emoji emoji-id="5960714428394507968">👁</tg-emoji><b>Модераторы</b>
 ┗ @Aether_AXE
