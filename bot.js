@@ -1298,14 +1298,8 @@ if (fs.existsSync(bookmakerImagePath)) {
               // Убираем неверный ответ и ошибку, затем переспрашиваем
               if (msg.message_id) bot.deleteMessage(chatId, msg.message_id).catch(() => {});
               if (questionMessageId) bot.deleteMessage(chatId, questionMessageId).catch(() => {});
-              bot.sendMessage(chatId, '❌ Недопустимое имя. Используйте только русские/английские буквы, цифры, _, !, ?, $, ₽ (от 3 до 20 символов)')
-                .then((errorMsg) => {
-                  setTimeout(() => {
-                    bot.deleteMessage(chatId, errorMsg.message_id).catch(() => {});
-                  }, 2500);
-                  askName();
-                })
-                .catch(() => {});
+              bot.sendMessage(chatId, '❌ Недопустимое имя. Используйте только русские/английские буквы, цифры, _, !, ?, $, ₽ (от 3 до 20 символов)');
+              askName();
               return;
             }
 
