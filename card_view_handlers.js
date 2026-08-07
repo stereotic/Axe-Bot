@@ -1,4 +1,5 @@
 const cardSystem = require('./card_system');
+const db = require('./database');
 
 // Временное хранилище для текущего индекса карты у каждого пользователя
 const userCardIndex = {};
@@ -94,7 +95,14 @@ function setupCardViewHandlers(bot) {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    openCardView(bot, chatId, userId, { chatType: msg.chat.type, showBackToMenu: false });
+    db.get('SELECT application_approved FROM users WHERE user_id = ?', [userId], (err, user) => {
+      if (err || !user || Number(user.application_approved) !== 1) {
+        bot.sendMessage(chatId, '❌ Команда недоступна. Пройдите регистрацию и дождитесь одобрения заявки администрацией.').catch(() => {});
+        return;
+      }
+
+      openCardView(bot, chatId, userId, { chatType: msg.chat.type, showBackToMenu: false });
+    });
   });
 
   bot.on('callback_query', (query) => {
