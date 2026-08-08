@@ -2905,7 +2905,7 @@ ${walletLine}`;
 
         bot.sendMessage(chatId, `💸 <b>Выплата: ${withdrawal.amount.toLocaleString()}₽ воркеру @${withdrawal.username || 'unknown'}</b>
 
-📎 <i>Прикрепите чек за перевод: фото, файл или ссылку.</i>
+📎 <i>Прикрепите чек</i>
 
 После отправки чек будет доставлен воркеру, а выплата завершена.`, { parse_mode: 'HTML' });
 
