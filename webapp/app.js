@@ -60,7 +60,7 @@ function esc(s) {
 function render(state) {
   document.getElementById('headLevel').textContent = `LVL ${state.level}`;
   const percentEl = document.getElementById('headPercent');
-  const totalPercent = Math.round(state.totalProgress * 100);
+  const totalPercent = Math.round(state.levelProgress * 100);
   percentEl.textContent = `${totalPercent}%`;
   percentEl.classList.toggle('done', totalPercent >= 100);
   document.getElementById('barFill').style.width = `${Math.round(state.levelProgress * 100)}%`;
