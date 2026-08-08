@@ -1,4 +1,5 @@
 const db = require('./database');
+const utils = require('./utils');
 
 // Порядок статусов по возрастанию (см. STATUS_THRESHOLDS в utils.js)
 const CHAT_STATUS_ORDER = ['NEW', 'PRO', 'MASTER', 'GOAT', 'GOLD', 'GG'];
@@ -45,8 +46,8 @@ const isChatUnlocked = (status, chat) => {
 const getChatByKey = (key) => STATUS_CHATS.find((c) => c.key === key);
 
 const getStatus = (userId) => new Promise((resolve) => {
-  db.get('SELECT status FROM users WHERE user_id = ?', [userId], (err, user) => {
-    resolve((!err && user && user.status) || 'NEW');
+  db.get('SELECT total_earned FROM users WHERE user_id = ?', [userId], (err, user) => {
+    resolve((!err && user) ? utils.getStatusByTotal(user.total_earned || 0) : 'NEW');
   });
 });
 
@@ -104,12 +105,12 @@ const sendPendingUnlocks = (bot, userId, status) => new Promise((resolve) => {
 // Стартовая миграция: существующим воркерам с уже набранными статусами шлём уведомления
 // по действующему статусу и всем пройденным ранее.
 const migrateExistingWorkers = (bot) => {
-  db.all('SELECT user_id, status FROM users WHERE application_approved = 1', (err, users) => {
+  db.all('SELECT user_id, total_earned FROM users WHERE application_approved = 1', (err, users) => {
     if (err || !users) {
       console.error('Error loading users for chat migration:', err);
       return;
     }
-    users.forEach((u) => sendPendingUnlocks(bot, u.user_id, u.status || 'NEW'));
+    users.forEach((u) => sendPendingUnlocks(bot, u.user_id, utils.getStatusByTotal(u.total_earned || 0)));
   });
 };
 

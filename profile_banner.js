@@ -408,7 +408,7 @@ async function renderProfileBanner(profile) {
   const ctx = canvas.getContext('2d');
   const totalEarned = Number(profile.total_earned || profile.totalEarned || 0);
   const level = getLevel(totalEarned);
-  const status = String(profile.status || level.current.name).toUpperCase();
+  const status = level.current.name.toUpperCase();
 
   ctx.drawImage(template, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   await drawAvatar(ctx, profile.avatarBuffer || profile.avatarUrl);
@@ -454,7 +454,7 @@ function buildProfileCaption(user, topPosition) {
 
   return `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji><b>Воркер:</b> @${user.username || 'unknown'}
 <tg-emoji emoji-id="5936017305585586269">🪪</tg-emoji><b>Name:</b> ${user.name}
-└ <b>Статус:</b> ${user.status || level.current.name}
+└ <b>Статус:</b> ${level.current.name}
 
 <tg-emoji emoji-id="5258204546391351475">💼</tg-emoji><b>Кошелек</b>
 └ <b>На вывод:</b> <i>${formatRub(user.balance)}</i>

@@ -373,9 +373,10 @@ function updateUsername(userId, username) {
 
 // Функция форматирования профиля
 function formatProfile(user, topPosition) {
+  const status = utils.getStatusByTotal(user.total_earned || 0);
   return `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji><b>Воркер:</b> @${user.username || 'unknown'}
 <tg-emoji emoji-id="5936017305585586269">🪪</tg-emoji><b>Name:</b> ${user.name}
-┗ <b>Статус:</b> ${user.status}
+┗ <b>Статус:</b> ${status}
 
 <tg-emoji emoji-id="5258204546391351475">💼</tg-emoji><b>Кошелек</b>
 ┗ <b>На вывод:</b> <i>${user.balance.toLocaleString()}₽</i>
@@ -2195,8 +2196,8 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
                       }
                       db.get('SELECT status, total_earned FROM users WHERE user_id = ?', [targetUserId], (err, updatedUser) => {
                         if (!err && updatedUser) {
-                          const currentStatus = updatedUser.status || 'NEW';
                           const currentTotal = updatedUser.total_earned || 0;
+                          const currentStatus = utils.getStatusByTotal(currentTotal);
                           const nextThreshold = utils.STATUS_THRESHOLDS.find(t => t.threshold > currentTotal);
                           const nextLevelAmount = nextThreshold ? nextThreshold.threshold : null;
                           let nextLevelText = '';
@@ -2902,28 +2903,87 @@ ${walletLine}`;
 
         bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
 
-        db.run('UPDATE withdrawals SET status = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?',
-          ['completed', withdrawalId],
-          (err) => {
-            if (err) {
-              console.error('Error completing withdrawal:', err);
-              bot.sendMessage(chatId, '❌ Ошибка обновления статуса');
+        bot.sendMessage(chatId, `💸 <b>Выплата: ${withdrawal.amount.toLocaleString()}₽ воркеру @${withdrawal.username || 'unknown'}</b>
+
+📎 <i>Прикрепите чек за перевод: фото, файл или ссылку.</i>
+
+После отправки чек будет доставлен воркеру, а выплата завершена.`, { parse_mode: 'HTML' });
+
+        // Ждём чек (фото / файл / текстовая ссылка) и только потом завершаем выплату
+        guard.setPendingInput(userId, chatId, (msg) => {
+          if (msg.chat.id !== chatId) return;
+          if (msg.from.id !== userId) return;
+
+          let fileId = null;
+          let fileType = null;
+          let checkText = null;
+
+          if (msg.photo && msg.photo.length > 0) {
+            fileId = msg.photo[msg.photo.length - 1].file_id;
+            fileType = 'photo';
+          } else if (msg.document) {
+            fileId = msg.document.file_id;
+            fileType = 'document';
+          } else if (msg.text && !msg.text.startsWith('/')) {
+            checkText = msg.text.trim();
+            if (!checkText) {
+              return;
+            }
+          } else {
+            bot.sendMessage(chatId, '❌ Пришлите фото, файл или ссылку на чек.');
+            return;
+          }
+
+          guard.clearPendingInput(userId);
+          bot.deleteMessage(chatId, msg.message_id).catch(() => {});
+
+          // Повторная проверка — заявку мог обработать другой админ
+          db.get('SELECT * FROM withdrawals WHERE id = ?', [withdrawalId], (err, latest) => {
+            if (err || !latest) {
+              bot.sendMessage(chatId, '❌ Заявка не найдена');
+              return;
+            }
+            if (latest.status !== 'pending') {
+              bot.sendMessage(chatId, '❌ Заявка уже обработана');
               return;
             }
 
-            bot.sendMessage(chatId, `✅Выплата: ${withdrawal.amount.toLocaleString()}₽ отправлена воркеру @${withdrawal.username || 'unknown'}`);
+            db.run('UPDATE withdrawals SET status = ?, completed_at = CURRENT_TIMESTAMP, check_file_id = ?, check_file_type = ?, check_message = ? WHERE id = ?',
+              ['completed', fileId, fileType, checkText, withdrawalId],
+              (err) => {
+                if (err) {
+                  console.error('Error completing withdrawal:', err);
+                  bot.sendMessage(chatId, '❌ Ошибка обновления статуса');
+                  return;
+                }
 
-            // Уведомляем воркера
-            const payoutLabel = getPayoutLabel(withdrawal.payout_method || 'cryptobot');
-            const workerText = `✅Успешный вывод
-<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>Сумма к выплате: ${withdrawal.amount.toLocaleString()}₽
-⚙️Способ выплаты: ${payoutLabel}`;
+                const payoutLabel = getPayoutLabel(latest.payout_method || 'cryptobot');
+                const workerText = `✅Успешный вывод
+<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>Сумма к выплате: ${latest.amount.toLocaleString()}₽
+⚙️Способ выплаты: ${payoutLabel}${checkText ? `\n📄 Чек: ${checkText}` : ''}`;
 
-            bot.sendMessage(withdrawal.user_id, workerText, { parse_mode: 'HTML' }).catch((err) => {
-              console.error('Error notifying worker:', err);
-            });
-          }
-        );
+                const notifyWorker = () => {
+                  if (fileId && fileType === 'photo') {
+                    return bot.sendPhoto(latest.user_id, fileId, { caption: workerText, parse_mode: 'HTML' });
+                  }
+                  if (fileId && fileType === 'document') {
+                    return bot.sendDocument(latest.user_id, fileId, { caption: workerText, parse_mode: 'HTML' });
+                  }
+                  return bot.sendMessage(latest.user_id, workerText, { parse_mode: 'HTML' });
+                };
+
+                notifyWorker()
+                  .then(() => {
+                    bot.sendMessage(chatId, `✅ Выплата: ${latest.amount.toLocaleString()}₽ прошла, чек отправлен воркеру @${withdrawal.username || 'unknown'}!`, { parse_mode: 'HTML' });
+                  })
+                  .catch((sendErr) => {
+                    console.error('Error sending check to worker:', sendErr);
+                    bot.sendMessage(chatId, `⚠️ Выплата завершена, но чек не удалось отправить воркеру @${withdrawal.username || 'unknown'}`);
+                  });
+              }
+            );
+          });
+        });
       }
     );
     return;
