@@ -626,7 +626,7 @@ function isSubscribedChatMember(member) {
   return false;
 }
 
-const WELCOME_KEYBOARD_TEXT = '🦋 <b>Добро пожаловать в AXE TEAM</b>!';
+const WELCOME_KEYBOARD_TEXT = '<tg-emoji emoji-id="5445088267181531740">🪓</tg-emoji>';
 
 // Панель «Информация» — текст AXE TEAM, общие чаты и закрытые по статусу кнопки.
 async function sendInfoPanel(chatId, userId, options = {}) {
