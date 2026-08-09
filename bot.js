@@ -236,8 +236,8 @@ const INFO_BANNER = () => {
       return;
     }
 
-    const excludedNames = ['@sss','@Testovhik','@тестик','тестик','@testovhik','testovhik'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
-    const excludedUsernames = ['sss','freeobnall'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+    const excludedNames = ['@sss','@Testovhik','@тестик','тестик','@testovhik','testovhik','test','#test'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+    const excludedUsernames = ['sss','freeobnall','test'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
 
     db.get(`SELECT COALESCE(SUM(p.amount), 0) as total, COUNT(p.id) as count
             FROM profits p JOIN users u ON p.user_id = u.user_id
@@ -1667,6 +1667,32 @@ bot.onText(/\/start/, (msg) => {
   });
 });
 
+// Публичный текст «Касса/Чат»: Букмекер — как раньше, остальные направления — общий формат.
+function buildPublicText(profit) {
+  const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
+
+  if (profit.direction === 3) {
+    const worker = String(profit.username || '').replace(/^[@#]+/, '');
+    const fmt = Number(profit.amount).toLocaleString('de-DE');
+    return `<b>🌸 УСПЕШНЫЙ ПРОФИТ🌸
+
+<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: Букмекер
+┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: #${worker}
+┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${fmt}₽</b>`;
+  }
+
+  let text = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
+
+<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
+┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
+  if (profit.direction === 1 && profit.curator) {
+    text += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
+  } else {
+    text += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
+  }
+  return text;
+}
+
 // Команда для публикации профита: username сумма направление (для всех пользователей)
 bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
   const chatId = msg.chat.id;
@@ -2173,17 +2199,7 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
 
 ━━━━━━━━━━━━━━━━━━━━
 
-<b>🌸 КАССА/ЧАТ:</b>
-<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
-
-<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
-┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}">${profit.name}</a>`;
-
-        if (profit.direction === 1 && profit.curator) {
-          combinedText += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
-        } else {
-          combinedText += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
-        }
+<b>🌸 КАССА/ЧАТ:</b>\n${buildPublicText(profit)}`;
 
         const combinedKeyboard = {
           inline_keyboard: [
@@ -2258,17 +2274,7 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
       const accountingText = utils.buildAccountingText(profit);
 
       // Отправляем в общую кассу и чат
-      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
-      let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
-
-<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
-┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
-
-      if (profit.direction === 1 && profit.curator) {
-        publicText += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
-      } else {
-        publicText += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
-      }
+      const publicText = buildPublicText(profit);
 
       let hasError = false;
       let cashOk = false;
@@ -2349,17 +2355,7 @@ try {
       if (profit._sent) return;
       profit._sent = true;
 
-      const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
-      let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
-
-<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
-┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
-
-      if (profit.direction === 1 && profit.curator) {
-        publicText += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
-      } else {
-        publicText += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
-      }
+      const publicText = buildPublicText(profit);
 
       let hasError = false;
       let cashOk = false;
@@ -3242,8 +3238,8 @@ const formatCashLine = (balance, label = 'Касса проекта') => {
 
 const getPeriodBalance = (startStr, endStr) => {
   return new Promise((resolve) => {
-    const excludedNames = ['@sss','@Testovhik','@тестик','тестик','@testovhik','testovhik'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
-    const excludedUsernames = ['sss','freeobnall'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+    const excludedNames = ['@sss','@Testovhik','@тестик','тестик','@testovhik','testovhik','test','#test'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+    const excludedUsernames = ['sss','freeobnall','test'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
     db.get(`SELECT COALESCE(SUM(p.amount), 0) as total
             FROM profits p JOIN users u ON p.user_id = u.user_id
             WHERE p.created_at >= ? AND p.created_at < ?

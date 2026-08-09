@@ -407,6 +407,7 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
 
         // Отправляем в бухгалтерию
         const accountingText = utils.buildAccountingText({
+          direction,
           directionName,
           username: user.username,
           amount,

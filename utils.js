@@ -188,8 +188,8 @@ function getDirectionName(direction) {
 }
 
 // Исключения из топов (тестовые / служебные аккаунты)
-const TOP_EXCLUDED_NAMES = ['#тестик', 'тестик', 'sss', '#testovhik', 'testovhik', '#sss'];
-const TOP_EXCLUDED_USERNAMES = ['sss', 'freeobnall'];
+const TOP_EXCLUDED_NAMES = ['#тестик', 'тестик', 'sss', '#testovhik', 'testovhik', '#sss', '#test', 'test'];
+const TOP_EXCLUDED_USERNAMES = ['sss', 'freeobnall', 'test'];
 
 function topExclusionWhere(alias = 'u') {
   const namesList = TOP_EXCLUDED_NAMES.map((n) => `'${n.replace(/'/g, "''")}'`).join(', ');
@@ -206,8 +206,31 @@ function formatAmount(amount) {
   return amount.toLocaleString('ru-RU').replace(/,/g, '.');
 }
 
+// Проценты бухгалтерии Букмекера сверх выплаты воркеру.
+const BOOKMAKER_ACCOUNT_PERCENTAGES = { tp: 5, owner: 15 };
+
+// Блок бухгалтерии Букмекера: суммы через '.' и только Тп/Владелец.
+function buildBookmakerAccountingText({ username, amount, workerPayout, note = '' }) {
+  const fmt = (n) => Number(n).toLocaleString('de-DE');
+  const worker = String(username || '').replace(/^@+/, '');
+  const tp = Math.floor(Number(amount) * BOOKMAKER_ACCOUNT_PERCENTAGES.tp / 100);
+  const owner = Math.floor(Number(amount) * BOOKMAKER_ACCOUNT_PERCENTAGES.owner / 100);
+  const body =
+    `⚽️ Букмекер\n` +
+    `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${worker}\n` +
+    `💸Сумма профита: ${fmt(amount)}₽\n` +
+    `<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${fmt(workerPayout)}₽\n` +
+    `👥 Тп: ${fmt(tp)}₽\n` +
+    `👑Владелец: ${fmt(owner)}₽` +
+    (note ? `\n${note}` : '');
+  return `<b>${body}</b>`;
+}
+
 // Общий блок бухгалтерии: готовые суммы, а не проценты.
-function buildAccountingText({ directionName, username, amount, workerPayout, shares, note = '' }) {
+function buildAccountingText({ direction, directionName, username, amount, workerPayout, shares, note = '' }) {
+  if (Number(direction) === 3) {
+    return buildBookmakerAccountingText({ username, amount, workerPayout, note });
+  }
   const fmt = (n) => Number(n).toLocaleString();
   const worker = String(username || '').replace(/^@+/, '');
   const body =
