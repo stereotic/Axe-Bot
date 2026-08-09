@@ -3,7 +3,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const db = new sqlite3.Database('./database.db');
 
-const ids = process.argv.slice(2).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+const ids = process.argv.slice(2).map(Number).filter((n) => Number.isInteger(n) && n !== 0);
 if (ids.length === 0) {
   console.error('Usage: node delete_db_users.js <tgId> [tgId...]');
   process.exit(1);

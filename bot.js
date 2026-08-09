@@ -1612,7 +1612,7 @@ bot.onText(/\/start/, (msg) => {
     const runStartFlow = () => {
       const handleApplicationState = (application) => {
         if (application && application.status === 'pending') {
-          bot.sendMessage(chatId, '<tg-emoji emoji-id="5776213190387961618">⏳</tg-emoji> Ожидай рассмотрения...', { parse_mode: 'HTML' });
+          bot.sendMessage(chatId, '<tg-emoji emoji-id="5776213190387961618">⏳</tg-emoji> <b>Ожидай рассмотрения...</b>', { parse_mode: 'HTML' });
           return;
         }
 
