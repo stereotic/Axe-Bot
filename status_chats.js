@@ -16,7 +16,7 @@ const OPEN_CHAT_LINKS = {
 const STATUS_CHATS = [
   {
     key: 'newpro',
-    label: 'NEW-PRO',
+    label: 'PRO',
     unlockStatus: 'PRO',
     link: 'https://t.me/+_-RftIj7dlY4NGUy'
   },
