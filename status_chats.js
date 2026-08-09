@@ -17,7 +17,7 @@ const STATUS_CHATS = [
   {
     key: 'newpro',
     label: 'NEW-PRO',
-    unlockStatus: 'NEW',
+    unlockStatus: 'PRO',
     link: 'https://t.me/+_-RftIj7dlY4NGUy'
   },
   {
