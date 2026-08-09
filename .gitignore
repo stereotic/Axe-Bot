@@ -9,3 +9,5 @@ bot.lock
 profit_list.txt
 photo_file_id_cache.json
 
+
+.photo_file_id_cache.json

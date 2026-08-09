@@ -1294,8 +1294,8 @@ if (fs.existsSync(bookmakerImagePath)) {
       break;
 
     case 'change_name':
-      bot.answerCallbackQuery(query.id);
-
+      // Не отвечаем сразу: табличка-уведомление об успехе отдаётся после
+      // применения имени, как у ошибок вывода. Кнопка держит спиннер до конца ввода.
       const askName = () => {
         // Для ввода данных отправляем новое сообщение
         bot.sendMessage(chatId, '✍️Введите новый ник:').then((sent) => {
@@ -1319,24 +1319,6 @@ if (fs.existsSync(bookmakerImagePath)) {
             }
 
             db.run('UPDATE users SET name = ? WHERE user_id = ?', [`#${newName}`, userId], (err) => {
-              if (err) {
-                bot.sendMessage(chatId, '❌ Ошибка изменения имени');
-              } else {
-                getUser(userId, async (err, user) => {
-                  if (err || !user) {
-                    bot.sendMessage(chatId, '✅ Имя успешно изменено!');
-                    return;
-                  }
-
-                  utils.getTopPosition(userId, async (err, position) => {
-                    const topPosition = err ? 0 : position;
-
-                    bot.sendMessage(chatId, '✅ Имя успешно изменено!');
-                    await sendProfileMessage(chatId, user, topPosition);
-                  });
-                });
-              }
-
               // Удаляем сообщение с вопросом и ответ пользователя
               if (msg.message_id) {
                 bot.deleteMessage(chatId, msg.message_id).catch(() => {});
@@ -1344,6 +1326,15 @@ if (fs.existsSync(bookmakerImagePath)) {
               if (questionMessageId) {
                 bot.deleteMessage(chatId, questionMessageId).catch(() => {});
               }
+
+              if (err) {
+                bot.answerCallbackQuery(query.id, { text: '❌ Ошибка изменения имени', show_alert: true });
+                return;
+              }
+
+              // Табличка успеха вместо отдельного сообщения + профиля.
+              // Пользователь остаётся в настройках.
+              bot.answerCallbackQuery(query.id, { text: '✅ Имя успешно изменено!', show_alert: true });
             });
           });
         });
