@@ -206,6 +206,23 @@ function formatAmount(amount) {
   return amount.toLocaleString('ru-RU').replace(/,/g, '.');
 }
 
+// Общий блок бухгалтерии: готовые суммы, а не проценты.
+function buildAccountingText({ directionName, username, amount, workerPayout, shares, note = '' }) {
+  const fmt = (n) => Number(n).toLocaleString();
+  const worker = String(username || '').replace(/^@+/, '');
+  const body =
+    `🚀${directionName}\n` +
+    `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${worker}\n` +
+    `💸Сумма профита: ${fmt(amount)}₽\n` +
+    `<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${fmt(workerPayout)}₽\n` +
+    `👑Владелец: ${fmt(shares.owner)}₽\n` +
+    `👔Администратор: ${fmt(shares.admin)}₽\n` +
+    `🍌Инвестор: ${fmt(shares.investor)}₽\n` +
+    `🧑‍💻Кодер: ${fmt(shares.coder)}₽` +
+    (note ? `\n${note}` : '');
+  return `<b>${body}</b>`;
+}
+
 module.exports = {
   STATUS_THRESHOLDS,
   DIRECTION_PERCENTAGES,
@@ -220,5 +237,6 @@ module.exports = {
   updateProjectStats,
   getDirectionName,
   topExclusionWhere,
-  formatAmount
+  formatAmount,
+  buildAccountingText
 };

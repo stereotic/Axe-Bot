@@ -406,16 +406,14 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
         );
 
         // Отправляем в бухгалтерию
-        const accountingText = `<b>🚀${directionName}
-<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: #${user.username}
-💸Сумма профита: ${utils.formatAmount(amount)}₽
-<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${utils.formatAmount(workerPayout)}₽
-👑Владелец: ${utils.formatAmount(shares.owner)}₽
-👔Администратор: ${utils.formatAmount(shares.admin)}₽
-🍌Инвестор: ${utils.formatAmount(shares.investor)}₽
-🧑‍💻Кодер: ${utils.formatAmount(shares.coder)}₽
-
-<i>✅ Автоматический профит из чека</i></b>`;
+        const accountingText = utils.buildAccountingText({
+          directionName,
+          username: user.username,
+          amount,
+          workerPayout,
+          shares,
+          note: '<i>✅ Автоматический профит из чека</i>'
+        });
 
         bot.sendMessage(ACCOUNTING_CHAT_ID, accountingText, { parse_mode: 'HTML' }).catch(err => {
           console.error('Error sending to accounting:', err);

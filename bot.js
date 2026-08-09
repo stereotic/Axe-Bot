@@ -1667,38 +1667,6 @@ bot.onText(/\/start/, (msg) => {
   });
 });
 
-// Букмекер (направление 3) публикуется сразу: в чат/кассу и в бухгалтерию,
-// без кнопок подтверждения. Формат запрашивал Бобик — проценты фиксированные.
-function publishBookmakerProfit(bot, chatId, workerUsername, amount) {
-  const worker = String(workerUsername || '').trim().replace(/^[@#]+/, '');
-  const fmt = Number(amount).toLocaleString('de-DE');
-
-  const accountingText = `<b>⚽️ Букмекер
-<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${worker}
-💸Сумма профита: ${fmt}₽
-<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: 70%
-👥 Тп: 5%
-👑Владелец: 15%</b>`;
-
-  const publicText = `<b>🌸 УСПЕШНЫЙ ПРОФИТ🌸
-
-<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: Букмекер
-┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: #${worker}
-┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${fmt}₽</b>`;
-
-  bot.sendMessage(ACCOUNTING_CHAT_ID, accountingText, { parse_mode: 'HTML' }).catch((err) =>
-    console.error('Error sending bookmaker accounting:', err)
-  );
-  bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) =>
-    console.error('Error sending bookmaker cash:', err)
-  );
-  bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) =>
-    console.error('Error sending bookmaker chat:', err)
-  );
-
-  bot.sendMessage(chatId, '✅ Профит Букмекер опубликован (касса и бухгалтерия).').catch(() => {});
-}
-
 // Команда для публикации профита: username сумма направление (для всех пользователей)
 bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
   const chatId = msg.chat.id;
@@ -1708,13 +1676,7 @@ bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
 
   const { username: workerUsername, amount, direction, mammothCount } = parsed;
 
-  // Букмекер (3) — авто-публикация без кнопок.
-  if (direction === 3) {
-    publishBookmakerProfit(bot, chatId, workerUsername, amount);
-    return true;
-  }
-
-  if (!workerUsername || !amount || ![1, 2].includes(direction)) {
+  if (!workerUsername || !amount || ![1, 2, 3].includes(direction)) {
     bot.sendMessage(chatId, '❌ Неверный формат. Используйте: username сумма направление\nПример: richvladwork 10000 1');
     return;
   }
@@ -1743,7 +1705,6 @@ bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
     const workerPayout = utils.calculateWorkerPayout(amount, direction);
     const shares = utils.calculateProfitShares(amount);
     const directionName = utils.getDirectionName(direction);
-    const directionPercent = utils.DIRECTION_PERCENTAGES[direction];
 
     // Сохраняем данные для подтверждения
     const profitId = `${workerData.user_id}_${Date.now()}`;
@@ -1762,14 +1723,7 @@ bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
     };
 
     // Формируем сообщение для бухгалтерии
-    const accountingText = `<b>🚀${directionName}
-<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: #${workerData.username}
-💸Сумма профита: ${amount.toLocaleString()}₽
-<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${workerPayout.toLocaleString()}₽ (${directionPercent}%)
-👑Владелец: ${shares.owner.toLocaleString()}₽
-👔Администратор: ${shares.admin.toLocaleString()}₽
-🍌Инвестор: ${shares.investor.toLocaleString()}₽
-🧑‍💻Кодер: ${shares.coder.toLocaleString()}₽</b>`;
+    const accountingText = utils.buildAccountingText(profitData[profitId]);
 
     const keyboard = {
       inline_keyboard: [
@@ -1791,13 +1745,7 @@ bot.onText(/^\/(?:[^\s\/]+)\s+(\d+)\s+([123])(?:\s+\(?(\d+)\)?)?$/, (msg) => {
 
   const { username: workerName, amount, direction, mammothCount } = parsed;
 
-  // Букмекер (3) — авто-публикация без кнопок.
-  if (direction === 3) {
-    publishBookmakerProfit(bot, chatId, workerName, amount);
-    return true;
-  }
-
-  if (!workerName || !amount || ![1, 2].includes(direction)) {
+  if (!workerName || !amount || ![1, 2, 3].includes(direction)) {
     bot.sendMessage(chatId, '❌ Неверный формат. Используйте: /name сумма направление\nПример: /richvladwork 5000 1');
     return;
   }
@@ -1824,7 +1772,6 @@ bot.onText(/^\/(?:[^\s\/]+)\s+(\d+)\s+([123])(?:\s+\(?(\d+)\)?)?$/, (msg) => {
     const workerPayout = utils.calculateWorkerPayout(amount, direction);
     const shares = utils.calculateProfitShares(amount);
     const directionName = utils.getDirectionName(direction);
-    const directionPercent = utils.DIRECTION_PERCENTAGES[direction];
 
     const profitId = `${workerData.user_id}_${Date.now()}`;
     profitData[profitId] = {
@@ -1841,14 +1788,7 @@ bot.onText(/^\/(?:[^\s\/]+)\s+(\d+)\s+([123])(?:\s+\(?(\d+)\)?)?$/, (msg) => {
       mammothCount: mammothCount
     };
 
-    const accountingText = `<b>🚀${directionName}
-<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: #${workerData.username}
-💸Сумма профита: ${amount.toLocaleString()}₽
-<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${workerPayout.toLocaleString()}₽ (${directionPercent}%)
-👑Владелец: ${shares.owner.toLocaleString()}₽
-👔Администратор: ${shares.admin.toLocaleString()}₽
-🍌Инвестор: ${shares.investor.toLocaleString()}₽
-🧑‍💻Кодер: ${shares.coder.toLocaleString()}₽</b>`;
+    const accountingText = utils.buildAccountingText(profitData[profitId]);
 
     const keyboard = {
       inline_keyboard: [
@@ -2229,15 +2169,7 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
       };
 
       const showCombinedKeyboard = () => {
-        let combinedText = `<b>📊 БУХГАЛТЕРИЯ:</b>
-🚀${profit.directionName}
-<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: #${profit.username}
-💸Сумма профита: ${profit.amount.toLocaleString()}₽
-<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${profit.workerPayout.toLocaleString()}₽
-👑Владелец: ${profit.shares.owner.toLocaleString()}₽
-👔Администратор: ${profit.shares.admin.toLocaleString()}₽
-🍌Инвестор: ${profit.shares.investor.toLocaleString()}₽
-🧑‍💻Кодер: ${profit.shares.coder.toLocaleString()}₽
+        let combinedText = `<b>📊 БУХГАЛТЕРИЯ:</b>\n${utils.buildAccountingText(profit)}
 
 ━━━━━━━━━━━━━━━━━━━━
 
@@ -2323,14 +2255,7 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
       profit._sent = true;
 
       // Отправляем в бухгалтерию
-      const accountingText = `<b>🚀${profit.directionName}
-<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: #${profit.username}
-💸Сумма профита: ${profit.amount.toLocaleString()}₽
-<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${profit.workerPayout.toLocaleString()}₽
-👑Владелец: ${profit.shares.owner.toLocaleString()}₽
-👔Администратор: ${profit.shares.admin.toLocaleString()}₽
-🍌Инвестор: ${profit.shares.investor.toLocaleString()}₽
-🧑‍💻Кодер: ${profit.shares.coder.toLocaleString()}₽</b>`;
+      const accountingText = utils.buildAccountingText(profit);
 
       // Отправляем в общую кассу и чат
       const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
@@ -2395,14 +2320,7 @@ try {
 
       bot.answerCallbackQuery(query.id);
 
-      const accountingText = `<b>🚀${profit.directionName}
-<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: #${profit.username}
-💸Сумма профита: ${profit.amount.toLocaleString()}₽
-<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${profit.workerPayout.toLocaleString()}₽
-👑Владелец: ${profit.shares.owner.toLocaleString()}₽
-👔Администратор: ${profit.shares.admin.toLocaleString()}₽
-🍌Инвестор: ${profit.shares.investor.toLocaleString()}₽
-🧑‍💻Кодер: ${profit.shares.coder.toLocaleString()}₽</b>`;
+      const accountingText = utils.buildAccountingText(profit);
 
       if (profit._sent) return;
       profit._sent = true;
@@ -2744,12 +2662,12 @@ try {
             } else {
               bot.answerCallbackQuery(query.id, { text: '❌ Нужна подписка на чат и канал', show_alert: true }).catch(() => {});
 
-              let errorMsg = '❌ Вы не подписаны на:\n';
+              let errorMsg = '<b>❌ Вы не подписаны на:\n';
               if (!chatStatus) errorMsg += '• AXE | CHAT💬\n';
               if (!channelStatus) errorMsg += '• AXE | NEWS🦋\n';
-              errorMsg += '\nПожалуйста, подпишитесь и попробуйте снова.';
+              errorMsg += '\nПожалуйста, подпишитесь и попробуйте снова.</b>';
 
-              bot.sendMessage(chatId, errorMsg);
+              bot.sendMessage(chatId, errorMsg, { parse_mode: 'HTML' });
             }
           })
           .catch(err => {
