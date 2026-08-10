@@ -324,7 +324,7 @@ function sendNoCardsMessage(bot, chatId, options = {}) {
     ? { chatType: options, showBackToMenu: false }
     : options;
 
-  return bot.sendMessage(chatId, '⏰Общие реквизиты временно отсутствуют', {
+  return bot.sendMessage(chatId, '<tg-emoji emoji-id="5451908327355232301">⏰</tg-emoji>Общие реквизиты временно отсутствуют\n<tg-emoji emoji-id="5444858967467534874">📝</tg-emoji>Реквизиты под запрос', {
     parse_mode: 'HTML',
     reply_markup: createNoCardsKeyboard(viewOptions)
   });
@@ -335,7 +335,7 @@ function editNoCardsMessage(bot, chatId, messageId, options = {}) {
     ? { chatType: options, showBackToMenu: false }
     : options;
 
-  bot.editMessageText('⏰Общие реквизиты временно отсутствуют', {
+  bot.editMessageText('<tg-emoji emoji-id="5451908327355232301">⏰</tg-emoji>Общие реквизиты временно отсутствуют\n<tg-emoji emoji-id="5444858967467534874">📝</tg-emoji>Реквизиты под запрос', {
     chat_id: chatId,
     message_id: messageId,
     parse_mode: 'HTML',
