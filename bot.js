@@ -57,7 +57,7 @@ const mentors = [
 • Четкий план работы.`
   },
   {
-    username: 'Arachnophob_AXE',
+    username: 'Arachnophobia_AXE',
     userId: null,
     banner: 'mentor_alprazalam.jpg',
     service: 'Кардинг, Букмекер',
@@ -931,10 +931,10 @@ function handleProtectedCallback(query, data, chatId, userId) {
 ┣<tg-emoji emoji-id="5776213190387961618">📚</tg-emoji><b>Время обучения</b> - ${mentor.trainingProfits} профитов
 ┗<tg-emoji emoji-id="5877396173135811032">⏳</tg-emoji><b>Рабочее время</b> - ${mentor.workingHours} Мск
 
-⚠️<b>Описание:</b>
+<tg-emoji emoji-id="5276240711795107620">⚠️</tg-emoji><b>Описание:</b>
 <i>${mentor.description}</i>
 
-❤️<b>Что ты получаешь?:</b>
+<tg-emoji emoji-id="5278611606756942667">❤️</tg-emoji><b>Что ты получаешь?:</b>
 ${mentor.benefits}`;
 
       const mentorKeyboard = {
@@ -3194,7 +3194,7 @@ bot.onText(/\/staff/, async (msg) => {
   const staffText = `<tg-emoji emoji-id="5357069174512303778">🦺</tg-emoji><b>Лица администрации</b>
 
 ┏ <tg-emoji emoji-id="5992157823838984339">👨‍🏫</tg-emoji><b>Кураторы</b>
-┣  @Arachnophob_Axe
+┣  @arachnophobia_AXE
 ┗  @Henry_AXE
 
 ┏<tg-emoji emoji-id="5960714428394507968">👁</tg-emoji><b>Модераторы</b>
