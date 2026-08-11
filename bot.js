@@ -2051,6 +2051,14 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
       const prize = battlepass.LEVELS[lvl - 1];
       if (!prize) continue;
 
+      const chatName = workerName && workerName !== '#' ? workerName : (workerUsername ? `#${workerUsername}` : '#');
+      bot.sendMessage(GENERAL_CHAT_ID,
+        `<tg-emoji emoji-id="5444984118519573636">🎁</tg-emoji>Новый подарок у ${chatName}\n` +
+        `<tg-emoji emoji-id="5451737714074364923">🎁</tg-emoji>Уровень PASS: ${lvl}\n` +
+        `<tg-emoji emoji-id="5445350075502997104">🎁</tg-emoji>Подарок: ${prize.title}`,
+        { parse_mode: 'HTML' }
+      ).catch((err) => console.error('Error sending gift to general chat:', err));
+
       if (prize.ticketName) {
         generateTicketNumber((err, ticket) => {
           if (err) {
