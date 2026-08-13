@@ -915,7 +915,9 @@ ${mentor.benefits}`;
 
       const mentorBannerPath = path.join(__dirname, 'images', mentor.banner);
 
-      if (fs.existsSync(mentorBannerPath)) {
+      // Telegram: лимит caption у фото — 1024 символа. Если карточка длиннее,
+      // отправляем текстом (лимит 4096), иначе фото с капшеном отвалится.
+      if (fs.existsSync(mentorBannerPath) && mentorText.length <= 1024) {
         replaceMenuMessage(chatId, messageId, {
           type: 'photo',
           imagePath: mentorBannerPath,
