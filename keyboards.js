@@ -64,7 +64,8 @@ const keyboards = {
           { text: 'Настройки', callback_data: 'settings' }
         ],
         [{ text: 'AXE SMS', icon_custom_emoji_id: '5447245070908564837', url: 'https://t.me/AXE_SMS_xBot' }],
-        [{ text: 'AXE DICE', icon_custom_emoji_id: '5447414344159631158', url: 'https://t.me/AXE_DICE_xBot' }]
+        [{ text: 'AXE DICE', icon_custom_emoji_id: '5447414344159631158', url: 'https://t.me/AXE_DICE_xBot' }],
+        [{ text: 'AXE Poker Project', icon_custom_emoji_id: '5445164597340316440', url: 'https://t.me/AXE_PokerProject_xBot' }]
       ]
     };
   },
