@@ -2,6 +2,7 @@ const cardSystem = require('./card_system');
 const utils = require('./utils');
 const battlepass = require('./battlepass');
 const { updatePinnedMessage } = require('./update_pinned');
+const { notifyCuratorOfProfit } = require('./curators');
 
 // Обработчики системы проверки чеков
 function setupCheckHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, CASH_CHANNEL_ID) {
@@ -382,6 +383,16 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
             }
           );
         }
+
+        // Уведомляем куратора о профите ученика
+        notifyCuratorOfProfit(bot, db, {
+          curator: user.curator,
+          percent: user.percent,
+          amount,
+          direction,
+          directionName,
+          username: user.username
+        });
 
         // Обновляем баланс и статистику воркера
         const xpGain = battlepass.xpFromAmount(amount, direction);

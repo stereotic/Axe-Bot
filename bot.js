@@ -23,6 +23,7 @@ const guard = require('./guard');
 const perf = require('./perf');
 const { parseProfitText, parseProfitCommand } = require('./profit_parser');
 const { acquire: acquireSingleInstance } = require('./single_instance');
+const { mentors, getMentorByIndex, getMentorByUsername, resolveMentorChatId, notifyCuratorOfProfit } = require('./curators');
 
 // Короткий текст, если нет картинки для меню (пустой sendMessage/caption Telegram отклоняет).
 const MENU_PANEL_FALLBACK = 'Выбери раздел:';
@@ -40,40 +41,7 @@ const GENERAL_CHAT_ID = '-1003986505552'; // Общий чат
 const profitData = {};
 global.profitData = profitData;
 
-// Данные куратора
-const mentors = [
-  {
-    username: 'Henry_AXE',
-    userId: null, // ID будет установлен при первом взаимодействии
-    banner: 'mentor_henry.jpg',
-    service: 'Кардинг',
-    hiredAt: '20.05.2026', // Дата найма для подсчета «На должности»
-    percent: 20,
-    trainingProfits: 5, // Количество профитов для обучения
-    workingHours: '14:00 - 00:00',
-    description: `Активный воркер. Приучаю работать на качество, добиваюсь твоей стабильности в работе. Перед обращением ко мне обязательно знать теорию направления. За ручку не веду, иду сзади и корректирую каждый твой шаг. Большие профиты не покажутся тебе сказкой если, ты уделишь время моему курированию а так же проявишь усидчивость при работе.`,
-    benefits: `• Обучение без мануалов!
-• Материалы для работы за твой %
-• Четкий план работы.`
-  },
-  {
-    username: 'Arachnophobia_AXE',
-    userId: null,
-    banner: 'mentor_alprazalam.jpg',
-    service: 'Кардинг, Букмекер',
-    hiredAt: '05.08.2026',
-    percent: 20,
-    trainingProfits: 5,
-    workingHours: '13:00 - 00:00',
-    description: `Активный и опытный воркер. Обучу работе с разнообразным трафиком, так же дам советы и актуальные способы в поиске трафика, доведу твои навыки до совершенства. Перед обучение просьба ознакомиться с базовым мануалом по кардингу. Найду индивидуальный подход к каждому воркеру, отвечу на каждый ваш вопрос и наставлю на четкую и профессиональную работу. Покажу на вашем примере, что если есть цель и желание, то большие профиты окажутся в ваших руках.`,
-    benefits: `• Обучение без мануалов!
-• Материалы для работы за твой %
-• Обучение по качественной обработке трафика
-• Психологические маневры для большего шанса успеха на профит`
-  }
-];
-
-const getMentorByIndex = (index) => mentors[index] || null;
+// Данные куратора (см. ./curators)
 
 // Полные месяцы с даты найма (ДД.ММ.ГГГГ)
 function calcMonthsOnPosition(hiredAt) {
@@ -192,6 +160,7 @@ bot.setMyCommands([
   { command: 'materials', description: 'Обучающие материалы' },
   { command: 'top', description: 'Топ воркеров за все время' },
   { command: 'card', description: 'Актуальные реквизиты' },
+  { command: 'cur', description: 'Панель куратора' },
   { command: 'keyboard', description: 'Показать кнопки Меню и Информация' }
 ]).then(() => {
   console.log('✅ Меню команд установлено');
@@ -974,30 +943,47 @@ ${mentor.benefits}`;
       bot.answerCallbackQuery(query.id, { text: '❌ Куратор не найден', show_alert: true });
       return;
     }
-    bot.answerCallbackQuery(query.id);
 
-    // Закрепляем пользователя за куратором
-    db.run('UPDATE users SET curator = ? WHERE user_id = ?', [mentor.username, userId], (err) => {
-      if (err) {
-        bot.sendMessage(chatId, '❌ Ошибка закрепления за куратором');
-        console.error('Error assigning mentor:', err);
+    // Воркер не может быть закреплён за двумя кураторами сразу
+    db.get('SELECT curator FROM users WHERE user_id = ?', [userId], (checkErr, checkUser) => {
+      if (!checkErr && checkUser && checkUser.curator) {
+        bot.answerCallbackQuery(query.id, {
+          text: '❌ Вы не можете быть закреплены за двумя кураторами сразу',
+          show_alert: true
+        });
         return;
       }
 
-      // Баг 3 исправлен: отправляем в личку пользователю (userId), а не в текущий чат (chatId)
-      bot.sendMessage(userId, `✅ Вы успешно закрепились за куратором @${mentor.username}!`).catch(err => {
-        console.error('Error sending to user:', err);
-      });
+      bot.answerCallbackQuery(query.id);
 
-      // Отправляем уведомление куратору (если у нас есть его ID)
-      if (mentor.userId) {
+      // Закрепляем пользователя за куратором и сохраняем его процент
+      db.run('UPDATE users SET curator = ?, percent = ? WHERE user_id = ?', [mentor.username, mentor.percent, userId], (err) => {
+        if (err) {
+          bot.sendMessage(chatId, '❌ Ошибка закрепления за куратором');
+          console.error('Error assigning mentor:', err);
+          return;
+        }
+
+        // Баг 3 исправлен: отправляем в личку пользователю (userId), а не в текущий чат (chatId)
+        bot.sendMessage(userId, `✅ Вы успешно закрепились за куратором @${mentor.username}!`).catch(err => {
+          console.error('Error sending to user:', err);
+        });
+
+        // Уведомляем куратора: Новый ученик
         db.get('SELECT username FROM users WHERE user_id = ?', [userId], (err, user) => {
           const username = user && user.username ? `@${user.username}` : `ID: ${userId}`;
-          bot.sendMessage(mentor.userId, `🎓 За тобой закрепился пользователь ${username}`).catch(err => {
-            console.error('Error sending to mentor:', err);
+          resolveMentorChatId(db, mentor, (mentorChatId) => {
+            if (!mentorChatId) return;
+            bot.sendMessage(
+              mentorChatId,
+              `<tg-emoji emoji-id="5445178551689062106">🟩</tg-emoji>Новый ученик: ${username}`,
+              { parse_mode: 'HTML' }
+            ).catch(err => {
+              console.error('Error sending to mentor:', err);
+            });
           });
         });
-      }
+      });
     });
     return;
   }
@@ -1744,6 +1730,7 @@ bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
       directionName: directionName,
       shares: shares,
       curator: user ? user.curator : null, // Добавляем куратора
+      percent: user ? user.percent : null,
       isRegistered: !!user, // Флаг - зарегистрирован ли воркер
       mammothCount: mammothCount
     };
@@ -1810,6 +1797,7 @@ bot.onText(/^\/(?:[^\s\/]+)\s+(\d+)\s+([123])(?:\s+\(?(\d+)\)?)?$/, (msg) => {
       directionName: directionName,
       shares: shares,
       curator: user ? user.curator : null,
+      percent: user ? user.percent : null,
       isRegistered: !!user,
       mammothCount: mammothCount
     };
@@ -2135,6 +2123,9 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
               );
             }
 
+            // Уведомляем куратора о профите ученика
+            notifyCuratorOfProfit(bot, db, profit);
+
 db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [targetUserId], (err, preUser) => {
                 const oldPassTotal = (!err && preUser) ? (preUser.battlepass_earned || 0) : 0;
                 const oldPassXp = (!err && preUser) ? (preUser.battlepass_xp || 0) : 0;
@@ -2396,6 +2387,90 @@ try {
       bot.sendMessage(chatId, hasError ? '⚠️ Профит отправлен с ошибками (см. лог).' : '✅ Профит опубликован!');
       return;
     }
+
+  // Панель куратора /cur: карточка ученика
+  if (data.startsWith('cur_student_')) {
+    const studentUserId = parseInt(data.replace('cur_student_', ''), 10);
+    const mentor = getMentorByUsername(query.from.username);
+    if (!mentor) {
+      bot.answerCallbackQuery(query.id, { text: '❌ Доступ запрещен', show_alert: true });
+      return;
+    }
+
+    db.get('SELECT * FROM users WHERE user_id = ?', [studentUserId], (err, student) => {
+      if (err || !student || String(student.curator || '').toLowerCase() !== mentor.username.toLowerCase()) {
+        bot.answerCallbackQuery(query.id, { text: '❌ Ученик не найден', show_alert: true });
+        return;
+      }
+      bot.answerCallbackQuery(query.id);
+
+      db.get('SELECT COALESCE(SUM(amount), 0) AS total, COUNT(id) AS cnt FROM profits WHERE user_id = ?',
+        [studentUserId], (err2, st) => {
+          const total = err2 ? 0 : Number(st.total || 0);
+          const cnt = err2 ? 0 : Number(st.cnt || 0);
+          const tag = String(student.username || student.name || studentUserId).replace(/^[@#]/, '');
+          const text = `<b>Ученик: @${tag}
+Профитов: ${cnt}
+Сумма профитов: ${fmtCurAmount(total)}₽
+Куратор: @${student.curator}</b>`;
+          const keyboard = {
+            inline_keyboard: [
+              [{ text: 'Отвязать ученика', callback_data: `cur_detach_${studentUserId}` }],
+              [{ text: '← Назад к списку', callback_data: 'cur_refresh_' }]
+            ]
+          };
+          bot.editMessageText(text, {
+            chat_id: chatId,
+            message_id: query.message.message_id,
+            parse_mode: 'HTML',
+            reply_markup: keyboard
+          }).catch(() => {});
+        });
+    });
+    return;
+  }
+
+  // Панель куратора /cur: отвязка ученика (список перерисовывается — ученик исчезает)
+  if (data.startsWith('cur_detach_')) {
+    const studentUserId = parseInt(data.replace('cur_detach_', ''), 10);
+    const mentor = getMentorByUsername(query.from.username);
+    if (!mentor) {
+      bot.answerCallbackQuery(query.id, { text: '❌ Доступ запрещен', show_alert: true });
+      return;
+    }
+
+    db.get('SELECT curator FROM users WHERE user_id = ?', [studentUserId], (err, row) => {
+      if (err || !row || String(row.curator || '').toLowerCase() !== mentor.username.toLowerCase()) {
+        bot.answerCallbackQuery(query.id, { text: '❌ Ученик не привязан к тебе', show_alert: true });
+        return;
+      }
+
+      db.run('UPDATE users SET curator = NULL, percent = NULL WHERE user_id = ?', [studentUserId], (updErr) => {
+        if (updErr) console.error('Error detaching student:', updErr);
+        bot.answerCallbackQuery(query.id, { text: '✅ Ученик отвязан', show_alert: true });
+
+        // Перерисовываем список живьём из БД — отвязанный ученик больше не отображается
+        renderCurMessage(chatId, mentor, query.message.message_id).catch((e) => {
+          console.error('cur_refresh after detach failed:', e);
+        });
+      });
+    });
+    return;
+  }
+
+  // Панель куратора /cur: обновление списка
+  if (data === 'cur_refresh_') {
+    const mentor = getMentorByUsername(query.from.username);
+    if (!mentor) {
+      bot.answerCallbackQuery(query.id, { text: '❌ Доступ запрещен', show_alert: true });
+      return;
+    }
+    bot.answerCallbackQuery(query.id);
+    renderCurMessage(chatId, mentor, query.message.message_id).catch((e) => {
+      console.error('cur_refresh failed:', e);
+    });
+    return;
+  }
 
   // Обработка начала заявки
   if (data === 'start_application') {
@@ -3195,9 +3270,10 @@ bot.onText(/\/staff/, async (msg) => {
 
 ┏ <tg-emoji emoji-id="5992157823838984339">👨‍🏫</tg-emoji><b>Кураторы</b>
 ┣  @arachnophobia_AXE
-┗  @Henry_AXE
+┗  @Maximus_AXE
 
 ┏<tg-emoji emoji-id="5960714428394507968">👁</tg-emoji><b>Модераторы</b>
+┣ @Henry_AXE
 ┗ @Aether_AXE
 
 ┏<tg-emoji emoji-id="6028226658543082010">🕵️‍♂️</tg-emoji><b>Саппорты</b> 
@@ -3210,6 +3286,104 @@ bot.onText(/\/staff/, async (msg) => {
 
   bot.sendMessage(chatId, staffText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {
     console.error('Error sending staff message:', err);
+  });
+});
+
+// ── Панель куратора /cur ────────────────────────────────────────────────
+const fmtCurAmount = (n) => Number(n).toLocaleString('de-DE');
+
+function profitWord(n) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'Профит';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'Профита';
+  return 'Профитов';
+}
+
+// Собирает контент панели /cur: список учеников + сумма их профитов
+function buildCurContent(mentor) {
+  return new Promise((resolve) => {
+    const curatorName = mentor.username;
+    db.all('SELECT user_id, username, name FROM users WHERE LOWER(curator) = LOWER(?) ORDER BY user_id ASC', [curatorName], (err, students) => {
+      if (err || !students || students.length === 0) {
+        resolve({
+          text: `<b><tg-emoji emoji-id="5445178551689062106">🟩</tg-emoji>Твои ученики\n\nУ тебя пока нет учеников.</b>`,
+          reply_markup: { inline_keyboard: [] }
+        });
+        return;
+      }
+
+      const ids = students.map((s) => s.user_id);
+      const placeholders = ids.map(() => '?').join(',');
+      db.all(`SELECT user_id, COALESCE(SUM(amount), 0) AS total, COUNT(id) AS cnt
+              FROM profits WHERE user_id IN (${placeholders}) GROUP BY user_id`, ids, (err2, rows) => {
+        const stats = {};
+        if (!err2 && rows) {
+          rows.forEach((r) => { stats[r.user_id] = { total: Number(r.total) || 0, cnt: Number(r.cnt) || 0 }; });
+        }
+
+        let grandTotal = 0;
+        const lines = [];
+        students.forEach((s) => {
+          const st = stats[s.user_id] || { total: 0, cnt: 0 };
+          grandTotal += st.total;
+          const tag = String(s.username || s.name || s.user_id).replace(/^[@#]/, '');
+          lines.push(`@${tag} - ${fmtCurAmount(st.total)}₽ ${st.cnt} ${profitWord(st.cnt)}`);
+        });
+
+        const text = `<b><tg-emoji emoji-id="5445178551689062106">🟩</tg-emoji>Твои ученики
+
+<tg-emoji emoji-id="5451730279485973759">🟪</tg-emoji>Общая сумма профитов
+┗ ${fmtCurAmount(grandTotal)}₽
+
+${lines.join('\n\n')}</b>`;
+
+        const keyboard = {
+          inline_keyboard: students.map((s) => [{
+            text: `Профиль: ${String(s.username || s.name || s.user_id).replace(/^[@#]/, '')}`,
+            callback_data: `cur_student_${s.user_id}`
+          }])
+        };
+        resolve({ text, reply_markup: keyboard });
+      });
+    });
+  });
+}
+
+// Показывает/перерисовывает панель /cur. Если messageId задан — editMessageText.
+function renderCurMessage(chatId, mentor, messageId) {
+  return buildCurContent(mentor).then(({ text, reply_markup }) => {
+    if (messageId) {
+      return bot.editMessageText(text, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: 'HTML',
+        reply_markup
+      }).catch(() =>
+        bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup })
+      );
+    }
+    return bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup });
+  });
+}
+
+bot.onText(/\/cur(?:@[\w_]+)?(?:\s|$)/, async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  if (msg.chat.type !== 'private') return;
+  if (!(await requireFullAccess(userId, chatId))) return;
+
+  const mentor = getMentorByUsername(msg.from.username);
+  if (!mentor) {
+    bot.sendMessage(chatId, '❌ Команда /cur доступна только кураторам.').catch(() => {});
+    return;
+  }
+
+  // Фиксируем Telegram ID куратора — он нужен для уведомлений о новых учениках и профитах
+  mentor.userId = userId;
+
+  renderCurMessage(chatId, mentor, null).catch((err) => {
+    console.error('/cur render failed:', err);
   });
 });
 

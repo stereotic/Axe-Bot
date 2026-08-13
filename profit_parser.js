@@ -7,7 +7,7 @@
 const KNOWN_COMMANDS = [
   'start', 'me', 'top', 'топ', 'staff', 'materials', 'card',
   'keyboard', 'setcard', 'cards', 'broadcast', 'cancel', 'mute',
-  'ban', 'updatepin', 'sendkeyboard', 'chatid', 'rass', 'bb'
+  'ban', 'updatepin', 'sendkeyboard', 'chatid', 'rass', 'bb', 'cur'
 ];
 
 // Формат без слэша: username сумма направление (мамонт) — «richvladwork 10000 1»
