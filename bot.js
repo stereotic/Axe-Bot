@@ -876,6 +876,13 @@ function handleProtectedCallback(query, data, chatId, userId) {
   const messageId = query.message.message_id;
   const hasPhoto = query.message.photo ? true : false;
 
+  // Telegram считает лимит caption (1024) по видимым символам: HTML-разметка
+  // и теги <tg-emoji> в длину не идут. Считаем именно её.
+  const captionLength = (html) => html
+    .replace(/<tg-emoji[^>]*>.*?<\/tg-emoji>/g, 'X')
+    .replace(/<[^>]+>/g, '')
+    .length;
+
   // Карточка куратора
   if (data.startsWith('show_mentor_')) {
     const mentorIndex = parseInt(data.replace('show_mentor_', ''), 10);
@@ -915,9 +922,10 @@ ${mentor.benefits}`;
 
       const mentorBannerPath = path.join(__dirname, 'images', mentor.banner);
 
-      // Telegram: лимит caption у фото — 1024 символа. Если карточка длиннее,
-      // отправляем текстом (лимит 4096), иначе фото с капшеном отвалится.
-      if (fs.existsSync(mentorBannerPath) && mentorText.length <= 1024) {
+      // Telegram: лимит caption у фото — 1024 видимых символа. Разметка не
+      // считается, поэтому сравниваем знак без HTML-тегов. Если карточка
+      // длиннее — отправляем текстом (лимит 4096), иначе фото с капшеном отвалится.
+      if (fs.existsSync(mentorBannerPath) && captionLength(mentorText) <= 1024) {
         replaceMenuMessage(chatId, messageId, {
           type: 'photo',
           imagePath: mentorBannerPath,
