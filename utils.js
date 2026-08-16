@@ -246,10 +246,50 @@ function buildAccountingText({ direction, directionName, username, amount, worke
   return `<b>${body}</b>`;
 }
 
+// Общий чат проекта — эталон членства: юзер, состоящий в нём, считается зарегистрированным.
+const MEMBER_CHAT_ID = '-1003986505552';
+
+function isSubscribedChatMember(member) {
+  if (!member) return false;
+  if (['member', 'administrator', 'creator'].includes(member.status)) return true;
+  // Ограниченный участник чата всё ещё считается подписанным
+  if (member.status === 'restricted' && member.is_member) return true;
+  return false;
+}
+
+// Если юзер отсутствует в БД или не одобрен — пускаем по факту членства в общем чате
+// и чиним запись (создаём/ставим application_approved = 1). Возвращает true при допуске.
+function ensureMemberAccess(bot, userId, contact) {
+  return new Promise((resolve) => {
+    bot.getChatMember(MEMBER_CHAT_ID, userId)
+      .then((member) => {
+        if (!isSubscribedChatMember(member)) return resolve(false);
+        const username = (contact && contact.username) || '';
+        db.get('SELECT user_id FROM users WHERE user_id = ?', [userId], (err, existing) => {
+          if (!err && existing) {
+            db.run(
+              'UPDATE users SET application_approved = 1, username = COALESCE(NULLIF(?, ""), username) WHERE user_id = ?',
+              [username, userId],
+              () => resolve(true)
+            );
+          } else {
+            db.run(
+              'INSERT OR IGNORE INTO users (user_id, username, name, status, application_approved, welcome_keyboard_sent) VALUES (?, ?, ?, ?, 1, 1)',
+              [userId, username, username || '#', 'NEW'],
+              () => resolve(true)
+            );
+          }
+        });
+      })
+      .catch(() => resolve(false));
+  });
+}
+
 module.exports = {
   STATUS_THRESHOLDS,
   DIRECTION_PERCENTAGES,
   PROFIT_SHARES,
+  MEMBER_CHAT_ID,
   getStatusByTotal,
   updateWorkerStatus,
   calculateWorkerPayout,
@@ -261,5 +301,7 @@ module.exports = {
   getDirectionName,
   topExclusionWhere,
   formatAmount,
-  buildAccountingText
+  buildAccountingText,
+  isSubscribedChatMember,
+  ensureMemberAccess
 };

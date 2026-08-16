@@ -568,23 +568,32 @@ function hasFullAccess(user) {
 }
 
 // Допуск к командам бота — только полностью принятые пользователи.
-async function requireFullAccess(userId, chatId) {
-  return new Promise((resolve) => {
+// Если юзер в чате, но в БД не одобрен/не создан (не проходил /start) —
+// членство в общем чате считается достаточным доказательством регистрации.
+async function requireFullAccess(userId, chatId, contact) {
+  const user = await new Promise((resolve) => {
     db.get('SELECT application_approved FROM users WHERE user_id = ?', [userId], (err, user) => {
       if (err) {
         // Транзиентная ошибка чтения БД (блокировка при массовых записях и т.п.).
         // Не вешаем ложный отказ «не зарегистрирован» на легитимного пользователя.
         console.error('requireFullAccess DB error:', err.message);
-        return resolve(true);
+        return resolve(null);
       }
-      if (!user || Number(user.application_approved) !== 1) {
-        bot.sendMessage(chatId, '❌ Команда недоступна. Пройдите регистрацию и дождитесь одобрения заявки администрацией.')
-          .catch(() => {});
-        return resolve(false);
-      }
-      resolve(true);
+      resolve(user);
     });
   });
+
+  if (user === null) return true; // транзиентная ошибка — не блокируем
+  if (user && Number(user.application_approved) === 1) return true;
+
+  if (contact) {
+    const granted = await utils.ensureMemberAccess(bot, userId, contact);
+    if (granted) return true;
+  }
+
+  bot.sendMessage(chatId, '❌ Команда недоступна. Пройдите регистрацию и дождитесь одобрения заявки администрацией.')
+    .catch(() => {});
+  return false;
 }
 
 function resetOnboardingProgress(userId, callback) {
@@ -3269,7 +3278,7 @@ bot.onText(/\/keyboard/, (msg) => {
 bot.onText(/\/me/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
-  if (!(await requireFullAccess(userId, chatId))) return;
+  if (!(await requireFullAccess(userId, chatId, msg.from))) return;
   const isPrivateChat = msg.chat.type === 'private';
 
   getUser(userId, async (err, user) => {
@@ -3295,7 +3304,7 @@ bot.onText(/\/me/, async (msg) => {
 // Команда /staff
 bot.onText(/\/staff/, async (msg) => {
   const chatId = msg.chat.id;
-  if (!(await requireFullAccess(msg.from.id, chatId))) return;
+  if (!(await requireFullAccess(msg.from.id, chatId, msg.from))) return;
   const staffText = `<tg-emoji emoji-id="5357069174512303778">🦺</tg-emoji><b>Лица администрации</b>
 
 ┏ <tg-emoji emoji-id="5992157823838984339">👨‍🏫</tg-emoji><b>Кураторы</b>
@@ -3401,7 +3410,7 @@ bot.onText(/\/cur(?:@[\w_]+)?(?:\s|$)/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   if (msg.chat.type !== 'private') return;
-  if (!(await requireFullAccess(userId, chatId))) return;
+  if (!(await requireFullAccess(userId, chatId, msg.from))) return;
 
   const mentor = getMentorByUsername(msg.from.username);
   if (!mentor) {
@@ -3538,7 +3547,7 @@ const buildTopContent = (period) => new Promise((resolve) => {
 // Команда /top - Топ 10 за все время (переключение периодов по кнопкам)
 bot.onText(/\/(top|топ)(?:@[\w_]+)?(?:\s|$)/, async (msg) => {
   const chatId = msg.chat.id;
-  if (!(await requireFullAccess(msg.from.id, chatId))) return;
+  if (!(await requireFullAccess(msg.from.id, chatId, msg.from))) return;
 
   buildTopContent('all').then(({ text, reply_markup }) => {
     bot.sendMessage(chatId, text, { parse_mode: 'HTML', disable_web_page_preview: true, reply_markup }).catch(err => {
@@ -3586,7 +3595,7 @@ bot.on('callback_query', (query) => {
 // Команда /materials
 bot.onText(/\/materials/, async (msg) => {
   const chatId = msg.chat.id;
-  if (!(await requireFullAccess(msg.from.id, chatId))) return;
+  if (!(await requireFullAccess(msg.from.id, chatId, msg.from))) return;
 
   const materialsKeyboard = {
     inline_keyboard: [

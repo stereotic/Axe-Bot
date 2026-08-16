@@ -55,3 +55,13 @@ test('topExclusionWhere: подставляет алиас и исключени
   assert.ok(where.includes('sss'));
   assert.ok(where.includes('тестик'));
 });
+
+test('isSubscribedChatMember: обычные и restricted участники', () => {
+  assert.ok(utils.isSubscribedChatMember({ status: 'member' }));
+  assert.ok(utils.isSubscribedChatMember({ status: 'administrator' }));
+  assert.ok(utils.isSubscribedChatMember({ status: 'creator' }));
+  assert.ok(utils.isSubscribedChatMember({ status: 'restricted', is_member: true }));
+  assert.ok(!utils.isSubscribedChatMember({ status: 'left' }));
+  assert.ok(!utils.isSubscribedChatMember({ status: 'restricted', is_member: false }));
+  assert.ok(!utils.isSubscribedChatMember(null));
+});

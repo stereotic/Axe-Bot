@@ -1,5 +1,6 @@
 const cardSystem = require('./card_system');
 const db = require('./database');
+const utils = require('./utils');
 
 // Временное хранилище для текущего индекса карты у каждого пользователя
 const userCardIndex = {};
@@ -102,12 +103,19 @@ function setupCardViewHandlers(bot) {
         openCardView(bot, chatId, userId, { chatType: msg.chat.type, showBackToMenu: false });
         return;
       }
-      if (!user || Number(user.application_approved) !== 1) {
-        bot.sendMessage(chatId, '❌ Команда недоступна. Пройдите регистрацию и дождитесь одобрения заявки администрацией.').catch(() => {});
+      if (Number(user && user.application_approved) === 1) {
+        openCardView(bot, chatId, userId, { chatType: msg.chat.type, showBackToMenu: false });
         return;
       }
 
-      openCardView(bot, chatId, userId, { chatType: msg.chat.type, showBackToMenu: false });
+      // Юзер есть в общем чате, но в БД не одобрен/не создан — членство = регистрация.
+      utils.ensureMemberAccess(bot, userId, msg.from).then((granted) => {
+        if (granted) {
+          openCardView(bot, chatId, userId, { chatType: msg.chat.type, showBackToMenu: false });
+          return;
+        }
+        bot.sendMessage(chatId, '❌ Команда недоступна. Пройдите регистрацию и дождитесь одобрения заявки администрацией.').catch(() => {});
+      });
     });
   });
 
