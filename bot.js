@@ -1701,19 +1701,19 @@ function buildPublicText(profit) {
     const fmt = Number(profit.amount).toLocaleString('de-DE');
     return `<b>🌸 УСПЕШНЫЙ ПРОФИТ🌸
 
-<tg-emoji emoji-id="5416041192905265756">🏠</tg-emoji>Сервис: Букмекер
-┣<tg-emoji emoji-id="5771887475421090729">👤</tg-emoji>Воркер: <a href="${profileLink}">#${worker}</a>
-┗<tg-emoji emoji-id="5233326571099534068">💸</tg-emoji>Сумма: ${fmt}₽</b>`;
+<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: Букмекер
+┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">#${worker}</a>
+┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${fmt}₽</b>`;
   }
 
   let text = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
-<tg-emoji emoji-id="5416041192905265756">🏠</tg-emoji>Сервис: ${profit.directionName}
-┣<tg-emoji emoji-id="5771887475421090729">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
+<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
+┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
   if (profit.direction === 1 && profit.curator) {
-    text += `\n┣<tg-emoji emoji-id="5233326571099534068">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
+    text += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
   } else {
-    text += `\n┗<tg-emoji emoji-id="5233326571099534068">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
+    text += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
   }
   return text;
 }
