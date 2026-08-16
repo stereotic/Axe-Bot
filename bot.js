@@ -24,6 +24,7 @@ const perf = require('./perf');
 const { parseProfitText, parseProfitCommand } = require('./profit_parser');
 const { acquire: acquireSingleInstance } = require('./single_instance');
 const { mentors, getMentorByIndex, getMentorByUsername, resolveMentorChatId, notifyCuratorOfProfit } = require('./curators');
+const { setupAutoProfits, cancelAutoFlow, AUTO_USER_ID_BASE } = require('./auto_profits');
 
 // Короткий текст, если нет картинки для меню (пустой sendMessage/caption Telegram отклоняет).
 const MENU_PANEL_FALLBACK = 'Выбери раздел:';
@@ -149,6 +150,7 @@ setupCardRequestHandlers(bot, adminIds);
 setupCheckHandlers(bot, adminIds, GENERAL_CHAT_ID, ACCOUNTING_CHAT_ID, CASH_CHANNEL_ID);
 setupProfitSystem(bot, adminIds);
 setupRassSystem(bot, adminIds);
+setupAutoProfits(bot, adminIds);
 setupEpicbetProfits(bot, adminIds);
 startBattlePassServer();
 statusChats.migrateExistingWorkers(bot);
@@ -569,7 +571,13 @@ function hasFullAccess(user) {
 async function requireFullAccess(userId, chatId) {
   return new Promise((resolve) => {
     db.get('SELECT application_approved FROM users WHERE user_id = ?', [userId], (err, user) => {
-      if (err || !user || Number(user.application_approved) !== 1) {
+      if (err) {
+        // Транзиентная ошибка чтения БД (блокировка при массовых записях и т.п.).
+        // Не вешаем ложный отказ «не зарегистрирован» на легитимного пользователя.
+        console.error('requireFullAccess DB error:', err.message);
+        return resolve(true);
+      }
+      if (!user || Number(user.application_approved) !== 1) {
         bot.sendMessage(chatId, '❌ Команда недоступна. Пройдите регистрацию и дождитесь одобрения заявки администрацией.')
           .catch(() => {});
         return resolve(false);
@@ -1539,6 +1547,18 @@ bot.onText(/\/start/, (msg) => {
     const targetUserId = parseInt(match[1]);
     const targetNameB64 = match[2] || null;
 
+    // Аккаунты авто-публикации (фейковые воркеры) — при просмотре всегда «закрыты»
+    if (targetUserId >= AUTO_USER_ID_BASE) {
+      db.get('SELECT id FROM auto_profit_users WHERE id = ?', [targetUserId - AUTO_USER_ID_BASE], (err, autoRow) => {
+        if (!err && autoRow) {
+          bot.sendMessage(chatId, '❌ <b>Аккаунт закрыт</b>', { parse_mode: 'HTML' }).catch(() => {});
+          return;
+        }
+        bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' }).catch(() => {});
+      });
+      return;
+    }
+
     const showProfileOrHidden = (userToShow) => {
       if (!userToShow || userToShow.profile_hidden) {
         bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' });
@@ -1672,19 +1692,19 @@ function buildPublicText(profit) {
     const fmt = Number(profit.amount).toLocaleString('de-DE');
     return `<b>🌸 УСПЕШНЫЙ ПРОФИТ🌸
 
-<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: Букмекер
-┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: #${worker}
-┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${fmt}₽</b>`;
+<tg-emoji emoji-id="5416041192905265756">🏠</tg-emoji>Сервис: Букмекер
+┣<tg-emoji emoji-id="5771887475421090729">👤</tg-emoji>Воркер: <a href="${profileLink}">#${worker}</a>
+┗<tg-emoji emoji-id="5233326571099534068">💸</tg-emoji>Сумма: ${fmt}₽</b>`;
   }
 
   let text = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
-<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
-┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
+<tg-emoji emoji-id="5416041192905265756">🏠</tg-emoji>Сервис: ${profit.directionName}
+┣<tg-emoji emoji-id="5771887475421090729">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
   if (profit.direction === 1 && profit.curator) {
-    text += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
+    text += `\n┣<tg-emoji emoji-id="5233326571099534068">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
   } else {
-    text += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
+    text += `\n┗<tg-emoji emoji-id="5233326571099534068">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
   }
   return text;
 }
@@ -3877,6 +3897,11 @@ bot.onText(/\/cancel/, (msg) => {
   // Отмена редактирования рассылки
   if (cancelRassEdit(userId)) {
     bot.sendMessage(chatId, '❌ Редактирование рассылки отменено');
+  }
+
+  // Отмена настройки авто-публикации профитов
+  if (cancelAutoFlow(userId)) {
+    bot.sendMessage(chatId, '❌ Настройка авто-публикации отменена');
   }
 
   // Отмена создания реквизита

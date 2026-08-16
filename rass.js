@@ -314,11 +314,8 @@ function sendScheduledRow(bot, row, today) {
 }
 
 function checkScheduledBroadcasts(bot) {
-  const now = new Date();
-  const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const { hm, today } = moscowTimeParts();
   if (!RASS_TIMES.includes(hm)) return;
-
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   db.all('SELECT * FROM scheduled_broadcasts WHERE time = ?', [hm], (err, rows) => {
     if (err || !rows || rows.length === 0) return;
@@ -331,6 +328,27 @@ function checkScheduledBroadcasts(bot) {
 
 function isRassEditing(userId) {
   return Boolean(rassEdit[userId]);
+}
+
+// Текущее время по Москве (UTC+3). Сервер может жить в UTC — иначе
+// рассылки уходили со сдвигом. Отдельный метод, чтобы не пробрасывать
+// TZ через env: проект целиком в московском поясе.
+function moscowTimeParts() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Moscow',
+    hour12: false,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((p) => p.type === type).value;
+  return {
+    hm: `${get('hour')}:${get('minute')}`,
+    today: `${get('year')}-${get('month')}-${get('day')}`
+  };
 }
 
 function cancelRassEdit(userId) {

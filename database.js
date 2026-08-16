@@ -323,6 +323,23 @@ db.serialize(() => {
     FOREIGN KEY (user_id) REFERENCES users(user_id)
   )`);
 
+  // Авто-публикация профитов (фейковые воркеры для кассы и чата)
+  db.run(`CREATE TABLE IF NOT EXISTS auto_profit_users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    amounts TEXT NOT NULL,
+    direction INTEGER DEFAULT 1,
+    time_from INTEGER DEFAULT 0,
+    time_to INTEGER DEFAULT 23,
+    interval_from INTEGER DEFAULT 60,
+    interval_to INTEGER DEFAULT 90,
+    enabled INTEGER DEFAULT 1,
+    total_amount INTEGER DEFAULT 0,
+    profit_count INTEGER DEFAULT 0,
+    last_profit_at INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   db.run(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_users_application_approved ON users(application_approved)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_profits_user_id ON profits(user_id)`);

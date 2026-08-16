@@ -96,7 +96,13 @@ function setupCardViewHandlers(bot) {
     const userId = msg.from.id;
 
     db.get('SELECT application_approved FROM users WHERE user_id = ?', [userId], (err, user) => {
-      if (err || !user || Number(user.application_approved) !== 1) {
+      if (err) {
+        // Транзиентная ошибка чтения БД — не блокируем легитимного пользователя.
+        console.error('/card access-check DB error:', err.message);
+        openCardView(bot, chatId, userId, { chatType: msg.chat.type, showBackToMenu: false });
+        return;
+      }
+      if (!user || Number(user.application_approved) !== 1) {
         bot.sendMessage(chatId, '❌ Команда недоступна. Пройдите регистрацию и дождитесь одобрения заявки администрацией.').catch(() => {});
         return;
       }
