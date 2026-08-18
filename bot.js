@@ -3450,6 +3450,7 @@ bot.onText(/\/ref(?:@[\w_]+)?(?:\s|$)/, (msg) => {
 
   const sendRefPanel = (stats) => {
     const fmt = (n) => Number(n || 0).toLocaleString('en-US');
+    console.log(`/ref ${msg.from.id}: users=${stats.total} blocked=${stats.blocked} active=${stats.active} inChat=${stats.inChat} profit=${stats.profitSum}`);
     const text = `<tg-emoji emoji-id="5451790705380859191">📊</tg-emoji><b>Статистика</b>
 
 <tg-emoji emoji-id="5445207349444782273">👥</tg-emoji><b>Пользователи:</b> ${fmt(stats.total)}
