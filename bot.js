@@ -196,6 +196,19 @@ process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
 });
 
+// Реферальная статистика: фиксируем, кто из приведённых заблокировал бота
+// (статус kicked в личке). Разблокировка (повторный /start) сбрасывает флаг.
+bot.on('my_chat_member', (update) => {
+  if (!update || !update.chat || update.chat.type !== 'private') return;
+  const status = update.new_chat_member && update.new_chat_member.status;
+  if (status !== 'kicked' && status !== 'member' && status !== 'administrator') return;
+  const userId = update.chat.id;
+  const blocked = status === 'kicked' ? 1 : 0;
+  db.run('UPDATE users SET referral_blocked = ? WHERE user_id = ?', [blocked, userId], (err) => {
+    if (err) console.error('Error updating referral_blocked:', err);
+  });
+});
+
 let infoBannerCache = { text: null, timestamp: 0 };
 const INFO_BANNER_CACHE_TTL = 60000;
 
@@ -316,7 +329,7 @@ function getUser(userId, callback) {
   db.get('SELECT * FROM users WHERE user_id = ?', [userId], callback);
 }
 
-function createUser(userId, username) {
+function createUser(userId, username, referredBy) {
   utils.generateWorkerNumber((err, workerNumber) => {
     if (err) {
       console.error('Error generating worker number:', err);
@@ -325,8 +338,8 @@ function createUser(userId, username) {
 
     const defaultName = `Worker${workerNumber}`;
     db.run(
-      'INSERT OR IGNORE INTO users (user_id, username, name, worker_number, application_approved, welcome_keyboard_sent) VALUES (?, ?, ?, ?, 0, 0)',
-      [userId, username, defaultName, workerNumber]
+      'INSERT OR IGNORE INTO users (user_id, username, name, worker_number, application_approved, welcome_keyboard_sent, referred_by) VALUES (?, ?, ?, ?, 0, 0, ?)',
+      [userId, username, defaultName, workerNumber, referredBy || null]
     );
   });
 }
@@ -1599,6 +1612,14 @@ bot.onText(/\/start/, (msg) => {
     return;
   }
 
+  // Реферальная ссылка /start ref_<id>: фиксируем пригласившего.
+  let referredBy = null;
+  const refMatch = startParam && startParam.match(/^ref_(\d+)$/);
+  if (refMatch && msg.chat.type === 'private') {
+    const parsedRef = parseInt(refMatch[1], 10);
+    if (parsedRef && parsedRef !== userId) referredBy = parsedRef;
+  }
+
   // Проверяем есть ли параметр (для просмотра профиля)
   const match = msg.text.match(/\/start\s+profile_(\d+)(?:_n_(.+))?/);
 
@@ -1719,9 +1740,14 @@ bot.onText(/\/start/, (msg) => {
       };
 
       if (!user) {
-        createUser(userId, username);
+        createUser(userId, username, referredBy);
         autoApproveIfMember(sendApplicationForm);
         return;
+      }
+
+      // Пришёл по ссылке, но уже существовал в БД — привязываем реферера один раз.
+      if (referredBy && user.referred_by == null) {
+        db.run('UPDATE users SET referred_by = ? WHERE user_id = ?', [referredBy, userId]);
       }
 
       db.get(
@@ -3349,6 +3375,107 @@ bot.onText(/\/me/, async (msg) => {
       }
     });
   });
+});
+
+// Команда /ref — реферальная статистика приведённых по индивидуальной ссылке.
+// Доступна всем, в меню команд не добавляется (см. bot.setMyCommands выше).
+const REF_GENERAL_CHAT_ID = '-1003986505552'; // Общий чат
+const REF_MEMBER_STATUSES = ['member', 'administrator', 'creator'];
+
+function isChatMember(member) {
+  if (!member) return false;
+  if (REF_MEMBER_STATUSES.includes(member.status)) return true;
+  return member.status === 'restricted' && member.is_member === true;
+}
+
+// Сколько из переданных userId сейчас в чате chatId (параллельно, с ограничением конкуренции).
+function countInChat(bot, userIds, chatId) {
+  return new Promise((resolve) => {
+    const queue = userIds.slice();
+    if (queue.length === 0) return resolve(0);
+    let inChat = 0;
+    let done = 0;
+    const CONCURRENCY = 15;
+    const work = () => {
+      while (queue.length) {
+        const uid = queue.shift();
+        bot.getChatMember(chatId, uid)
+          .then((member) => {
+            if (isChatMember(member)) inChat += 1;
+          })
+          .catch(() => {})
+          .finally(() => {
+            done += 1;
+            if (done >= userIds.length) resolve(inChat);
+          });
+      }
+    };
+    for (let i = 0; i < Math.min(CONCURRENCY, userIds.length); i += 1) work();
+  });
+}
+
+bot.onText(/\/ref(?:@[\w_]+)?(?:\s|$)/, (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const botUsername = process.env.BOT_USERNAME || 'AXE_xBOT';
+  const refLink = `https://t.me/${botUsername}?start=ref_${userId}`;
+
+  const sendRefPanel = (stats) => {
+    const fmt = (n) => Number(n || 0).toLocaleString('en-US');
+    const text = `<tg-emoji emoji-id="5451790705380859191">📊</tg-emoji><b>Статистика</b>
+
+<tg-emoji emoji-id="5445207349444782273">👥</tg-emoji><b>Пользователи:</b> ${fmt(stats.total)}
+
+<tg-emoji emoji-id="5444862184398040102">🚫</tg-emoji><b>Заблокировали:</b> ${fmt(stats.blocked)}
+
+<tg-emoji emoji-id="5449873797052148929">⚡️</tg-emoji><b>Активные пользователи:</b> ${fmt(stats.active)}
+
+<tg-emoji emoji-id="5451730279485973759">🟪</tg-emoji><b>В чате:</b> ${fmt(stats.inChat)}
+
+<tg-emoji emoji-id="5451805523018033441">💰</tg-emoji><b>Сумма профитов:</b> ${fmt(stats.profitSum)}₽
+
+<tg-emoji emoji-id="5445228961720215872">🔗</tg-emoji><b>Ваша ссылка:</b>
+<code>${escapeHtml(refLink)}</code>`;
+
+    bot.sendMessage(chatId, text, { parse_mode: 'HTML', disable_web_page_preview: true }).catch((err) => {
+      console.error('Error sending /ref panel:', telegramErrorSummary(err));
+    });
+  };
+
+  db.get(
+    `SELECT
+       COUNT(*) AS total,
+       COALESCE(SUM(CASE WHEN referral_blocked = 1 THEN 1 ELSE 0 END), 0) AS blocked,
+       COALESCE(SUM(CASE WHEN application_approved = 1 AND COALESCE(referral_blocked, 0) = 0 THEN 1 ELSE 0 END), 0) AS active,
+       COALESCE((SELECT SUM(p.amount)
+                 FROM profits p JOIN users u2 ON p.user_id = u2.user_id
+                 WHERE u2.referred_by = ?), 0) AS profit_sum
+     FROM users WHERE referred_by = ?`,
+    [userId, userId],
+    (err, row) => {
+      if (err) {
+        console.error('/ref stats error:', err);
+        bot.sendMessage(chatId, '❌ Ошибка загрузки статистики. Попробуйте ещё раз.').catch(() => {});
+        return;
+      }
+
+      const stats = row || { total: 0, blocked: 0, active: 0, profit_sum: 0 };
+
+      db.all('SELECT user_id FROM users WHERE referred_by = ?', [userId], (idsErr, referredRows) => {
+        if (idsErr) {
+          console.error('/ref referred list error:', idsErr);
+          stats.inChat = 0;
+          sendRefPanel(stats);
+          return;
+        }
+        const ids = (referredRows || []).map((r) => r.user_id);
+        countInChat(bot, ids, REF_GENERAL_CHAT_ID).then((inChat) => {
+          stats.inChat = inChat;
+          sendRefPanel(stats);
+        });
+      });
+    }
+  );
 });
 
 // Команда /staff

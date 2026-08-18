@@ -20,6 +20,8 @@ db.serialize(() => {
     percent INTEGER,
     worker_number INTEGER,
     application_approved INTEGER DEFAULT 0,
+    referred_by INTEGER,
+    referral_blocked INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
@@ -92,6 +94,18 @@ db.serialize(() => {
   db.run(`ALTER TABLE users ADD COLUMN worker_number INTEGER`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
       console.error('Error adding worker_number column:', err);
+    }
+  });
+
+  // Реферальная система: кто привёл + заблокировал ли бота приведённый
+  db.run(`ALTER TABLE users ADD COLUMN referred_by INTEGER`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding referred_by column:', err);
+    }
+  });
+  db.run(`ALTER TABLE users ADD COLUMN referral_blocked INTEGER DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding referral_blocked column:', err);
     }
   });
 
