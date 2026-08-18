@@ -3377,42 +3377,9 @@ bot.onText(/\/me/, async (msg) => {
   });
 });
 
-// Команда /ref — реферальная статистика приведённых по индивидуальной ссылке.
+// Команда /ref — общая статистика проекта + индивидуальная ссылка приглашения.
 // Доступна всем, в меню команд не добавляется (см. bot.setMyCommands выше).
 const REF_GENERAL_CHAT_ID = '-1003986505552'; // Общий чат
-const REF_MEMBER_STATUSES = ['member', 'administrator', 'creator'];
-
-function isChatMember(member) {
-  if (!member) return false;
-  if (REF_MEMBER_STATUSES.includes(member.status)) return true;
-  return member.status === 'restricted' && member.is_member === true;
-}
-
-// Сколько из переданных userId сейчас в чате chatId (параллельно, с ограничением конкуренции).
-function countInChat(bot, userIds, chatId) {
-  return new Promise((resolve) => {
-    const queue = userIds.slice();
-    if (queue.length === 0) return resolve(0);
-    let inChat = 0;
-    let done = 0;
-    const CONCURRENCY = 15;
-    const work = () => {
-      while (queue.length) {
-        const uid = queue.shift();
-        bot.getChatMember(chatId, uid)
-          .then((member) => {
-            if (isChatMember(member)) inChat += 1;
-          })
-          .catch(() => {})
-          .finally(() => {
-            done += 1;
-            if (done >= userIds.length) resolve(inChat);
-          });
-      }
-    };
-    for (let i = 0; i < Math.min(CONCURRENCY, userIds.length); i += 1) work();
-  });
-}
 
 bot.onText(/\/ref(?:@[\w_]+)?(?:\s|$)/, (msg) => {
   const chatId = msg.chat.id;
@@ -3442,16 +3409,21 @@ bot.onText(/\/ref(?:@[\w_]+)?(?:\s|$)/, (msg) => {
     });
   };
 
+  // Общая статистика по проекту (та же выдача, что у «Касса проекта», тесты исключены).
+  // «Пользователи» — принятые воркеры (кинули заявку и были одобрены).
+  const excludedNames = ['@sss','@Testovhik','@тестик','тестик','@testovhik','testovhik','test','#test'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+  const excludedUsernames = ['sss','freeobnall','test'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+
   db.get(
     `SELECT
-       COUNT(*) AS total,
-       COALESCE(SUM(CASE WHEN referral_blocked = 1 THEN 1 ELSE 0 END), 0) AS blocked,
+       COALESCE(SUM(CASE WHEN application_approved = 1 THEN 1 ELSE 0 END), 0) AS total,
+       COALESCE(SUM(CASE WHEN application_approved = 1 AND referral_blocked = 1 THEN 1 ELSE 0 END), 0) AS blocked,
        COALESCE(SUM(CASE WHEN application_approved = 1 AND COALESCE(referral_blocked, 0) = 0 THEN 1 ELSE 0 END), 0) AS active,
        COALESCE((SELECT SUM(p.amount)
                  FROM profits p JOIN users u2 ON p.user_id = u2.user_id
-                 WHERE u2.referred_by = ?), 0) AS profit_sum
-     FROM users WHERE referred_by = ?`,
-    [userId, userId],
+                 WHERE LOWER(TRIM(COALESCE(u2.name, ''))) NOT IN (${excludedNames})
+                   AND LOWER(TRIM(COALESCE(u2.username, ''))) NOT IN (${excludedUsernames})), 0) AS profit_sum
+     FROM users`,
     (err, row) => {
       if (err) {
         console.error('/ref stats error:', err);
@@ -3461,19 +3433,15 @@ bot.onText(/\/ref(?:@[\w_]+)?(?:\s|$)/, (msg) => {
 
       const stats = row || { total: 0, blocked: 0, active: 0, profit_sum: 0 };
 
-      db.all('SELECT user_id FROM users WHERE referred_by = ?', [userId], (idsErr, referredRows) => {
-        if (idsErr) {
-          console.error('/ref referred list error:', idsErr);
+      bot.getChatMemberCount(REF_GENERAL_CHAT_ID)
+        .then((count) => {
+          stats.inChat = Number(count) || 0;
+          sendRefPanel(stats);
+        })
+        .catch(() => {
           stats.inChat = 0;
           sendRefPanel(stats);
-          return;
-        }
-        const ids = (referredRows || []).map((r) => r.user_id);
-        countInChat(bot, ids, REF_GENERAL_CHAT_ID).then((inChat) => {
-          stats.inChat = inChat;
-          sendRefPanel(stats);
         });
-      });
     }
   );
 });
