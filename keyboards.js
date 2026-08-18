@@ -115,12 +115,13 @@ const keyboards = {
     ]
   }),
 
-  profile_settings: (isHidden) => ({
+  profile_settings: (isHidden, curator) => ({
     inline_keyboard: [
       [{ text: 'Изменить Name', callback_data: 'change_name' }],
       [{ text: isHidden ? 'Открыть профиль' : 'Скрыть профиль', callback_data: 'hide_profile' }],
       [{ text: '💼 Кошелек для выплаты', callback_data: 'payout_wallet' }],
       [{ text: 'Перенести профиль', callback_data: 'transfer_profile' }],
+      ...(curator ? [{ text: 'Отвязаться от куратора', callback_data: 'detach_curator' }] : []),
       [{ text: 'Назад', callback_data: 'profile' }]
     ]
   }),

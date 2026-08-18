@@ -1230,7 +1230,7 @@ if (fs.existsSync(bookmakerImagePath)) {
 
     case 'profile_settings':
       bot.answerCallbackQuery(query.id);
-      db.get('SELECT profile_hidden FROM users WHERE user_id = ?', [userId], (err, user) => {
+      db.get('SELECT profile_hidden, curator FROM users WHERE user_id = ?', [userId], (err, user) => {
         if (err) {
           bot.answerCallbackQuery(query.id, { text: '❌ Ошибка', show_alert: true });
           return;
@@ -1243,13 +1243,13 @@ if (fs.existsSync(bookmakerImagePath)) {
           replaceMenuMessage(chatId, messageId, {
             type: 'photo',
             imagePath: settingsImagePath,
-            reply_markup: keyboards.profile_settings(user.profile_hidden)
+            reply_markup: keyboards.profile_settings(user.profile_hidden, user.curator)
           });
         } else {
           replaceMenuMessage(chatId, messageId, {
             type: 'text',
             text: settingsText,
-            reply_markup: keyboards.profile_settings(user.profile_hidden)
+            reply_markup: keyboards.profile_settings(user.profile_hidden, user.curator)
           });
         }
       });
@@ -1357,7 +1357,7 @@ if (fs.existsSync(bookmakerImagePath)) {
       break;
 
     case 'hide_profile':
-      db.get('SELECT profile_hidden FROM users WHERE user_id = ?', [userId], (err, user) => {
+      db.get('SELECT profile_hidden, curator FROM users WHERE user_id = ?', [userId], (err, user) => {
         if (err) {
           bot.answerCallbackQuery(query.id, { text: '❌ Ошибка', show_alert: true });
           return;
@@ -1374,10 +1374,60 @@ if (fs.existsSync(bookmakerImagePath)) {
             bot.answerCallbackQuery(query.id, { text: message, show_alert: false });
 
             // Обновляем клавиатуру с новым состоянием
-            bot.editMessageReplyMarkup(keyboards.profile_settings(newState), {
+            bot.editMessageReplyMarkup(keyboards.profile_settings(newState, user.curator), {
               chat_id: chatId,
               message_id: messageId
             }).catch(() => {});
+          }
+        });
+      });
+      break;
+
+    case 'detach_curator':
+      db.get('SELECT curator, profile_hidden FROM users WHERE user_id = ?', [userId], (err, user) => {
+        if (err) {
+          bot.answerCallbackQuery(query.id, { text: '❌ Ошибка', show_alert: true });
+          return;
+        }
+
+        if (!user || !user.curator) {
+          bot.answerCallbackQuery(query.id, { text: '❌ Вы не закреплены за куратором', show_alert: true });
+          return;
+        }
+
+        const curatorName = user.curator;
+        const mentor = getMentorByUsername(curatorName);
+
+        db.run('UPDATE users SET curator = NULL, percent = NULL WHERE user_id = ?', [userId], (updErr) => {
+          if (updErr) {
+            bot.answerCallbackQuery(query.id, { text: '❌ Ошибка отвязки', show_alert: true });
+            console.error('Error detaching curator:', updErr);
+            return;
+          }
+
+          bot.answerCallbackQuery(query.id, { text: '✅ Вы отвязались от куратора', show_alert: true });
+
+          // Обновляем клавиатуру настроек — кнопка отвязки исчезает
+          bot.editMessageReplyMarkup(keyboards.profile_settings(user.profile_hidden, null), {
+            chat_id: chatId,
+            message_id: messageId
+          }).catch(() => {});
+
+          // Уведомляем куратора, что ученик отвязался
+          if (mentor) {
+            db.get('SELECT username, name FROM users WHERE user_id = ?', [userId], (err, student) => {
+              const username = student && student.username ? `@${student.username}` : `ID: ${userId}`;
+              resolveMentorChatId(db, mentor, (mentorChatId) => {
+                if (!mentorChatId) return;
+                bot.sendMessage(
+                  mentorChatId,
+                  `🟥Ученик отвязался от куратора: ${username}`,
+                  { parse_mode: 'HTML' }
+                ).catch(err => {
+                  console.error('Error sending to mentor:', err);
+                });
+              });
+            });
           }
         });
       });
@@ -2080,9 +2130,9 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
 
       const chatName = workerName && workerName !== '#' ? workerName : (workerUsername ? `#${workerUsername}` : '#');
       bot.sendMessage(GENERAL_CHAT_ID,
-        `<tg-emoji emoji-id="5444984118519573636">🎁</tg-emoji>Новый подарок у ${chatName}\n` +
+        `<b><tg-emoji emoji-id="5444984118519573636">🎁</tg-emoji>Новый подарок у ${chatName}\n` +
         `<tg-emoji emoji-id="5451737714074364923">🎁</tg-emoji>Уровень PASS: ${lvl}\n` +
-        `<tg-emoji emoji-id="5445350075502997104">🎁</tg-emoji>Подарок: ${prize.title}`,
+        `<tg-emoji emoji-id="5445350075502997104">🎁</tg-emoji>Подарок: ${prize.title}</b>`,
         { parse_mode: 'HTML' }
       ).catch((err) => console.error('Error sending gift to general chat:', err));
 
@@ -3171,7 +3221,7 @@ ${withdrawal.check_message || ''}`;
                                'materials', 'profile_settings', 'change_name', 'hide_profile',
                                'transfer_profile', 'withdraw', 'cancel_withdraw', 'back_to_menu',
                                'payout_wallet', 'wallet_set_cryptobot', 'wallet_set_trc20',
-                               'wallet_set_bep20', 'wallet_cancel_input'];
+                               'wallet_set_bep20', 'wallet_cancel_input', 'detach_curator'];
 
   if (protectedCallbacks.includes(data) || data.startsWith('wallet_confirm_') ||
       data.startsWith('show_mentor_') || data.startsWith('assign_mentor_')) {
