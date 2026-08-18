@@ -121,7 +121,7 @@ const keyboards = {
       [{ text: isHidden ? 'Открыть профиль' : 'Скрыть профиль', callback_data: 'hide_profile' }],
       [{ text: '💼 Кошелек для выплаты', callback_data: 'payout_wallet' }],
       [{ text: 'Перенести профиль', callback_data: 'transfer_profile' }],
-      ...(curator ? [{ text: 'Отвязаться от куратора', callback_data: 'detach_curator' }] : []),
+      ...(curator ? [[{ text: 'Отвязаться от куратора', callback_data: 'detach_curator' }]] : []),
       [{ text: 'Назад', callback_data: 'profile' }]
     ]
   }),
