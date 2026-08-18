@@ -222,6 +222,7 @@ function backfillReferralBlocked(bot) {
     const CONCURRENCY = 15;
     let running = 0;
     let checked = 0;
+    let foundBlocked = 0;
 
     const isBlockedError = (err) => {
       try {
@@ -240,10 +241,12 @@ function backfillReferralBlocked(bot) {
         bot.getChatMember(uid, uid)
           .then((member) => {
             const blocked = member && member.status === 'kicked' ? 1 : 0;
+            if (blocked) foundBlocked += 1;
             db.run('UPDATE users SET referral_blocked = ? WHERE user_id = ?', [blocked, uid]);
           })
           .catch((apiErr) => {
             if (isBlockedError(apiErr)) {
+              foundBlocked += 1;
               db.run('UPDATE users SET referral_blocked = 1 WHERE user_id = ?', [uid]);
             }
           })
@@ -254,7 +257,7 @@ function backfillReferralBlocked(bot) {
           });
       }
       if (checked >= users.length) {
-        console.log(`✅ referral_blocked залит: проверено ${checked} воркеров`);
+        console.log(`✅ referral_blocked залит: проверено ${checked} воркеров, заблокировавших ${foundBlocked}`);
       }
     };
 
@@ -3450,7 +3453,7 @@ bot.onText(/\/ref(?:@[\w_]+)?(?:\s|$)/, (msg) => {
 
   const sendRefPanel = (stats) => {
     const fmt = (n) => Number(n || 0).toLocaleString('en-US');
-    console.log(`/ref ${msg.from.id}: users=${stats.total} blocked=${stats.blocked} active=${stats.active} inChat=${stats.inChat} profit=${stats.profitSum}`);
+    console.log(`/ref ${msg.from.id}: users=${stats.total} blocked=${stats.blocked} active=${stats.active} inChat=${stats.inChat} profit=${stats.profit_sum}`);
     const text = `<tg-emoji emoji-id="5451790705380859191">📊</tg-emoji><b>Статистика</b>
 
 <tg-emoji emoji-id="5445207349444782273">👥</tg-emoji><b>Пользователи:</b> ${fmt(stats.total)}
@@ -3461,7 +3464,7 @@ bot.onText(/\/ref(?:@[\w_]+)?(?:\s|$)/, (msg) => {
 
 <tg-emoji emoji-id="5451730279485973759">🟪</tg-emoji><b>В чате:</b> ${fmt(stats.inChat)}
 
-<tg-emoji emoji-id="5451805523018033441">💰</tg-emoji><b>Сумма профитов:</b> ${fmt(stats.profitSum)}₽
+<tg-emoji emoji-id="5451805523018033441">💰</tg-emoji><b>Сумма профитов:</b> ${fmt(stats.profit_sum)}₽
 
 <tg-emoji emoji-id="5445228961720215872">🔗</tg-emoji><b>Ваша ссылка:</b>
 <code>${escapeHtml(refLink)}</code>`;
