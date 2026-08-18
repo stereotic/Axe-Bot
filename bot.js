@@ -154,6 +154,8 @@ setupAutoProfits(bot, adminIds);
 setupEpicbetProfits(bot, adminIds);
 startBattlePassServer();
 statusChats.migrateExistingWorkers(bot);
+backfillReferralBlocked(bot);
+logRefProfitSource();
 
 // Устанавливаем меню команд бота
 bot.setMyCommands([
@@ -208,6 +210,50 @@ bot.on('my_chat_member', (update) => {
     if (err) console.error('Error updating referral_blocked:', err);
   });
 });
+
+// Заливка флагов на старте: трекер не знает, кто блокировал бота ДО его установки.
+// Проверяем личку каждого принятого воркера (kicked = блок) и проставляем referral_blocked.
+// Дальше my_chat_member держит флаг актуальным.
+function backfillReferralBlocked(bot) {
+  db.all('SELECT user_id FROM users WHERE application_approved = 1', (err, users) => {
+    if (err || !users || !users.length) return;
+    const queue = users.slice();
+    const CONCURRENCY = 15;
+    let running = 0;
+    let checked = 0;
+
+    const pump = () => {
+      while (running < CONCURRENCY && queue.length) {
+        running += 1;
+        const uid = queue.shift();
+        bot.getChatMember(uid, uid)
+          .then((member) => {
+            const blocked = member && member.status === 'kicked' ? 1 : 0;
+            db.run('UPDATE users SET referral_blocked = ? WHERE user_id = ?', [blocked, uid]);
+          })
+          .catch(() => {})
+          .finally(() => {
+            running -= 1;
+            checked += 1;
+            pump();
+          });
+      }
+      if (checked >= users.length) {
+        console.log(`✅ referral_blocked залит: проверено ${checked} воркеров`);
+      }
+    };
+
+    pump();
+  });
+}
+
+// Стартовая диагностика /ref: что лежит в profits на этой базе.
+function logRefProfitSource() {
+  db.get('SELECT COUNT(*) AS cnt, COALESCE(SUM(amount), 0) AS sum FROM profits', (err, row) => {
+    if (err) return;
+    console.log(`/ref источник: профитов в profits = ${row.cnt}, сумма = ${row.sum}₽`);
+  });
+}
 
 let infoBannerCache = { text: null, timestamp: 0 };
 const INFO_BANNER_CACHE_TTL = 60000;
@@ -3409,20 +3455,15 @@ bot.onText(/\/ref(?:@[\w_]+)?(?:\s|$)/, (msg) => {
     });
   };
 
-  // Общая статистика по проекту (та же выдача, что у «Касса проекта», тесты исключены).
+  // Общая статистика по проекту.
   // «Пользователи» — принятые воркеры (кинули заявку и были одобрены).
-  const excludedNames = ['@sss','@Testovhik','@тестик','тестик','@testovhik','testovhik','test','#test'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
-  const excludedUsernames = ['sss','freeobnall','test'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
-
+  // «Сумма профитов» — вся касса из profits, без фильтров по именам.
   db.get(
     `SELECT
        COALESCE(SUM(CASE WHEN application_approved = 1 THEN 1 ELSE 0 END), 0) AS total,
        COALESCE(SUM(CASE WHEN application_approved = 1 AND referral_blocked = 1 THEN 1 ELSE 0 END), 0) AS blocked,
        COALESCE(SUM(CASE WHEN application_approved = 1 AND COALESCE(referral_blocked, 0) = 0 THEN 1 ELSE 0 END), 0) AS active,
-       COALESCE((SELECT SUM(p.amount)
-                 FROM profits p JOIN users u2 ON p.user_id = u2.user_id
-                 WHERE LOWER(TRIM(COALESCE(u2.name, ''))) NOT IN (${excludedNames})
-                   AND LOWER(TRIM(COALESCE(u2.username, ''))) NOT IN (${excludedUsernames})), 0) AS profit_sum
+       COALESCE((SELECT SUM(p.amount) FROM profits p), 0) AS profit_sum
      FROM users`,
     (err, row) => {
       if (err) {
