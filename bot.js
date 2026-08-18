@@ -212,7 +212,8 @@ bot.on('my_chat_member', (update) => {
 });
 
 // Заливка флагов на старте: трекер не знает, кто блокировал бота ДО его установки.
-// Проверяем личку каждого принятого воркера (kicked = блок) и проставляем referral_blocked.
+// Проверяем личку каждого принятого воркера: блокировавший — либо статус kicked
+// в ответе, либо Telegram отвечает 403 «bot was blocked by the user».
 // Дальше my_chat_member держит флаг актуальным.
 function backfillReferralBlocked(bot) {
   db.all('SELECT user_id FROM users WHERE application_approved = 1', (err, users) => {
@@ -221,6 +222,16 @@ function backfillReferralBlocked(bot) {
     const CONCURRENCY = 15;
     let running = 0;
     let checked = 0;
+
+    const isBlockedError = (err) => {
+      try {
+        const msg = String((err && err.message) || '');
+        const desc = (err && err.response && err.response.body && err.response.body.description) || '';
+        return /bot was blocked by the user/i.test(msg + ' ' + desc);
+      } catch (_) {
+        return false;
+      }
+    };
 
     const pump = () => {
       while (running < CONCURRENCY && queue.length) {
@@ -231,7 +242,11 @@ function backfillReferralBlocked(bot) {
             const blocked = member && member.status === 'kicked' ? 1 : 0;
             db.run('UPDATE users SET referral_blocked = ? WHERE user_id = ?', [blocked, uid]);
           })
-          .catch(() => {})
+          .catch((apiErr) => {
+            if (isBlockedError(apiErr)) {
+              db.run('UPDATE users SET referral_blocked = 1 WHERE user_id = ?', [uid]);
+            }
+          })
           .finally(() => {
             running -= 1;
             checked += 1;
