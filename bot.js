@@ -3441,7 +3441,7 @@ bot.onText(/\/me/, async (msg) => {
   });
 });
 
-// Команда /ref — общая статистика проекта + индивидуальная ссылка приглашения.
+// Команда /ref — индивидуальная ссылка приглашения + статистика по ней.
 // Доступна всем, в меню команд не добавляется (см. bot.setMyCommands выше).
 const REF_GENERAL_CHAT_ID = '-1003986505552'; // Общий чат
 
@@ -3474,16 +3474,23 @@ bot.onText(/\/ref(?:@[\w_]+)?(?:\s|$)/, (msg) => {
     });
   };
 
-  // Общая статистика по проекту.
-  // «Пользователи» — принятые воркеры (кинули заявку и были одобрены).
-  // «Сумма профитов» — вся касса из profits, без фильтров по именам.
+  // Индивидуальная статистика по ссылке этого пользователя ref_<id>,
+  // те же строки панели, что и раньше, но цифры — только по его приведённым.
+  // «Пользователи» — приведённые им принятье воркеры.
+  // «Сумма профитов» — касса только приведённых им воркеров.
   db.get(
     `SELECT
        COALESCE(SUM(CASE WHEN application_approved = 1 THEN 1 ELSE 0 END), 0) AS total,
        COALESCE(SUM(CASE WHEN application_approved = 1 AND referral_blocked = 1 THEN 1 ELSE 0 END), 0) AS blocked,
        COALESCE(SUM(CASE WHEN application_approved = 1 AND COALESCE(referral_blocked, 0) = 0 THEN 1 ELSE 0 END), 0) AS active,
-       COALESCE((SELECT SUM(p.amount) FROM profits p), 0) AS profit_sum
-     FROM users`,
+       COALESCE((SELECT SUM(p.amount)
+                 FROM profits p
+                 INNER JOIN users u ON u.user_id = p.user_id
+                 WHERE u.referred_by = ?
+                   AND u.application_approved = 1), 0) AS profit_sum
+     FROM users
+     WHERE referred_by = ? AND application_approved = 1`,
+    [userId, userId],
     (err, row) => {
       if (err) {
         console.error('/ref stats error:', err);
@@ -3491,17 +3498,50 @@ bot.onText(/\/ref(?:@[\w_]+)?(?:\s|$)/, (msg) => {
         return;
       }
 
-      const stats = row || { total: 0, blocked: 0, active: 0, profit_sum: 0 };
+      const base = row || { total: 0, blocked: 0, active: 0, profit_sum: 0 };
 
-      bot.getChatMemberCount(REF_GENERAL_CHAT_ID)
-        .then((count) => {
-          stats.inChat = Number(count) || 0;
-          sendRefPanel(stats);
-        })
-        .catch(() => {
-          stats.inChat = 0;
-          sendRefPanel(stats);
-        });
+      // «В чате» — сколько приведённых воркеров реально в общем чате.
+      // Проверяем членство с ограниченной конкуренцией, как в backfillReferralBlocked.
+      db.all(
+        'SELECT user_id FROM users WHERE referred_by = ? AND application_approved = 1',
+        [userId],
+        (userErr, referred) => {
+          if (userErr || !referred || !referred.length) {
+            base.inChat = 0;
+            sendRefPanel(base);
+            return;
+          }
+
+          const queue = referred.slice(0, 100);
+          const CONCURRENCY = 10;
+          let running = 0;
+          let done = 0;
+          let inChat = 0;
+
+          const pump = () => {
+            while (running < CONCURRENCY && queue.length) {
+              running += 1;
+              const uid = queue.shift();
+              bot.getChatMember(REF_GENERAL_CHAT_ID, uid)
+                .then((member) => {
+                  if (member && ['member', 'administrator', 'creator'].includes(member.status)) inChat += 1;
+                })
+                .catch(() => {})
+                .finally(() => {
+                  running -= 1;
+                  done += 1;
+                  pump();
+                });
+            }
+            if (done >= referred.length) {
+              base.inChat = inChat;
+              sendRefPanel(base);
+            }
+          };
+
+          pump();
+        }
+      );
     }
   );
 });
