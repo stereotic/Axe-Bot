@@ -13,6 +13,8 @@
 //   node res_gift_backfill.js --dry 900000000002          — посчитать и показать тексты, не слать
 //   node res_gift_backfill.js --test-chat <id> 900000000002 — слать подарки в тестовый чат,
 //                                                              без билетов в БД, синка и алертов админам
+//   node res_gift_backfill.js --force=900000000002:1 900000000002 — переслать уровень 1,
+//                                                              даже если помечен как уведомлённый
 
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
@@ -28,6 +30,18 @@ const dryRun = args.includes('--dry');
 const testChatIdx = args.indexOf('--test-chat');
 const testChat = testChatIdx >= 0 ? args[testChatIdx + 1] : null;
 const targets = args.filter((a) => /^\d+$/.test(a)).map(Number);
+// --force=900000000002:1,900000000002:4 — отправить конкретные уровни даже если
+// они уже помечены как уведомлённые (например, сообщение не дошло из-за сбоя).
+const forceMap = new Map();
+args.forEach((a) => {
+  if (!a.startsWith('--force=')) return;
+  String(a.slice(8)).split(',').forEach((pair) => {
+    const [id, lvl] = pair.split(':').map(Number);
+    if (!id || !lvl) return;
+    if (!forceMap.has(id)) forceMap.set(id, new Set());
+    forceMap.get(id).add(lvl);
+  });
+});
 
 const tokens = (process.env.BOT_TOKEN || '').trim();
 if (!tokens) {
@@ -115,6 +129,17 @@ async function main() {
       if (!row) missed.push(lvl);
     }
 
+    if (forceMap.has(u.user_id)) {
+      forceMap.get(u.user_id).forEach((lvl) => {
+        if (!missed.includes(lvl)) missed.push(lvl);
+      });
+    }
+    missed.sort((a, b) => a - b);
+    if (forceMap.has(u.user_id)) {
+      const f = forceMap.get(u.user_id).size ? [...forceMap.get(u.user_id)].sort((a, b) => a - b).join(',') : '';
+      console.log(`  форс=[${f}]`);
+    }
+
     console.log(`  пропущено=[${missed.join(',') || '-'}]`);
 
     if (!missed.length) continue;
@@ -143,7 +168,7 @@ async function main() {
       }
 
       await dbRun(
-        'INSERT INTO pass_gift_notified (user_id, prize_level) VALUES (?, ?)',
+        'INSERT OR IGNORE INTO pass_gift_notified (user_id, prize_level) VALUES (?, ?)',
         [u.user_id, lvl]
       );
       sendLevelGift(bot, db, adminIds, u.user_id, u.username || null, u.name, lvl);
