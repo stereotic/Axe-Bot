@@ -25,6 +25,7 @@ const { parseProfitText, parseProfitCommand } = require('./profit_parser');
 const { acquire: acquireSingleInstance } = require('./single_instance');
 const { mentors, getMentorByIndex, getMentorByUsername, resolveMentorChatId, notifyCuratorOfProfit } = require('./curators');
 const { setupAutoProfits, cancelAutoFlow, AUTO_USER_ID_BASE } = require('./auto_profits');
+const { sendPrizeNotifications } = require('./prize_notifications');
 
 // Короткий текст, если нет картинки для меню (пустой sendMessage/caption Telegram отклоняет).
 const MENU_PANEL_FALLBACK = 'Выбери раздел:';
@@ -2167,7 +2168,6 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
   // Уведомление воркеру о профите и прогрессе АХЕ PASS
   const formatXp = (xp) => String(Math.round(xp * 100) / 100).replace('.', ',');
 
-  // pass = { totalEarned, xp } — касса и накопленный XP.
   const sendAxePassNotification = (workerId, profitAmount, oldPass, newPass) => {
     const oldLevel = battlepass.buildState(oldPass.totalEarned, oldPass.xp).level;
     const state = battlepass.buildState(newPass.totalEarned, newPass.xp);
@@ -2182,85 +2182,6 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
     }
 
     bot.sendMessage(workerId, text, { parse_mode: 'HTML' }).catch(() => {});
-  };
-
-  // Генерация номера билета вида #Hd1001 — уникальный в таблице tickets
-  const generateTicketNumber = (callback) => {
-    const letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const pick = (n, set) => {
-      let s = '';
-      for (let i = 0; i < n; i++) s += set[Math.floor(Math.random() * set.length)];
-      return s;
-    };
-    const candidate = () => `#${pick(2 + (Math.random() < 0.5 ? 1 : 0), letters)}${pick(4, '0123456789')}`;
-
-    const tryGen = (attempt) => {
-      if (attempt > 15) return callback(new Error('Не удалось сгенерировать уникальный номер билета'));
-      const num = candidate();
-      db.get('SELECT id FROM tickets WHERE ticket_number = ?', [num], (err, row) => {
-        if (err) return callback(err);
-        if (row) return tryGen(attempt + 1);
-        callback(null, num);
-      });
-    };
-    tryGen(0);
-  };
-
-  // Уведомления о призах при переходе на новые уровни пасса
-  const sendPrizeNotifications = (workerId, workerUsername, workerName, oldPass, newPass) => {
-    const oldLevel = battlepass.buildState(oldPass.totalEarned, oldPass.xp).level;
-    const newLevel = battlepass.buildState(newPass.totalEarned, newPass.xp).level;
-    if (newLevel <= oldLevel) return;
-
-    const mention = workerUsername ? `@${workerUsername}` : (workerName || 'без имени');
-
-    for (let lvl = oldLevel + 1; lvl <= newLevel; lvl++) {
-      const prize = battlepass.LEVELS[lvl - 1];
-      if (!prize) continue;
-
-      const chatName = workerName && workerName !== '#' ? workerName : (workerUsername ? `#${workerUsername}` : '#');
-      bot.sendMessage(GENERAL_CHAT_ID,
-        `<b><tg-emoji emoji-id="5444984118519573636">🎁</tg-emoji>Новый подарок у ${chatName}\n` +
-        `<tg-emoji emoji-id="5451737714074364923">🎁</tg-emoji>Уровень PASS: ${lvl}\n` +
-        `<tg-emoji emoji-id="5445350075502997104">🎁</tg-emoji>Подарок: ${prize.title}</b>`,
-        { parse_mode: 'HTML' }
-      ).catch((err) => console.error('Error sending gift to general chat:', err));
-
-      if (prize.ticketName) {
-        generateTicketNumber((err, ticket) => {
-          if (err) {
-            console.error('Error generating ticket:', err);
-            return;
-          }
-          db.run(
-            'INSERT INTO tickets (user_id, username, prize_level, prize_title, ticket_number) VALUES (?, ?, ?, ?, ?)',
-            [workerId, workerUsername || null, lvl, prize.title, ticket],
-            (dbErr) => { if (dbErr) console.error('Error saving ticket:', dbErr); }
-          );
-
-          bot.sendMessage(workerId,
-            `<tg-emoji emoji-id="5994502837327892086">🎉</tg-emoji>Поздравляем \n` +
-            `<tg-emoji emoji-id="5963213811597970978">🎟️</tg-emoji>Ты получил билет на розыгрыш: ${prize.ticketName} <tg-emoji emoji-id="5190855056848615312">🎁</tg-emoji>\n\n` +
-            `<tg-emoji emoji-id="5987917196469213507">🎫</tg-emoji>Номер билета: ${ticket}`,
-            { parse_mode: 'HTML' }).catch(() => {});
-
-          adminIds.forEach((adminId) => {
-            bot.sendMessage(adminId,
-              `<b>${mention}</b> получил билет на розыгрыш: <b>${prize.ticketName}</b>\nНомер билета: ${ticket}`,
-              { parse_mode: 'HTML' }
-            ).catch(() => {});
-          });
-        });
-      } else {
-        const workerTag = workerName && workerName !== '#' ? workerName : (workerUsername ? `@${workerUsername}` : 'без имени');
-        adminIds.forEach((adminId) => {
-          bot.sendMessage(adminId,
-            `<b>${workerTag}</b> получил новую награду: <b>${prize.title}</b>`,
-            { parse_mode: 'HTML' }
-          ).catch(() => {});
-        });
-      }
-    }
   };
 
   // Обработка profit system
@@ -2352,7 +2273,7 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
 <tg-emoji emoji-id="5276240711795107620">⚠️</tg-emoji><i>Подать заявку на выплату можно в профиле.</i>`;
                           bot.sendMessage(targetUserId, profitMessage, { parse_mode: 'HTML' }).catch(() => {});
                           sendAxePassNotification(targetUserId, profit.amount, { totalEarned: oldPassTotal, xp: oldPassXp }, { totalEarned: newPassTotal, xp: newPassXp });
-                          sendPrizeNotifications(targetUserId, profit.username, profit.name, { totalEarned: oldPassTotal, xp: oldPassXp }, { totalEarned: newPassTotal, xp: newPassXp });
+                          sendPrizeNotifications(bot, db, adminIds, targetUserId, profit.username, profit.name, { totalEarned: oldPassTotal, xp: oldPassXp }, { totalEarned: newPassTotal, xp: newPassXp });
                         }
                       });
                     });

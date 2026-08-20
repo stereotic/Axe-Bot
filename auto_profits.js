@@ -9,6 +9,7 @@ const utils = require('./utils');
 const battlepass = require('./battlepass');
 const statusChats = require('./status_chats');
 const { updatePinnedMessage } = require('./update_pinned');
+const { sendPrizeNotifications } = require('./prize_notifications');
 
 const CASH_CHANNEL_ID = '-1003924744333'; // Общая касса
 const GENERAL_CHAT_ID = '-1003986505552'; // Общий чат
@@ -25,6 +26,8 @@ const editFlow = {};  // userId -> состояние редактировани
 const panelMsg = {};  // userId -> id открытой карточки пользователя
 const lastCallback = {};
 const publishing = new Set(); // защита от двойной публикации одного юзера
+
+let autoAdminIds = [];
 
 function dedupeCallback(userId, data) {
   const key = `${userId}\u0000${data}`;
@@ -490,6 +493,15 @@ async function recordProfit(bot, user, profit, workerPayout) {
 
   await ensureUser(profit.userId, profit.username);
 
+  const pre = await dbGetP(
+    'SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?',
+    [profit.userId]
+  ).catch(() => null);
+  const oldPass = {
+    totalEarned: pre ? (pre.battlepass_earned || 0) : 0,
+    xp: pre ? (pre.battlepass_xp || 0) : 0
+  };
+
   const profitId = await insertProfit(profit.userId, amount, workerPayout, direction);
 
   const shares = utils.calculateProfitShares(amount);
@@ -523,6 +535,17 @@ async function recordProfit(bot, user, profit, workerPayout) {
   });
   updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((err) =>
     console.error('[ap] updatePinnedMessage:', err.message)
+  );
+
+  sendPrizeNotifications(
+    bot,
+    db,
+    autoAdminIds,
+    profit.userId,
+    profit.username,
+    profit.name,
+    oldPass,
+    { totalEarned: oldPass.totalEarned + amount, xp: oldPass.xp + xpGain }
   );
 }
 
@@ -607,6 +630,7 @@ function cancelAutoFlow(userId) {
 }
 
 function setupAutoProfits(bot, adminIds) {
+  autoAdminIds = Array.isArray(adminIds) ? adminIds : [];
   // Команда /res — меню авто-публикации (только админы, личка)
   bot.onText(/\/res(?:@[\w_]+)?(?:\s|$)/, (msg) => {
     const chatId = msg.chat.id;
