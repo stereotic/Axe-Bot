@@ -5,7 +5,8 @@ const db = require('./database');
 // 30.000 ₽ -> floor(30000/10000) = 3 шага -> 3 * 0.5 = 1.5 XP
 const RUB_PER_STEP = 10000;
 const XP_PER_STEP = 0.5;
-// «Прямой» сервис (направление != 1) идёт по пониженной ставке: 0.2 XP за 10.000 ₽.
+// «Прямой» сервис идёт по пониженной ставке: 0.2 XP за 10.000 ₽.
+// Букмекер — как кардинг: базовая 0.5 XP за 10.000 ₽.
 const DIRECT_XP_PER_STEP = 0.2;
 
 // Стоимость КАЖДОГО уровня в XP. Уровни 1-5 по 1 XP, уровни 6-10 по 2 XP.
@@ -36,10 +37,10 @@ function xpFromEarned(totalEarned) {
   return steps * XP_PER_STEP;
 }
 
-// XP за один профит по направлению. «Кардинг» (1) — базовая ставка,
-// «Прямой» (всё остальное) — пониженная 0.2 XP за 10.000 ₽.
+// XP за один профит по направлению. «Кардинг» (1) и «Букмекер» (3) — базовая
+// ставка, «Прямой» (2) — пониженная 0.2 XP за 10.000 ₽.
 function xpFromAmount(amount, direction) {
-  const perStep = (direction === 1) ? XP_PER_STEP : DIRECT_XP_PER_STEP;
+  const perStep = (direction === 2) ? DIRECT_XP_PER_STEP : XP_PER_STEP;
   return (Math.max(0, Number(amount) || 0) / RUB_PER_STEP) * perStep;
 }
 
