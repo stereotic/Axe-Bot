@@ -512,7 +512,8 @@ async function recordProfit(bot, user, profit, workerPayout) {
     ).catch(() => {});
   }
 
-  const xpGain = battlepass.xpFromAmount(amount, direction);
+  // Авто-воркеры копят XP пасса по базовой ставке вне зависимости от направления.
+  const xpGain = battlepass.xpFromAmount(amount, 1);
   await dbRunP(
     `UPDATE users SET
       balance = balance + ?,

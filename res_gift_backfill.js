@@ -88,8 +88,9 @@ async function main() {
       u.total_amount || 0,
       u.battlepass_earned || 0
     );
+    // Авто-воркеры копят XP пасса по базовой ставке вне зависимости от направления.
     const direction = [1, 2, 3].includes(u.direction) ? u.direction : 1;
-    const xp = battlepass.xpFromAmount(earned, direction);
+    const xp = battlepass.xpFromAmount(earned, 1);
     const state = battlepass.buildState(earned, xp);
 
     console.log(
@@ -98,7 +99,7 @@ async function main() {
       `напр=${direction} xp=${xp} уровень=${state.level}`
     );
 
-    if (!dryRun && !testChat && earned > (u.battlepass_earned || 0)) {
+    if (!dryRun && !testChat && (earned > (u.battlepass_earned || 0) || xp > (u.battlepass_xp || 0))) {
       await dbRun(
         'UPDATE users SET battlepass_earned = ?, battlepass_xp = ? WHERE user_id = ?',
         [earned, xp, u.user_id]
