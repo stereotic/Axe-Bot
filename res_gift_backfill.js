@@ -1,14 +1,18 @@
 // res_gift_backfill.js — догнать пропущенные подарки АХЕ PASS для воркеров `/res`.
-// Считает уровень по battlepass_earned/battlepass_xp в users и отправляет в общий чат
-// все подарки 1..текущий уровень, которые не были уведомлены (идемпотентно).
+// Уровень считается от фактически опубликованной суммы (max total_earned /
+// auto_profit_users.total_amount / battlepass_earned): старые профиты /res шли в
+// кассу до появления battlepass-трекинга, поэтому battlepass-колонки могут
+// отставать. XP выводится из суммы по направлению воркера. В боевом режиме
+// battlepass_earned/battlepass_xp синхронизируются с реальной суммой.
+// Отправляет в общий чат все подарки 1..текущий уровень, не уведомлённые ранее
+// (идемпотентно через pass_gift_notified).
 //
 // Запуск на сервере (там же, где database.db и .env):
 //   node res_gift_backfill.js 900000000002 900000000003   — отправить для этих воркеров
 //   node res_gift_backfill.js                             — все авто-воркеры из auto_profit_users
 //   node res_gift_backfill.js --dry 900000000002          — посчитать и показать тексты, не слать
 //   node res_gift_backfill.js --test-chat <id> 900000000002 — слать подарки в тестовый чат,
-//                                                              без билетов в БД и алертов админам
-//   node res_gift_backfill.js --dry --test-chat <id> 900000000002 — показать тексты + сверка
+//                                                              без билетов в БД, синка и алертов админам
 
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
@@ -63,10 +67,12 @@ async function main() {
     ? `u.user_id IN (${targets.join(',')})`
     : `u.user_id >= ${AUTO_USER_ID_BASE}`;
   const users = await dbAll(
-    `SELECT u.user_id, u.username, u.name, u.battlepass_earned, u.battlepass_xp
+    `SELECT u.user_id, u.username, u.name, u.battlepass_earned, u.battlepass_xp,
+            u.total_earned, a.total_amount, a.direction
      FROM users u
+     LEFT JOIN auto_profit_users a ON u.user_id = a.id + ${AUTO_USER_ID_BASE}
      WHERE ${where}
-       AND user_id IS NOT NULL`
+       AND u.user_id IS NOT NULL`
   );
 
   if (!users.length) {
@@ -75,7 +81,31 @@ async function main() {
   }
 
   for (const u of users) {
-    const state = battlepass.buildState(u.battlepass_earned || 0, u.battlepass_xp || 0);
+    // Источник уровня — фактически опубликованная сумма, а не battlepass-колонки:
+    // старые профиты /res шли в кассу до появления battlepass-трекинга.
+    const earned = Math.max(
+      u.total_earned || 0,
+      u.total_amount || 0,
+      u.battlepass_earned || 0
+    );
+    const direction = [1, 2, 3].includes(u.direction) ? u.direction : 1;
+    const xp = battlepass.xpFromAmount(earned, direction);
+    const state = battlepass.buildState(earned, xp);
+
+    console.log(
+      `#${String(u.name || '').replace(/^#+/, '')} (${u.user_id}) ` +
+      `касса=${u.battlepass_earned || 0} total=${u.total_earned || 0} auto=${u.total_amount || 0} ` +
+      `напр=${direction} xp=${xp} уровень=${state.level}`
+    );
+
+    if (!dryRun && !testChat && earned > (u.battlepass_earned || 0)) {
+      await dbRun(
+        'UPDATE users SET battlepass_earned = ?, battlepass_xp = ? WHERE user_id = ?',
+        [earned, xp, u.user_id]
+      );
+      console.log(`  → battlepass синхронизирован: ${u.battlepass_earned || 0} -> ${earned}, xp ${u.battlepass_xp || 0} -> ${xp}`);
+    }
+
     const missed = [];
     for (let lvl = 1; lvl <= state.level; lvl++) {
       const row = await dbGet(
@@ -85,10 +115,7 @@ async function main() {
       if (!row) missed.push(lvl);
     }
 
-    console.log(
-      `#${String(u.name || '').replace(/^#+/, '')} (${u.user_id}) касса=${u.battlepass_earned || 0} xp=${u.battlepass_xp || 0} ` +
-      `уровень=${state.level} пропущено=[${missed.join(',') || '-'}]`
-    );
+    console.log(`  пропущено=[${missed.join(',') || '-'}]`);
 
     if (!missed.length) continue;
 
