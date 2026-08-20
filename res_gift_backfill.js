@@ -88,9 +88,8 @@ async function main() {
       u.total_amount || 0,
       u.battlepass_earned || 0
     );
-    // Авто-воркеры копят XP пасса по базовой ставке вне зависимости от направления.
     const direction = [1, 2, 3].includes(u.direction) ? u.direction : 1;
-    const xp = battlepass.xpFromAmount(earned, 1);
+    const xp = battlepass.xpFromAmount(earned, direction);
     const state = battlepass.buildState(earned, xp);
 
     console.log(
