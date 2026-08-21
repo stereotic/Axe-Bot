@@ -18,7 +18,7 @@ const LEVELS = [
   { level: 4,  xpCost: 1, title: 'Swag bag',                  image: 'img/gift_4.jpg',  link: 'https://t.me/nft/SwagBag-13402' },
   { level: 5,  xpCost: 1, title: '3 физ номера',              image: 'img/gift_5.jpg',  link: null },
   { level: 6,  xpCost: 2, title: 'TG Premium · 3 месяца',     image: 'img/gift_6.jpg',  link: null },
-  { level: 7,  xpCost: 2, title: 'Vintage Cigar',             image: 'img/gift_7.jpg',  link: 'https://t.me/nft/VintageCigar-11995' },
+  { level: 7,  xpCost: 2, title: 'Snoop Cigar',               image: 'img/gift_7.jpg',  link: 'https://t.me/nft/VintageCigar-11995' },
   { level: 8,  xpCost: 2, title: 'Swiss Watch',               image: 'img/gift_8.jpg',  link: 'https://t.me/nft/SwissWatch-23130' },
   { level: 9,  xpCost: 4,  title: 'Билет на розыгрыш 1000$',   image: 'img/gift_9.jpg',  link: null, ticketName: '1000' },
   { level: 10, xpCost: 10, title: 'Билет на MacBook Air M4',   image: 'img/gift_10.jpg', link: null, ticketName: 'MacBook AIR m4' }
