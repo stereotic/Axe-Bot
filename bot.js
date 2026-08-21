@@ -420,6 +420,25 @@ function updateUsername(userId, username) {
   });
 }
 
+// Для профита идентификатор без префикса сначала считается тегом (#Name),
+// а username — только запасным вариантом. Это не даёт @username перехватить
+// начисление, если в базе уже есть одноимённый тег.
+function findWorkerForProfit(identifier, callback) {
+  const worker = String(identifier || '').trim().replace(/^[@#]+/, '');
+  const tag = `#${worker}`.toLowerCase();
+  const username = worker.toLowerCase();
+
+  db.get(
+    `SELECT * FROM users
+     WHERE LOWER(TRIM(COALESCE(name, ''))) = ?
+        OR LOWER(TRIM(COALESCE(username, ''))) = ?
+     ORDER BY CASE WHEN LOWER(TRIM(COALESCE(name, ''))) = ? THEN 0 ELSE 1 END
+     LIMIT 1`,
+    [tag, username, tag],
+    callback
+  );
+}
+
 // Функция форматирования профиля
 function formatProfile(user, topPosition) {
   const status = utils.getStatusByTotal(user.total_earned || 0);
@@ -1873,8 +1892,8 @@ bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
     return;
   }
 
-  // Ищем воркера в базе
-  db.get('SELECT * FROM users WHERE username = ?', [workerUsername], (err, user) => {
+  // Сначала ищем точный тег #..., затем username @...
+  findWorkerForProfit(workerUsername, (err, user) => {
     let workerData;
 
     if (err || !user) {
@@ -1943,9 +1962,8 @@ bot.onText(/^\/(?:[^\s\/]+)\s+(\d+)\s+([123])(?:\s+\(?(\d+)\)?)?$/, (msg) => {
     return;
   }
 
-  const searchUsername = workerName.toLowerCase();
-
-  db.get('SELECT * FROM users WHERE LOWER(username) = ?', [searchUsername], (err, user) => {
+  // Сначала ищем точный тег #..., затем username @...
+  findWorkerForProfit(workerName, (err, user) => {
     let workerData;
 
     if (err || !user) {
