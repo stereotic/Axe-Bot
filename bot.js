@@ -165,7 +165,6 @@ bot.setMyCommands([
   { command: 'materials', description: 'Обучающие материалы' },
   { command: 'top', description: 'Топ воркеров за все время' },
   { command: 'card', description: 'Актуальные реквизиты' },
-  { command: 'cur', description: 'Панель куратора' },
   { command: 'keyboard', description: 'Показать кнопки Меню и Информация' }
 ]).then(() => {
   console.log('✅ Меню команд установлено');
@@ -420,9 +419,8 @@ function updateUsername(userId, username) {
   });
 }
 
-// Для профита идентификатор без префикса сначала считается тегом (#Name),
-// а username — только запасным вариантом. Это не даёт @username перехватить
-// начисление, если в базе уже есть одноимённый тег.
+// В команде профита указывается Telegram username. Тег профиля (#Name)
+// используем только как запасной вариант поиска.
 function findWorkerForProfit(identifier, callback) {
   const worker = String(identifier || '').trim().replace(/^[@#]+/, '');
   const tag = `#${worker}`.toLowerCase();
@@ -432,9 +430,9 @@ function findWorkerForProfit(identifier, callback) {
     `SELECT * FROM users
      WHERE LOWER(TRIM(COALESCE(name, ''))) = ?
         OR LOWER(TRIM(COALESCE(username, ''))) = ?
-     ORDER BY CASE WHEN LOWER(TRIM(COALESCE(name, ''))) = ? THEN 0 ELSE 1 END
+     ORDER BY CASE WHEN LOWER(TRIM(COALESCE(username, ''))) = ? THEN 0 ELSE 1 END
      LIMIT 1`,
-    [tag, username, tag],
+    [tag, username, username],
     callback
   );
 }
@@ -1857,7 +1855,8 @@ function buildPublicText(profit) {
   const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
 
   if (profit.direction === 3) {
-    const worker = String(profit.username || '').replace(/^[@#]+/, '');
+    // В публикации выводим профильный тег, а не Telegram username из команды.
+    const worker = String(profit.name || profit.username || '').replace(/^[@#]+/, '');
     const fmt = Number(profit.amount).toLocaleString('de-DE');
     return `<b>🌸 УСПЕШНЫЙ ПРОФИТ🌸
 
@@ -1892,7 +1891,7 @@ bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
     return;
   }
 
-  // Сначала ищем точный тег #..., затем username @...
+  // Идентификатор команды — Telegram username; тег — только fallback.
   findWorkerForProfit(workerUsername, (err, user) => {
     let workerData;
 
@@ -1962,7 +1961,7 @@ bot.onText(/^\/(?:[^\s\/]+)\s+(\d+)\s+([123])(?:\s+\(?(\d+)\)?)?$/, (msg) => {
     return;
   }
 
-  // Сначала ищем точный тег #..., затем username @...
+  // Идентификатор команды — Telegram username; тег — только fallback.
   findWorkerForProfit(workerName, (err, user) => {
     let workerData;
 
