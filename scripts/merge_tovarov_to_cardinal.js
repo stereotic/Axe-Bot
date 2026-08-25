@@ -47,12 +47,22 @@ async function resolveAccount(key) {
   }
   const tag = `#${String(key).replace(/^[@#]+/, '')}`.toLowerCase();
   const lower = String(key).toLowerCase();
-  return dbGetP(
-    `SELECT * FROM users
-     WHERE LOWER(TRIM(COALESCE(username, ''))) = ? OR LOWER(TRIM(COALESCE(name, ''))) = ?
-     LIMIT 1`,
-    [lower, tag]
+  const rows = await new Promise((res, rej) =>
+    db.all(
+      `SELECT * FROM users
+       WHERE LOWER(TRIM(COALESCE(username, ''))) = ? OR LOWER(TRIM(COALESCE(name, ''))) = ?
+       ORDER BY user_id`,
+      [lower, tag],
+      (err, r) => (err ? rej(err) : res(r || []))
+    )
   );
+  if (rows.length > 1) {
+    console.error(`❌ Ключ «${key}» совпал с несколькими аккаунтами — укажи id явно:`);
+    rows.forEach((r) => console.error(`   ${fmtUser(r)}`));
+    process.exitCode = 1;
+    return null;
+  }
+  return rows[0] || null;
 }
 
 // Таблицы со ссылкой на пользователя — переносим исторические записи тоже.
