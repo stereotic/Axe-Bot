@@ -1,6 +1,7 @@
 const cardSystem = require('./card_system');
 const utils = require('./utils');
 const battlepass = require('./battlepass');
+const statusChats = require('./status_chats');
 const { updatePinnedMessage } = require('./update_pinned');
 const { notifyCuratorOfProfit } = require('./curators');
 
@@ -396,25 +397,46 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
 
         // Обновляем баланс и статистику воркера
         const xpGain = battlepass.xpFromAmount(amount, direction);
-        db.run(`UPDATE users SET
-          balance = balance + ?,
-          total_earned = total_earned + ?,
-          battlepass_earned = COALESCE(battlepass_earned, 0) + ?,
-          battlepass_xp = COALESCE(battlepass_xp, 0) + ?,
-          profit_count = profit_count + 1
-          WHERE user_id = ?`,
-          [workerPayout, amount, amount, xpGain, check.user_id],
-          (err) => {
-            if (err) {
-              console.error('Error updating user:', err);
-            } else {
+        db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [check.user_id], (preErr, preUser) => {
+          const oldPassTotal = (!preErr && preUser) ? (preUser.battlepass_earned || 0) : 0;
+          const oldPassXp = (!preErr && preUser) ? (preUser.battlepass_xp || 0) : 0;
+          const newPassTotal = oldPassTotal + amount;
+          const newPassXp = oldPassXp + xpGain;
+
+          db.run(`UPDATE users SET
+            balance = balance + ?,
+            total_earned = total_earned + ?,
+            battlepass_earned = COALESCE(battlepass_earned, 0) + ?,
+            battlepass_xp = COALESCE(battlepass_xp, 0) + ?,
+            profit_count = profit_count + 1
+            WHERE user_id = ?`,
+            [workerPayout, amount, amount, xpGain, check.user_id],
+            (err) => {
+              if (err) {
+                console.error('Error updating user:', err);
+                return;
+              }
               console.log(`✅ Auto-profit: Updated balance for user ${check.user_id}: +${workerPayout}₽`);
-              utils.updateWorkerStatus(check.user_id, (err) => {
-                if (err) console.error('Error updating status:', err);
+              utils.updateWorkerStatus(check.user_id, (statusErr, newStatus) => {
+                if (!statusErr && newStatus) {
+                  statusChats.sendPendingUnlocks(bot, check.user_id, newStatus);
+                }
+
+                // Личное уведомление воркеру о прогрессе АХЕ PASS — как в ручном пути в bot.js.
+                const oldLevel = battlepass.buildState(oldPassTotal, oldPassXp).level;
+                const state = battlepass.buildState(newPassTotal, newPassXp);
+                const xpText = String(Math.round(xpGain * 100) / 100).replace('.', ',');
+                let passText = `<b><tg-emoji emoji-id="5217822164362739968">👑</tg-emoji>Профит на сумму: ${utils.formatAmount(amount)}₽\nПолучено: ${xpText}xp\nУ вас ${state.level} уровень АХЕ PASS</b>`;
+                if (state.level > oldLevel) {
+                  passText += `\n\n<b>Получите новый подарок! 🎁</b>`;
+                }
+                bot.sendMessage(check.user_id, passText, { parse_mode: 'HTML' }).catch((e) =>
+                  console.error('Error sending pass notification:', e.message)
+                );
               });
             }
-          }
-        );
+          );
+        });
 
         // Отправляем в бухгалтерию
         const accountingText = utils.buildAccountingText({
@@ -434,16 +456,18 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
         // Отправляем в общую кассу и чат
         const workerName = user.name && (user.name.startsWith('@') || user.name.startsWith('#')) ? '#' + user.name.replace(/^[@#]/, '') : '#' + (user.name || user.username);
         const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}`;
-        let publicText = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸
+        const em = utils.profitEmojiSet(amount);
+        const e = utils.tgEmoji;
+        let publicText = `<b>${e(em.header, '🌸')}УСПЕШНЫЙ ПРОФИТ${e(em.header, '🌸')}
 
-<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${directionName}
-┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${workerName}</a>`;
+${e(em.service, '🏠')}Сервис: ${directionName}
+┣${e(em.worker, '👤')}Воркер: <a href="${profileLink}">${workerName}</a>`;
 
         // Добавляем куратора, если он есть и направление = 1 (Кардинг)
         if (direction === 1 && user.curator) {
-          publicText += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(amount)}₽\n┗👨‍🏫Куратор: @${user.curator}</b>`;
+          publicText += `\n┣${e(em.amount, '💸')}Сумма: ${utils.formatAmount(amount)}₽\n┗👨‍🏫Куратор: @${user.curator}</b>`;
         } else {
-          publicText += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(amount)}₽</b>`;
+          publicText += `\n┗${e(em.amount, '💸')}Сумма: ${utils.formatAmount(amount)}₽</b>`;
         }
 
         bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(err => {

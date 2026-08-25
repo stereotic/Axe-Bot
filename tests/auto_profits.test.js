@@ -57,7 +57,8 @@ test('pickNextInterval: в границах заданного диапазон�
 
 test('buildPublicText: формат Букмекера и Кардинга', () => {
   const bk = buildPublicText({ userId: 900000000001, username: 'Психопат', name: '#Психопат', amount: 65544, direction: 3 });
-  assert.ok(bk.startsWith('<b>🌸 УСПЕШНЫЙ ПРОФИТ'));
+  assert.ok(bk.startsWith('<b><tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>УСПЕШНЫЙ ПРОФИТ'), 'заголовок крупного профита');
+  assert.ok(bk.includes('УСПЕШНЫЙ ПРОФИТ<tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>'));
   assert.ok(bk.includes('Букмекер'));
   assert.ok(bk.includes('#Психопат'));
   assert.ok(bk.includes('65.544₽'));
@@ -65,6 +66,9 @@ test('buildPublicText: формат Букмекера и Кардинга', () 
   const kd = buildPublicText({ userId: 900000000001, username: 'Психопат', name: '#Психопат', amount: 12345, direction: 1, directionName: 'Кардинг' });
   assert.ok(kd.includes('Сервис: Кардинг'));
   assert.ok(kd.includes('12.345₽'));
+  // До 50к — малый набор эмодзи
+  assert.ok(kd.includes('5445006366450164917'));
+  assert.ok(!kd.includes('5451767267744328949'));
 
   // Работа воркера в ссылке профиля экранируется
   const evil = buildPublicText({ userId: 900000000001, username: '<b>', name: '#<b>', amount: 1, direction: 3 });

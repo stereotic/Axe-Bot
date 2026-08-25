@@ -277,11 +277,14 @@ function askTarget(bot, chatId, userId, time) {
 }
 
 function sendScheduledRow(bot, row, today) {
+  // Занимаем слот сразу: массовая отправка идёт долго (90мс × получатели),
+  // и без этого 30-секундные тики успевали запустить её повторно.
+  db.run('UPDATE scheduled_broadcasts SET last_sent_date = ? WHERE id = ?', [today, row.id], (err) => {
+    if (err) console.error('[rass] error updating last_sent_date:', err);
+  });
+
   const done = (success, fail) => {
     console.log(`[rass] ${row.time} → ${row.target === 'all' ? 'всем' : row.target}: ok=${success}, fail=${fail}`);
-    db.run('UPDATE scheduled_broadcasts SET last_sent_date = ? WHERE id = ?', [today, row.id], (err) => {
-      if (err) console.error('[rass] error updating last_sent_date:', err);
-    });
   };
 
   if (row.target && row.target !== 'all') {
@@ -313,14 +316,32 @@ function sendScheduledRow(bot, row, today) {
   });
 }
 
+// Окно «догоняющей» отправки: если точный тик пропущен (перезапуск бота,
+// блокировка цикла), рассылка уйдёт с опозданием до RASS_GRACE_MIN минут.
+const RASS_GRACE_MIN = 60;
+
+function hmToMinutes(hm) {
+  const [h, m] = String(hm).split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
 function checkScheduledBroadcasts(bot) {
   const { hm, today } = moscowTimeParts();
-  if (!RASS_TIMES.includes(hm)) return;
+  const nowMin = hmToMinutes(hm);
 
-  db.all('SELECT * FROM scheduled_broadcasts WHERE time = ?', [hm], (err, rows) => {
-    if (err || !rows || rows.length === 0) return;
+  db.all('SELECT * FROM scheduled_broadcasts', (err, rows) => {
+    if (err || !rows || !rows.length) return;
     rows.forEach(row => {
+      if (!RASS_TIMES.includes(row.time)) return;
+      if (!row.content_type) return;
       if (row.last_sent_date === today) return;
+
+      // Не «минута в минуту», а окно: слот считается наступившим и не
+      // пропускается, если тик на точной минуте был пропущен.
+      const delayMin = nowMin - hmToMinutes(row.time);
+      if (delayMin < 0 || delayMin > RASS_GRACE_MIN) return;
+      if (delayMin > 0) console.log(`[rass] ${row.time} догоняющая отправка (+${delayMin} мин)`);
+
       sendScheduledRow(bot, row, today);
     });
   });

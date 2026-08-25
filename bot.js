@@ -21,7 +21,7 @@ const statusChats = require('./status_chats');
 const { setupEpicbetProfits } = require('./epicbet_profits');
 const guard = require('./guard');
 const perf = require('./perf');
-const { parseProfitText, parseProfitCommand } = require('./profit_parser');
+const { parseProfitText, parseProfitMention, parseProfitCommand } = require('./profit_parser');
 const { acquire: acquireSingleInstance } = require('./single_instance');
 const { mentors, getMentorByIndex, getMentorByUsername, resolveMentorChatId, notifyCuratorOfProfit } = require('./curators');
 const { setupAutoProfits, cancelAutoFlow, AUTO_USER_ID_BASE } = require('./auto_profits');
@@ -418,6 +418,10 @@ function updateUsername(userId, username) {
     }
   });
 }
+
+// Граница «фейковых» аккаунтов: реальные Telegram id её никогда не достигают.
+// Рисованые пользователи (Date.now()-id и авто-воркеры 900000000000+) живут выше неё.
+const FAKE_USER_ID_MIN = 10000000000;
 
 // В команде профита указывается Telegram username. Тег профиля (#Name)
 // используем только как запасной вариант поиска.
@@ -1851,151 +1855,141 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // Публичный текст «Касса/Чат»: Букмекер — как раньше, остальные направления — общий формат.
+// Набор премиум-эмодзи зависит от суммы: до 50к один, свыше — другой.
 function buildPublicText(profit) {
   const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
+  const em = utils.profitEmojiSet(profit.amount);
+  const e = utils.tgEmoji;
 
   if (profit.direction === 3) {
     // В публикации выводим профильный тег, а не Telegram username из команды.
     const worker = String(profit.name || profit.username || '').replace(/^[@#]+/, '');
     const fmt = Number(profit.amount).toLocaleString('de-DE');
-    return `<b>🌸 УСПЕШНЫЙ ПРОФИТ🌸
+    return `<b>${e(em.header, '🌸')}УСПЕШНЫЙ ПРОФИТ${e(em.header, '🌸')}
 
-<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: Букмекер
-┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">#${worker}</a>
-┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${fmt}₽</b>`;
+${e(em.service, '🏠')}Сервис: Букмекер
+┣${e(em.worker, '👤')}Воркер: <a href="${profileLink}">#${worker}</a>
+┗${e(em.amount, '💸')}Сумма: ${fmt}₽</b>`;
   }
 
-  let text = `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
+  let text = `<b>${e(em.header, '🌸')}УСПЕШНЫЙ ПРОФИТ${e(em.header, '🌸')}${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
-<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
-┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">${profit.name}</a>`;
+${e(em.service, '🏠')}Сервис: ${profit.directionName}
+┣${e(em.worker, '👤')}Воркер: <a href="${profileLink}">${profit.name}</a>`;
   if (profit.direction === 1 && profit.curator) {
-    text += `\n┣<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
+    text += `\n┣${e(em.amount, '💸')}Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
   } else {
-    text += `\n┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
+    text += `\n┗${e(em.amount, '💸')}Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
   }
   return text;
 }
 
-// Команда для публикации профита: username сумма направление (для всех пользователей)
-bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
-  const chatId = msg.chat.id;
-  const userId = msg.from.id;
-  const parsed = parseProfitText(msg.text);
-  if (!parsed) return;
-
-  const { username: workerUsername, amount, direction, mammothCount } = parsed;
-
+// Общая сборка «нарисованного» профита: воркер не ищется в БД,
+// данные временные — пользователь будет создан при отправке (user_id = 0).
+function prepareDrawProfit(chatId, { username: workerUsername, amount, direction, mammothCount }) {
   if (!workerUsername || !amount || ![1, 2, 3].includes(direction)) {
     bot.sendMessage(chatId, '❌ Неверный формат. Используйте: username сумма направление\nПример: richvladwork 10000 1');
     return;
   }
 
-  // Идентификатор команды — Telegram username; тег — только fallback.
-  findWorkerForProfit(workerUsername, (err, user) => {
-    let workerData;
+  const workerData = {
+    user_id: 0, // Временный ID
+    username: workerUsername,
+    name: `#${workerUsername}`
+  };
 
-    if (err || !user) {
-      // Если воркер не найден в базе - создаем временные данные
-      workerData = {
-        user_id: 0, // Временный ID
-        username: workerUsername,
-        name: `#${workerUsername}`
-      };
-    } else {
-      workerData = user;
-    }
+  const displayName = workerData.name && (workerData.name.startsWith('@') || workerData.name.startsWith('#'))
+    ? '#' + workerData.name.replace(/^[@#]/, '')
+    : '#' + (workerData.name || workerData.username);
 
-    // Normalize name — ensure # prefix
-    const displayName = workerData.name && (workerData.name.startsWith('@') || workerData.name.startsWith('#'))
-      ? '#' + workerData.name.replace(/^[@#]/, '')
-      : '#' + (workerData.name || workerData.username);
+  const workerPayout = utils.calculateWorkerPayout(amount, direction);
+  const shares = utils.calculateProfitShares(amount);
+  const directionName = utils.getDirectionName(direction);
 
-    // Рассчитываем суммы
-    const workerPayout = utils.calculateWorkerPayout(amount, direction);
-    const shares = utils.calculateProfitShares(amount);
-    const directionName = utils.getDirectionName(direction);
+  const profitId = `${workerData.user_id}_${Date.now()}`;
+  profitData[profitId] = {
+    userId: workerData.user_id,
+    username: workerData.username,
+    name: displayName,
+    amount: amount,
+    workerPayout: workerPayout,
+    direction: direction,
+    directionName: directionName,
+    shares: shares,
+    curator: null,
+    percent: null,
+    isRegistered: false,
+    mammothCount: mammothCount
+  };
 
-    // Сохраняем данные для подтверждения
-    const profitId = `${workerData.user_id}_${Date.now()}`;
-    profitData[profitId] = {
-      userId: workerData.user_id,
-      username: workerData.username,
-      name: displayName,
-      amount: amount,
-      workerPayout: workerPayout,
-      direction: direction,
-      directionName: directionName,
-      shares: shares,
-      curator: user ? user.curator : null, // Добавляем куратора
-      percent: user ? user.percent : null,
-      isRegistered: !!user, // Флаг - зарегистрирован ли воркер
-      mammothCount: mammothCount
-    };
+  const accountingText = utils.buildAccountingText(profitData[profitId]);
 
-    // Формируем сообщение для бухгалтерии
-    const accountingText = utils.buildAccountingText(profitData[profitId]);
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: 'Отправить', callback_data: `send_profit_accounting_${profitId}` }]
+    ]
+  };
 
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: 'Отправить', callback_data: `send_profit_accounting_${profitId}` }]
-      ]
-    };
+  bot.sendMessage(chatId, accountingText, { parse_mode: 'HTML', reply_markup: keyboard });
+}
 
-    bot.sendMessage(chatId, accountingText, { parse_mode: 'HTML', reply_markup: keyboard });
-  });
+// Нарисованный профит без префикса: username сумма направление (для всех пользователей)
+bot.onText(/^(?!\/)[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
+  const parsed = parseProfitText(msg.text);
+  if (!parsed) return;
+  prepareDrawProfit(msg.chat.id, parsed);
   return true; // Предотвращаем дальнейшую обработку
 });
 
-// Команда для публикации профита: /name сумма направление (например /richvladwork 5000 1)
+// Нарисованный профит со слышом: /name сумма направление (например /richvladwork 5000 1)
 bot.onText(/^\/(?:[^\s\/]+)\s+(\d+)\s+([123])(?:\s+\(?(\d+)\)?)?$/, (msg) => {
-  const chatId = msg.chat.id;
-  const userId = msg.from.id;
   const parsed = parseProfitCommand(msg.text);
+  if (!parsed) return;
+  prepareDrawProfit(msg.chat.id, parsed);
+  return true;
+});
+
+// Реальный профит по @: @username сумма направление — только существующий пользователь из БД.
+bot.onText(/^@[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
+  const chatId = msg.chat.id;
+  const parsed = parseProfitMention(msg.text);
   if (!parsed) return;
 
   const { username: workerName, amount, direction, mammothCount } = parsed;
 
   if (!workerName || !amount || ![1, 2, 3].includes(direction)) {
-    bot.sendMessage(chatId, '❌ Неверный формат. Используйте: /name сумма направление\nПример: /richvladwork 5000 1');
+    bot.sendMessage(chatId, '❌ Неверный формат. Используйте: @username сумма направление\nПример: @richvladwork 5000 1');
     return;
   }
 
   // Идентификатор команды — Telegram username; тег — только fallback.
   findWorkerForProfit(workerName, (err, user) => {
-    let workerData;
-
     if (err || !user) {
-      workerData = {
-        user_id: 0,
-        username: workerName,
-        name: `#${workerName}`
-      };
-    } else {
-      workerData = user;
+      bot.sendMessage(chatId, `❌ Воркер @${workerName} не найден в базе.\nРеальный профит можно вбить только для зарегистрированного пользователя.\nДля рисованого профита: ${workerName} ${amount} ${direction}`);
+      return;
     }
 
-    const displayName = workerData.name && (workerData.name.startsWith('@') || workerData.name.startsWith('#'))
-      ? '#' + workerData.name.replace(/^[@#]/, '')
-      : '#' + (workerData.name || workerData.username);
+    const displayName = user.name && (user.name.startsWith('@') || user.name.startsWith('#'))
+      ? '#' + user.name.replace(/^[@#]/, '')
+      : '#' + (user.name || user.username);
 
     const workerPayout = utils.calculateWorkerPayout(amount, direction);
     const shares = utils.calculateProfitShares(amount);
     const directionName = utils.getDirectionName(direction);
 
-    const profitId = `${workerData.user_id}_${Date.now()}`;
+    const profitId = `${user.user_id}_${Date.now()}`;
     profitData[profitId] = {
-      userId: workerData.user_id,
-      username: workerData.username,
+      userId: user.user_id,
+      username: user.username,
       name: displayName,
       amount: amount,
       workerPayout: workerPayout,
       direction: direction,
       directionName: directionName,
       shares: shares,
-      curator: user ? user.curator : null,
-      percent: user ? user.percent : null,
-      isRegistered: !!user,
+      curator: user.curator || null,
+      percent: user.percent || null,
+      isRegistered: true,
       mammothCount: mammothCount
     };
 
@@ -2340,7 +2334,10 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
         saveProfitAndUpdateUser(profit.userId);
         showCombinedKeyboard();
       } else {
-        db.get('SELECT user_id FROM users WHERE username = ?', [profit.username], (err, existingUser) => {
+        // Рисованый профит: переиспользуем только ранее созданный фейковый
+        // аккаунт (id выше FAKE_USER_ID_MIN). Реальные пользователи не
+        // затрагиваются — их пасс и баланс считаются только через @-команду.
+        db.get('SELECT user_id FROM users WHERE username = ? AND user_id > ?', [profit.username, FAKE_USER_ID_MIN], (err, existingUser) => {
           if (existingUser) {
             profit.userId = existingUser.user_id;
             saveProfitAndUpdateUser(existingUser.user_id);

@@ -10,12 +10,16 @@ const KNOWN_COMMANDS = [
   'ban', 'updatepin', 'sendkeyboard', 'chatid', 'rass', 'bb', 'cur'
 ];
 
-// Формат без слэша: username сумма направление (мамонт) — «richvladwork 10000 1»
+// Формат «нарисованного» профита без слэша: username сумма направление (мамонт) — «richvladwork 10000 1»
+// Префикс @ запрещён: он зарезервирован под реального пользователя.
 // Направления: 1 — Кардинг, 2 — Прямой, 3 — Букмекер.
-const TEXT_RE = /^(?!\/)([^\s]+)\s+(\d+)₽?\s+([123])(?:\s+\(?(\d+)\)?)?$/;
+const TEXT_RE = /^(?!\/|@)([^\s@]+)\s+(\d+)₽?\s+([123])(?:\s+\(?(\d+)\)?)?$/;
 
 // Формат со слышом: /username сумма направление (мамонт) — «/richvladwork 5000 1»
-const COMMAND_RE = /^\/([^\s]+)\s+(\d+)\s+([123])(?:\s+\(?(\d+)\)?)?$/;
+const COMMAND_RE = /^\/(?!@)([^\s]+)\s+(\d+)\s+([123])(?:\s+\(?(\d+)\)?)?$/;
+
+// Формат реального пользователя: @username сумма направление (мамонт) — «@richvladwork 5000 1»
+const MENTION_RE = /^@([^\s@]+)\s+(\d+)₽?\s+([123])(?:\s+\(?(\d+)\)?)?$/;
 
 function parseProfitText(text) {
   if (typeof text !== 'string') return null;
@@ -23,6 +27,18 @@ function parseProfitText(text) {
   if (!m) return null;
   return {
     username: m[1].replace(/^\/+/, '').replace(/@.+$/, ''),
+    amount: parseInt(m[2], 10),
+    direction: parseInt(m[3], 10),
+    mammothCount: m[4] ? parseInt(m[4], 10) : null
+  };
+}
+
+function parseProfitMention(text) {
+  if (typeof text !== 'string') return null;
+  const m = text.match(MENTION_RE);
+  if (!m) return null;
+  return {
+    username: m[1],
     amount: parseInt(m[2], 10),
     direction: parseInt(m[3], 10),
     mammothCount: m[4] ? parseInt(m[4], 10) : null
@@ -49,5 +65,6 @@ function parseProfitCommand(text) {
 module.exports = {
   KNOWN_COMMANDS,
   parseProfitText,
+  parseProfitMention,
   parseProfitCommand
 };

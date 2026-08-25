@@ -4,6 +4,7 @@ const assert = require('node:assert');
 const {
   KNOWN_COMMANDS,
   parseProfitText,
+  parseProfitMention,
   parseProfitCommand
 } = require('../profit_parser');
 
@@ -65,4 +66,27 @@ test('parseProfitCommand: суффикс @Bot не влияет на распо�
 
 test('parseProfitCommand: мамонт в скобках', () => {
   assert.deepStrictEqual(parseProfitCommand('/worker 5000 2 (4)'), { username: 'worker', amount: 5000, direction: 2, mammothCount: 4 });
+});
+
+test('parseProfitText: @-формат не парсится как рисованый', () => {
+  assert.strictEqual(parseProfitText('@worker 5000 1'), null);
+});
+
+test('parseProfitMention: базовый формат с @', () => {
+  assert.deepStrictEqual(parseProfitMention('@richvladwork 5000 1'), { username: 'richvladwork', amount: 5000, direction: 1, mammothCount: null });
+});
+
+test('parseProfitMention: сумма с ₽ и мамонт в скобках', () => {
+  assert.deepStrictEqual(parseProfitMention('@worker 5000₽ 2 (3)'), { username: 'worker', amount: 5000, direction: 2, mammothCount: 3 });
+});
+
+test('parseProfitMention: без @ не парсится', () => {
+  assert.strictEqual(parseProfitMention('worker 5000 1'), null);
+  assert.strictEqual(parseProfitMention('/worker 5000 1'), null);
+});
+
+test('parseProfitMention: неверный формат возвращает null', () => {
+  assert.strictEqual(parseProfitMention('@worker 100 4'), null);
+  assert.strictEqual(parseProfitMention('@worker abc 1'), null);
+  assert.strictEqual(parseProfitMention(null), null);
 });

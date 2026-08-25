@@ -351,8 +351,16 @@ db.serialize(() => {
     total_amount INTEGER DEFAULT 0,
     profit_count INTEGER DEFAULT 0,
     last_profit_at INTEGER,
+    amounts_pos INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+
+  // Позиция очереди сумм для авто-публикации (для старых БД)
+  db.run(`ALTER TABLE auto_profit_users ADD COLUMN amounts_pos INTEGER DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding amounts_pos to auto_profit_users:', err);
+    }
+  });
 
   db.run(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_users_application_approved ON users(application_approved)`);

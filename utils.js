@@ -249,6 +249,31 @@ function buildAccountingText({ direction, directionName, username, amount, worke
 // Общий чат проекта — эталон членства: юзер, состоящий в нём, считается зарегистрированным.
 const MEMBER_CHAT_ID = '-1003986505552';
 
+// Премиум-эмодзи публикации профита: до 50к — один набор, свыше — другой.
+const PROFIT_EMOJI_THRESHOLD = 50000;
+const PROFIT_EMOJI_SETS = {
+  small: {
+    header: '5444984118519573636',
+    service: '5445006366450164917',
+    worker: '5445214049593766654',
+    amount: '5445152270784178138'
+  },
+  large: {
+    header: '5444984118519573636',
+    service: '5451767267744328949',
+    worker: '5451735570885680691',
+    amount: '5451805523018033441'
+  }
+};
+
+function profitEmojiSet(amount) {
+  return Number(amount) > PROFIT_EMOJI_THRESHOLD ? PROFIT_EMOJI_SETS.large : PROFIT_EMOJI_SETS.small;
+}
+
+function tgEmoji(id, fallback) {
+  return `<tg-emoji emoji-id="${id}">${fallback}</tg-emoji>`;
+}
+
 function isSubscribedChatMember(member) {
   if (!member) return false;
   if (['member', 'administrator', 'creator'].includes(member.status)) return true;
@@ -302,6 +327,8 @@ module.exports = {
   topExclusionWhere,
   formatAmount,
   buildAccountingText,
+  profitEmojiSet,
+  tgEmoji,
   isSubscribedChatMember,
   ensureMemberAccess
 };

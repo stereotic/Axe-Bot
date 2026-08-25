@@ -117,23 +117,26 @@ function pickNextInterval(user) {
 }
 
 // Публичный текст «Касса/Чат» — тот же формат, что в bot.js buildPublicText.
+// Набор премиум-эмодзи зависит от суммы: до 50к один, свыше — другой.
 function buildPublicText(profit) {
   const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${profit.userId}`;
   const worker = plainName(profit.username || profit.name);
+  const em = utils.profitEmojiSet(profit.amount);
+  const e = utils.tgEmoji;
 
   if (profit.direction === 3) {
-    return `<b>🌸 УСПЕШНЫЙ ПРОФИТ🌸
+    return `<b>${e(em.header, '🌸')}УСПЕШНЫЙ ПРОФИТ${e(em.header, '🌸')}
 
-<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: Букмекер
-┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">#${escapeHtml(worker)}</a>
-┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${fmt(profit.amount)}₽</b>`;
+${e(em.service, '🏠')}Сервис: Букмекер
+┣${e(em.worker, '👤')}Воркер: <a href="${profileLink}">#${escapeHtml(worker)}</a>
+┗${e(em.amount, '💸')}Сумма: ${fmt(profit.amount)}₽</b>`;
   }
 
-  return `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸
+  return `<b>${e(em.header, '🌸')}УСПЕШНЫЙ ПРОФИТ${e(em.header, '🌸')}
 
-<tg-emoji emoji-id="5287744906251510022">🏠</tg-emoji>Сервис: ${profit.directionName}
-┣<tg-emoji emoji-id="5936017305585586269">👤</tg-emoji>Воркер: <a href="${profileLink}">#${escapeHtml(worker)}</a>
-┗<tg-emoji emoji-id="5769403330761593044">💸</tg-emoji>Сумма: ${fmt(profit.amount)}₽</b>`;
+${e(em.service, '🏠')}Сервис: ${profit.directionName}
+┣${e(em.worker, '👤')}Воркер: <a href="${profileLink}">#${escapeHtml(worker)}</a>
+┗${e(em.amount, '💸')}Сумма: ${fmt(profit.amount)}₽</b>`;
 }
 
 function editOrSend(bot, chatId, messageId, text, opts = {}) {
@@ -416,7 +419,7 @@ function handleEditText(bot, chatId, userId, msg) {
       bot.sendMessage(chatId, '❌ Суммы числами через пробел.').catch(() => {});
       return;
     }
-    apply('amounts = ?', [amounts.join(' ')], '✅ Суммы обновлены.');
+    apply('amounts = ?, amounts_pos = 0', [amounts.join(' ')], '✅ Суммы обновлены. Публикация начнётся с первой суммы.');
     return;
   }
 
@@ -554,7 +557,10 @@ async function publishProfit(bot, user) {
   publishing.add(user.id);
   try {
     const amounts = parseAmounts(user.amounts) || [5000];
-    const amount = amounts[Math.floor(Math.random() * amounts.length)];
+    // Суммы публикуются по очереди, каждая по одному разу за цикл.
+    const pos = user.amounts_pos || 0;
+    const amount = amounts[pos % amounts.length];
+    const nextPos = (pos + 1) % amounts.length;
     const direction = user.direction || 1;
     const worker = plainName(user.name);
     const userId = AUTO_USER_ID_BASE + user.id;
@@ -594,8 +600,8 @@ async function publishProfit(bot, user) {
     await recordProfit(bot, user, profit, workerPayout);
 
     await dbRunP(
-      'UPDATE auto_profit_users SET total_amount = total_amount + ?, profit_count = profit_count + 1, last_profit_at = ? WHERE id = ?',
-      [amount, Date.now(), user.id]
+      'UPDATE auto_profit_users SET total_amount = total_amount + ?, profit_count = profit_count + 1, last_profit_at = ?, amounts_pos = ? WHERE id = ?',
+      [amount, Date.now(), nextPos, user.id]
     ).catch((err) => console.error('[ap] update stats:', err.message));
 
     console.log(`[ap] ${worker} +${amount}₽ → в БД, касса и чат`);

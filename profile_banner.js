@@ -289,12 +289,16 @@ async function fetchBuffer(url, attempts = 2) {
 
 const avatarCache = new Map();
 const AVATAR_CACHE_TTL = 300000;
+// При сбое загрузки не считаем аватарку «отсутствующей»: повторная попытка
+// уже через полминуты, а до неё отдаём прошлый удачный буфер, если был.
+const AVATAR_RETRY_TTL = 30000;
 
 async function getTelegramAvatarBuffer(bot, userId) {
   if (!bot || !userId) return null;
 
   const cached = avatarCache.get(userId);
-  if (cached && Date.now() - cached.timestamp < AVATAR_CACHE_TTL) {
+  const ttl = cached && cached.buffer ? AVATAR_CACHE_TTL : AVATAR_RETRY_TTL;
+  if (cached && Date.now() - cached.timestamp < ttl) {
     return cached.buffer;
   }
 
@@ -302,16 +306,20 @@ async function getTelegramAvatarBuffer(bot, userId) {
     const photos = await bot.getUserProfilePhotos(userId, { limit: 1 });
     const photoSizes = photos.photos?.[0];
     if (!photoSizes || photoSizes.length === 0) {
+      // У пользователя действительно нет аватарки — кэшируем надолго.
       avatarCache.set(userId, { buffer: null, timestamp: Date.now() });
       return null;
     }
 
     const fileUrl = await bot.getFileLink(photoSizes[photoSizes.length - 1].file_id);
-    const buffer = await fetchBuffer(fileUrl);
+    const buffer = await fetchBuffer(fileUrl, 3);
     avatarCache.set(userId, { buffer, timestamp: Date.now() });
     return buffer;
   } catch (error) {
+    // Временный сбой (сеть, рейт-лимит, 403 на один запрос): показываем
+    // прошлую удачную аватарку вместо фолбэка и пробуем снова позже.
     console.error(`Avatar loading failed for user ${userId}:`, error.message);
+    if (cached && cached.buffer) return cached.buffer;
     avatarCache.set(userId, { buffer: null, timestamp: Date.now() });
     return null;
   }
