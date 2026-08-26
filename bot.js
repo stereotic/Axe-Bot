@@ -1884,7 +1884,8 @@ ${e(em.service, '🏠')}Сервис: ${profit.directionName}
   return text;
 }
 
-// Общая сборка «нарисованного» профита: воркер не ищется в БД,
+// Общая сборка «нарисованного» профита. Воркер ищется по username:
+// если найден — берём его профиль (реальный id и тег #Name), иначе
 // данные временные — пользователь будет создан при отправке (user_id = 0).
 function prepareDrawProfit(chatId, { username: workerUsername, amount, direction, mammothCount }) {
   if (!workerUsername || !amount || ![1, 2, 3].includes(direction)) {
@@ -1892,45 +1893,55 @@ function prepareDrawProfit(chatId, { username: workerUsername, amount, direction
     return;
   }
 
-  const workerData = {
-    user_id: 0, // Временный ID
-    username: workerUsername,
-    name: `#${workerUsername}`
-  };
+  // Идентификатор команды — Telegram username; тег — только fallback.
+  findWorkerForProfit(workerUsername, (err, user) => {
+    let workerData;
 
-  const displayName = workerData.name && (workerData.name.startsWith('@') || workerData.name.startsWith('#'))
-    ? '#' + workerData.name.replace(/^[@#]/, '')
-    : '#' + (workerData.name || workerData.username);
+    if (err || !user) {
+      // Если воркер не найден в базе - создаем временные данные
+      workerData = {
+        user_id: 0, // Временный ID
+        username: workerUsername,
+        name: `#${workerUsername}`
+      };
+    } else {
+      workerData = user;
+    }
 
-  const workerPayout = utils.calculateWorkerPayout(amount, direction);
-  const shares = utils.calculateProfitShares(amount);
-  const directionName = utils.getDirectionName(direction);
+    const displayName = workerData.name && (workerData.name.startsWith('@') || workerData.name.startsWith('#'))
+      ? '#' + workerData.name.replace(/^[@#]/, '')
+      : '#' + (workerData.name || workerData.username);
 
-  const profitId = `${workerData.user_id}_${Date.now()}`;
-  profitData[profitId] = {
-    userId: workerData.user_id,
-    username: workerData.username,
-    name: displayName,
-    amount: amount,
-    workerPayout: workerPayout,
-    direction: direction,
-    directionName: directionName,
-    shares: shares,
-    curator: null,
-    percent: null,
-    isRegistered: false,
-    mammothCount: mammothCount
-  };
+    const workerPayout = utils.calculateWorkerPayout(amount, direction);
+    const shares = utils.calculateProfitShares(amount);
+    const directionName = utils.getDirectionName(direction);
 
-  const accountingText = utils.buildAccountingText(profitData[profitId]);
+    const profitId = `${workerData.user_id}_${Date.now()}`;
+    profitData[profitId] = {
+      userId: workerData.user_id,
+      username: workerData.username,
+      name: displayName,
+      amount: amount,
+      workerPayout: workerPayout,
+      direction: direction,
+      directionName: directionName,
+      shares: shares,
+      curator: user ? user.curator : null,
+      percent: user ? user.percent : null,
+      isRegistered: !!user,
+      mammothCount: mammothCount
+    };
 
-  const keyboard = {
-    inline_keyboard: [
-      [{ text: 'Отправить', callback_data: `send_profit_accounting_${profitId}` }]
-    ]
-  };
+    const accountingText = utils.buildAccountingText(profitData[profitId]);
 
-  bot.sendMessage(chatId, accountingText, { parse_mode: 'HTML', reply_markup: keyboard });
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: 'Отправить', callback_data: `send_profit_accounting_${profitId}` }]
+      ]
+    };
+
+    bot.sendMessage(chatId, accountingText, { parse_mode: 'HTML', reply_markup: keyboard });
+  });
 }
 
 // Нарисованный профит без префикса: username сумма направление (для всех пользователей)
@@ -2337,7 +2348,7 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
         // Рисованый профит: переиспользуем только ранее созданный фейковый
         // аккаунт (id выше FAKE_USER_ID_MIN). Реальные пользователи не
         // затрагиваются — их пасс и баланс считаются только через @-команду.
-        db.get('SELECT user_id FROM users WHERE username = ? AND user_id > ?', [profit.username, FAKE_USER_ID_MIN], (err, existingUser) => {
+        db.get('SELECT user_id FROM users WHERE LOWER(TRIM(COALESCE(username, \'\'))) = ? AND user_id > ?', [String(profit.username || '').trim().toLowerCase(), FAKE_USER_ID_MIN], (err, existingUser) => {
           if (existingUser) {
             profit.userId = existingUser.user_id;
             saveProfitAndUpdateUser(existingUser.user_id);
