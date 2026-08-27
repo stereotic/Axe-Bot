@@ -2,6 +2,20 @@ const battlepass = require('./battlepass');
 
 const GENERAL_CHAT_ID = '-1003986505552';
 
+// Отправка в общий чат с повтором: вызов Telegram может временно упасть
+// (сетевой сбой/429), а уведомление о подарке не должно теряться.
+function sendGiftToGeneralChat(bot, text, attempt = 1) {
+  return bot.sendMessage(GENERAL_CHAT_ID, text, { parse_mode: 'HTML' }).catch((err) => {
+    if (attempt >= 3) {
+      console.error(`Error sending gift to general chat (attempt ${attempt}):`, err?.message || err);
+      return null;
+    }
+    const delay = attempt * 1000;
+    return new Promise((resolve) => setTimeout(resolve, delay))
+      .then(() => sendGiftToGeneralChat(bot, text, attempt + 1));
+  });
+}
+
 // Генерация номера билета вида #Hd1001 — уникальный в таблице tickets
 function generateTicketNumber(db, callback) {
   const letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -41,8 +55,7 @@ function sendLevelGift(bot, db, adminIds, workerId, workerUsername, workerName, 
 
   const mention = workerUsername ? `@${workerUsername}` : (workerName || 'без имени');
   const chatName = workerName && workerName !== '#' ? workerName : (workerUsername ? `#${workerUsername}` : '#');
-  bot.sendMessage(GENERAL_CHAT_ID, giftChatText(workerUsername, workerName, lvl), { parse_mode: 'HTML' })
-    .catch(() => console.error('Error sending gift to general chat:'));
+  sendGiftToGeneralChat(bot, giftChatText(workerUsername, workerName, lvl));
 
   if (prize.ticketName) {
     generateTicketNumber(db, (err, ticket) => {
@@ -92,4 +105,4 @@ function sendPrizeNotifications(bot, db, adminIds, workerId, workerUsername, wor
   }
 }
 
-module.exports = { sendPrizeNotifications, sendLevelGift, generateTicketNumber, giftChatText };
+module.exports = { sendPrizeNotifications, sendLevelGift, generateTicketNumber, giftChatText, sendGiftToGeneralChat };
