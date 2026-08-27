@@ -3377,7 +3377,7 @@ bot.onText(/\/kassaq(?:@[\w_]+)?(?:\s|$)/, async (msg) => {
     bot.sendMessage(chatId, '❌ Команда доступна только администрации.');
     return;
   }
-  bot.sendMessage(chatId, '💱 Введите курс выплаты (например, 84):');
+  bot.sendMessage(chatId, '💱 Введите курс выплаты:');
   guard.setPendingInput(userId, chatId, (inputMsg) => {
     guard.clearPendingInput(userId);
     const rate = Number(String(inputMsg.text || '').replace(',', '.').trim());
