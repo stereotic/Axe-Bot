@@ -434,9 +434,14 @@ function findWorkerForProfit(identifier, callback) {
     `SELECT * FROM users
      WHERE LOWER(TRIM(COALESCE(name, ''))) = ?
         OR LOWER(TRIM(COALESCE(username, ''))) = ?
-     ORDER BY CASE WHEN LOWER(TRIM(COALESCE(username, ''))) = ? THEN 0 ELSE 1 END
+     ORDER BY CASE
+       WHEN LOWER(TRIM(COALESCE(username, ''))) = ?
+            AND TRIM(COALESCE(name, '')) LIKE '#%' THEN 0
+       WHEN LOWER(TRIM(COALESCE(username, ''))) = ? THEN 1
+       ELSE 2
+     END
      LIMIT 1`,
-    [tag, username, username],
+    [tag, username, username, username],
     callback
   );
 }
