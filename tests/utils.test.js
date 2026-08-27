@@ -9,8 +9,8 @@ test('calculateWorkerPayout: 80% кардинг, 75% прямик, floor', () =>
   assert.strictEqual(utils.calculateWorkerPayout(999, 1), 799);
 });
 
-test('calculateProfitShares: доли 6/4/5/5 от суммы', () => {
-  assert.deepStrictEqual(utils.calculateProfitShares(10000), { owner: 600, admin: 400, investor: 500, coder: 500 });
+test('calculateProfitShares: доли 5/5/3/7 от суммы', () => {
+  assert.deepStrictEqual(utils.calculateProfitShares(10000), { owner: 500, admin: 500, investor: 300, coder: 700 });
 });
 
 test('getStatusByTotal: пороги уровней', () => {

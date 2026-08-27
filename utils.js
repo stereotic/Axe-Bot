@@ -19,10 +19,10 @@ const DIRECTION_PERCENTAGES = {
 
 // Распределение долей
 const PROFIT_SHARES = {
-  owner: 6,
-  admin: 4,
-  investor: 5,
-  coder: 5
+  owner: 5,
+  admin: 5,
+  investor: 3,
+  coder: 7
 };
 
 /**
@@ -207,39 +207,45 @@ function formatAmount(amount) {
 }
 
 // Проценты бухгалтерии Букмекера сверх выплаты воркеру.
-const BOOKMAKER_ACCOUNT_PERCENTAGES = { tp: 5, owner: 15 };
+const BOOKMAKER_ACCOUNT_PERCENTAGES = { tp: 5, owner: 11, investor: 4 };
 
 // Блок бухгалтерии Букмекера: суммы через '.' и только Тп/Владелец.
-function buildBookmakerAccountingText({ username, amount, workerPayout, note = '' }) {
+function buildBookmakerAccountingText({ username, amount, workerPayout, curator, curatorPayout, note = '' }) {
   const fmt = (n) => Number(n).toLocaleString('de-DE');
   const worker = String(username || '').replace(/^@+/, '');
   const tp = Math.floor(Number(amount) * BOOKMAKER_ACCOUNT_PERCENTAGES.tp / 100);
   const owner = Math.floor(Number(amount) * BOOKMAKER_ACCOUNT_PERCENTAGES.owner / 100);
+  const investor = Math.floor(Number(amount) * BOOKMAKER_ACCOUNT_PERCENTAGES.investor / 100);
+  const curatorLine = curator ? `@Куратор: ${fmt(curatorPayout ?? Math.floor(Number(amount) * 20 / 100))}₽\n` : '';
   const body =
+    curatorLine +
     `⚽️ Букмекер\n` +
     `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${worker}\n` +
     `💸Сумма профита: ${fmt(amount)}₽\n` +
     `<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${fmt(workerPayout)}₽\n` +
     `👥 Тп: ${fmt(tp)}₽\n` +
-    `👑Владелец: ${fmt(owner)}₽` +
+    `👑Владелец: ${fmt(owner)}₽\n` +
+    `🍌Инвестор: ${fmt(investor)}₽` +
     (note ? `\n${note}` : '');
   return `<b>${body}</b>`;
 }
 
 // Общий блок бухгалтерии: готовые суммы, а не проценты.
-function buildAccountingText({ direction, directionName, username, amount, workerPayout, shares, note = '' }) {
+function buildAccountingText({ direction, directionName, username, amount, workerPayout, shares, curator, curatorPayout, note = '' }) {
   if (Number(direction) === 3) {
-    return buildBookmakerAccountingText({ username, amount, workerPayout, note });
+    return buildBookmakerAccountingText({ username, amount, workerPayout, curator, curatorPayout, note });
   }
   const fmt = (n) => Number(n).toLocaleString();
   const worker = String(username || '').replace(/^@+/, '');
+  const curatorLine = curator ? `@Куратор: ${fmt(curatorPayout ?? Math.floor(Number(amount) * 20 / 100))}₽\n` : '';
   const body =
     `🚀${directionName}\n` +
     `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${worker}\n` +
     `💸Сумма профита: ${fmt(amount)}₽\n` +
     `<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${fmt(workerPayout)}₽\n` +
+    curatorLine +
     `👑Владелец: ${fmt(shares.owner)}₽\n` +
-    `👔Администратор: ${fmt(shares.admin)}₽\n` +
+    `👾ТП: ${fmt(shares.admin)}₽\n` +
     `🍌Инвестор: ${fmt(shares.investor)}₽\n` +
     `🧑‍💻Кодер: ${fmt(shares.coder)}₽` +
     (note ? `\n${note}` : '');

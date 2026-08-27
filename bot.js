@@ -1917,7 +1917,8 @@ function prepareDrawProfit(chatId, { username: workerUsername, amount, direction
       ? '#' + workerData.name.replace(/^[@#]/, '')
       : '#' + (workerData.name || workerData.username);
 
-    const workerPayout = utils.calculateWorkerPayout(amount, direction);
+    const hasCurator = [1, 3].includes(direction) && user && user.curator;
+    const workerPayout = hasCurator ? Math.floor(amount * (direction === 3 ? 50 : 60) / 100) : utils.calculateWorkerPayout(amount, direction);
     const shares = utils.calculateProfitShares(amount);
     const directionName = utils.getDirectionName(direction);
 
@@ -1932,6 +1933,7 @@ function prepareDrawProfit(chatId, { username: workerUsername, amount, direction
       directionName: directionName,
       shares: shares,
       curator: user ? user.curator : null,
+      curatorPayout: hasCurator ? Math.floor(amount * 20 / 100) : null,
       percent: user ? user.percent : null,
       isRegistered: !!user,
       mammothCount: mammothCount
@@ -1989,7 +1991,8 @@ bot.onText(/^@[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
       ? '#' + user.name.replace(/^[@#]/, '')
       : '#' + (user.name || user.username);
 
-    const workerPayout = utils.calculateWorkerPayout(amount, direction);
+    const hasCurator = [1, 3].includes(direction) && user.curator;
+    const workerPayout = hasCurator ? Math.floor(amount * (direction === 3 ? 50 : 60) / 100) : utils.calculateWorkerPayout(amount, direction);
     const shares = utils.calculateProfitShares(amount);
     const directionName = utils.getDirectionName(direction);
 
@@ -2004,6 +2007,7 @@ bot.onText(/^@[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
       directionName: directionName,
       shares: shares,
       curator: user.curator || null,
+      curatorPayout: hasCurator ? Math.floor(amount * 20 / 100) : null,
       percent: user.percent || null,
       isRegistered: true,
       mammothCount: mammothCount
@@ -3366,6 +3370,38 @@ bot.onText(/\/keyboard/, (msg) => {
 });
 
 // Команда /me
+bot.onText(/\/kassaq(?:@[\w_]+)?(?:\s|$)/, async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  if (!adminIds.includes(userId)) {
+    bot.sendMessage(chatId, '❌ Команда доступна только администрации.');
+    return;
+  }
+  bot.sendMessage(chatId, '💱 Введите курс выплаты (например, 84):');
+  guard.setPendingInput(userId, chatId, (inputMsg) => {
+    guard.clearPendingInput(userId);
+    const rate = Number(String(inputMsg.text || '').replace(',', '.').trim());
+    if (!Number.isFinite(rate) || rate <= 0) {
+      bot.sendMessage(chatId, '❌ Некорректный курс. Введите положительное число.');
+      return;
+    }
+    db.all(`SELECT ps.role, COALESCE(SUM(ps.amount), 0) AS total
+            FROM profit_shares ps
+            JOIN profits p ON p.id = ps.profit_id
+            GROUP BY ps.role`, (err, rows) => {
+      if (err) {
+        bot.sendMessage(chatId, '❌ Не удалось посчитать бухгалтерию.');
+        return;
+      }
+      const totals = Object.fromEntries((rows || []).map((r) => [r.role, Number(r.total) || 0]));
+      const fmt = (n) => Number(n).toLocaleString('ru-RU');
+      const usd = (n) => Math.round(n / rate);
+      const line = (label, key) => `${label} - ${fmt(totals[key] || 0)}₽ ~ ${fmt(usd(totals[key] || 0))}$`;
+      bot.sendMessage(chatId, `<b>📊 Бухгалтерия по профитам\nКурс: ${rate}\n\n${line('Владелец', 'owner')}\n${line('Инвестор', 'investor')}\n${line('ТП', 'admin')}\n${line('Кодер', 'coder')}</b>`, { parse_mode: 'HTML' });
+    });
+  });
+});
+
 bot.onText(/\/me/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
