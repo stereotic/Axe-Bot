@@ -481,8 +481,8 @@ async function ensureUser(userId, worker) {
   if (existing) return;
   await dbRunP(
     `INSERT OR IGNORE INTO users
-      (user_id, username, name, status, balance, total_earned, battlepass_earned, battlepass_xp, profit_count, application_approved)
-     VALUES (?, ?, ?, 'NEW', 0, 0, 0, 0, 0, 1)`,
+      (user_id, username, name, status, balance, total_earned, battlepass_earned, battlepass_xp, profit_count, application_approved, profile_hidden)
+     VALUES (?, ?, ?, 'NEW', 0, 0, 0, 0, 0, 1, 1)`,
     [userId, worker, '#' + worker]
   );
 }

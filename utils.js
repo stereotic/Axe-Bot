@@ -305,7 +305,7 @@ function ensureMemberAccess(bot, userId, contact) {
             );
           } else {
             db.run(
-              'INSERT OR IGNORE INTO users (user_id, username, name, status, application_approved, welcome_keyboard_sent) VALUES (?, ?, ?, ?, 1, 1)',
+              'INSERT OR IGNORE INTO users (user_id, username, name, status, application_approved, welcome_keyboard_sent, profile_hidden) VALUES (?, ?, ?, ?, 1, 1, 1)',
               [userId, username, username || '#', 'NEW'],
               () => resolve(true)
             );

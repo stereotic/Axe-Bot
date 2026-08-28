@@ -15,7 +15,7 @@ db.serialize(() => {
     total_earned INTEGER DEFAULT 0,
     battlepass_earned INTEGER DEFAULT 0,
     profit_count INTEGER DEFAULT 0,
-    profile_hidden INTEGER DEFAULT 0,
+    profile_hidden INTEGER DEFAULT 1,
     curator TEXT,
     percent INTEGER,
     worker_number INTEGER,
@@ -303,6 +303,15 @@ db.serialize(() => {
   db.run(`INSERT OR IGNORE INTO stats (key, value) VALUES ('total_profits', '120')`);
   db.run(`INSERT OR IGNORE INTO stats (key, value) VALUES ('open_date', '03.03.2026')`);
   db.run(`INSERT OR IGNORE INTO stats (key, value) VALUES ('worker_counter', '0')`);
+  // Однократно скрываем профили, существовавшие до включения приватности по умолчанию.
+  db.run(`INSERT OR IGNORE INTO stats (key, value) VALUES ('profiles_hidden_migrated', '0')`);
+  db.get(`SELECT value FROM stats WHERE key = 'profiles_hidden_migrated'`, (migrationErr, migration) => {
+    if (migrationErr || migration?.value === '1') return;
+    db.run(`UPDATE users SET profile_hidden = 1`, (updateErr) => {
+      if (updateErr) console.error('Error hiding existing profiles:', updateErr);
+      db.run(`UPDATE stats SET value = '1' WHERE key = 'profiles_hidden_migrated'`);
+    });
+  });
 
   db.run(`CREATE TABLE IF NOT EXISTS scheduled_broadcasts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
