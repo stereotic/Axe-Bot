@@ -1722,7 +1722,7 @@ bot.onText(/\/start/, (msg) => {
     if (targetUserId >= AUTO_USER_ID_BASE) {
       db.get('SELECT id FROM auto_profit_users WHERE id = ?', [targetUserId - AUTO_USER_ID_BASE], (err, autoRow) => {
         if (!err && autoRow) {
-          bot.sendMessage(chatId, '❌ <b>Аккаунт закрыт</b>', { parse_mode: 'HTML' }).catch(() => {});
+          bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' }).catch(() => {});
           return;
         }
         bot.sendMessage(chatId, '❌ <b>Пользователь скрыл профиль</b>', { parse_mode: 'HTML' }).catch(() => {});
