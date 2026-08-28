@@ -3397,7 +3397,18 @@ bot.onText(/\/kassaq(?:@[\w_]+)?(?:\s|$)/, async (msg) => {
       const fmt = (n) => Number(n).toLocaleString('ru-RU');
       const usd = (n) => Math.round(n / rate);
       const line = (label, key) => `${label} - ${fmt(totals[key] || 0)}₽ ~ ${fmt(usd(totals[key] || 0))}$`;
-      bot.sendMessage(chatId, `<b>📊 Бухгалтерия по профитам\nКурс: ${rate}\n\n${line('Владелец', 'owner')}\n${line('Инвестор', 'investor')}\n${line('ТП', 'admin')}\n${line('Кодер', 'coder')}</b>`, { parse_mode: 'HTML' });
+      db.all(`SELECT direction, COALESCE(SUM(amount), 0) AS amount, COALESCE(SUM(amount_to_pay), 0) AS payout
+              FROM profits GROUP BY direction ORDER BY direction`, (dirErr, directions) => {
+        if (dirErr) {
+          bot.sendMessage(chatId, '❌ Не удалось посчитать направления.');
+          return;
+        }
+        const names = { 1: 'Кардинг', 2: 'Прямой', 3: 'Букмекер' };
+        const directionLines = (directions || []).map((d) =>
+          `<b>🚀${names[d.direction] || 'Другое'}</b>\n💸Сумма профита: ${fmt(d.amount)}₽ ~ ${fmt(usd(d.amount))}$\n💼К выплате: ${fmt(d.payout)}₽ ~ ${fmt(usd(d.payout))}$`
+        ).join('\n\n');
+        bot.sendMessage(chatId, `<b>📊 Бухгалтерия по профитам\nКурс: ${rate}</b>\n\n${directionLines}\n\n<b>${line('Владелец', 'owner')}\n${line('Инвестор', 'investor')}\n${line('ТП', 'admin')}\n${line('Кодер', 'coder')}</b>`, { parse_mode: 'HTML' });
+      });
     });
   });
 });

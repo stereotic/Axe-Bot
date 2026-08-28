@@ -561,6 +561,7 @@ async function publishProfit(bot, user) {
     const pos = user.amounts_pos || 0;
     const amount = amounts[pos % amounts.length];
     const nextPos = (pos + 1) % amounts.length;
+    const completed = pos >= amounts.length - 1;
     const direction = user.direction || 1;
     const worker = plainName(user.name);
     const userId = AUTO_USER_ID_BASE + user.id;
@@ -600,11 +601,12 @@ async function publishProfit(bot, user) {
     await recordProfit(bot, user, profit, workerPayout);
 
     await dbRunP(
-      'UPDATE auto_profit_users SET total_amount = total_amount + ?, profit_count = profit_count + 1, last_profit_at = ?, amounts_pos = ? WHERE id = ?',
-      [amount, Date.now(), nextPos, user.id]
+      'UPDATE auto_profit_users SET total_amount = total_amount + ?, profit_count = profit_count + 1, last_profit_at = ?, amounts_pos = ?, enabled = ? WHERE id = ?',
+      [amount, Date.now(), nextPos, completed ? 0 : 1, user.id]
     ).catch((err) => console.error('[ap] update stats:', err.message));
 
     console.log(`[ap] ${worker} +${amount}₽ → в БД, касса и чат`);
+    if (completed) console.log(`[ap] ${worker}: список сумм завершён, публикация отключена`);
   } catch (err) {
     console.error('[ap] publish error:', err.message);
   } finally {
