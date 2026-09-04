@@ -39,6 +39,15 @@ const ACCOUNTING_CHAT_ID = '-1003606797013'; // Бухгалтерия
 const CASH_CHANNEL_ID = '-1003924744333'; // Общая касса (https://t.me/+euO9gzLMUMFhNmJi)
 const GENERAL_CHAT_ID = '-1003986505552'; // Общий чат
 
+const GROOMING_COMMUNITY = {
+  key: 'grooming',
+  title: 'GROOMING COMMUNITY',
+  creatorId: 7032488691,
+  creatorUsername: '@symphonik_AXE',
+  createdAt: '05.09.2026',
+  chatUrl: 'https://t.me/+EcTOSMKQH9thNTQy'
+};
+
 // Временное хранилище для данных профита
 const profitData = {};
 global.profitData = profitData;
@@ -1243,32 +1252,112 @@ if (fs.existsSync(bookmakerImagePath)) {
 
     case 'community':
       bot.answerCallbackQuery(query.id);
-      const communityImagePath = path.join(__dirname, 'images', 'buy_card.jpg');
-      const communityText = '<b><tg-emoji emoji-id="5260687119092817530">⭐️</tg-emoji>Для создания комьюнити необходимо согласование администрации.\n\nОбратитесь в Feedback</b>';
-
       const communityKeyboard = {
         inline_keyboard: [
-          [{ text: 'Feedback', url: 'https://t.me/FeedbackAXEbot' }],
-          [{ text: 'Назад в меню', callback_data: 'back_to_menu' }]
+          [{ text: 'GROOMING COMMUNITY', icon_custom_emoji_id: '5451767267744328949', callback_data: 'community_grooming' }],
+          [{ text: 'Создать', callback_data: 'create_community' }],
+          [{ text: 'Назад', callback_data: 'back_to_menu' }]
         ]
       };
 
-      if (fs.existsSync(communityImagePath)) {
-        replaceMenuMessage(chatId, messageId, {
-          type: 'photo',
-          imagePath: communityImagePath,
-          caption: communityText,
-          parse_mode: 'HTML',
-          reply_markup: communityKeyboard
-        });
-      } else {
-        replaceMenuMessage(chatId, messageId, {
-          type: 'text',
-          text: communityText,
-          parse_mode: 'HTML',
-          reply_markup: communityKeyboard
-        });
-      }
+      // Telegram не принимает пустой текст, поэтому используем невидимый символ:
+      // пользователь видит только кнопки, как в ТЗ.
+      replaceMenuMessage(chatId, messageId, {
+        type: 'text',
+        text: '\u2060',
+        reply_markup: communityKeyboard
+      });
+      break;
+
+    case 'community_grooming':
+      bot.answerCallbackQuery(query.id);
+      db.get(
+        'SELECT COALESCE(SUM(amount), 0) AS total FROM community_profits WHERE community_key = ?',
+        [GROOMING_COMMUNITY.key],
+        (err, row) => {
+          const cash = err ? 0 : Number(row?.total || 0);
+          const communityText = `<tg-emoji emoji-id="5451845805516302233">🌸</tg-emoji><b>GROOMING COMMUNITY</b>\n<b>— Создано: <i>${GROOMING_COMMUNITY.createdAt}</i></b>\n\n<tg-emoji emoji-id="5445006366450164917">💳</tg-emoji><b>Направление - Кардинг</b>\n\n<blockquote><tg-emoji emoji-id="5449873797052148929">💭</tg-emoji><b>Концепция - Фейк Тима</b></blockquote>\n\n<tg-emoji emoji-id="5445152270784178138">💸</tg-emoji><b>Касса комьюнити: ${utils.formatAmount(cash)}₽</b>\n\n<tg-emoji emoji-id="5451767267744328949">🏛</tg-emoji><b>Создатель: ${GROOMING_COMMUNITY.creatorUsername}</b>`;
+          replaceMenuMessage(chatId, messageId, {
+            type: 'text',
+            text: communityText,
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: 'Вступить', callback_data: 'community_join_grooming' }],
+                [{ text: 'Назад', callback_data: 'community' }]
+              ]
+            }
+          });
+        }
+      );
+      break;
+
+    case 'create_community':
+      bot.answerCallbackQuery(query.id, { text: 'Создание комьюнити скоро будет доступно.' });
+      break;
+
+    case 'community_join_grooming':
+      db.get(
+        'SELECT 1 AS member FROM community_members WHERE community_key = ? AND user_id = ?',
+        [GROOMING_COMMUNITY.key, userId],
+        (memberErr, member) => {
+          if (memberErr) {
+            bot.answerCallbackQuery(query.id, { text: 'Не удалось отправить заявку. Попробуйте ещё раз.' });
+            return;
+          }
+          if (member) {
+            bot.answerCallbackQuery(query.id, { text: 'Вы уже состоите в комьюнити.' });
+            return;
+          }
+
+          db.get(
+            "SELECT status FROM community_join_requests WHERE community_key = ? AND user_id = ?",
+            [GROOMING_COMMUNITY.key, userId],
+            (requestErr, request) => {
+              if (requestErr) {
+                bot.answerCallbackQuery(query.id, { text: 'Не удалось отправить заявку. Попробуйте ещё раз.' });
+                return;
+              }
+              if (request?.status === 'pending') {
+                bot.answerCallbackQuery(query.id, { text: 'Заявка уже отправлена.' });
+                return;
+              }
+
+              db.run(
+                `INSERT INTO community_join_requests (community_key, user_id, status, requested_at, decided_at, decided_by)
+                 VALUES (?, ?, 'pending', CURRENT_TIMESTAMP, NULL, NULL)
+                 ON CONFLICT(community_key, user_id) DO UPDATE SET status = 'pending', requested_at = CURRENT_TIMESTAMP, decided_at = NULL, decided_by = NULL`,
+                [GROOMING_COMMUNITY.key, userId],
+                (saveErr) => {
+                  if (saveErr) {
+                    console.error('Error saving community request:', saveErr);
+                    bot.answerCallbackQuery(query.id, { text: 'Не удалось отправить заявку. Попробуйте ещё раз.' });
+                    return;
+                  }
+
+                  const workerUsername = query.from?.username || '';
+                  const worker = workerUsername ? `@${workerUsername}` : `#${userId}`;
+                  bot.answerCallbackQuery(query.id);
+                  bot.sendMessage(chatId, '<tg-emoji emoji-id="5451947415852589066">📨</tg-emoji><b>Заявка на вступление отправлена создателю комьюнити</b>', { parse_mode: 'HTML' }).catch(() => {});
+                  bot.sendMessage(
+                    GROOMING_COMMUNITY.creatorId,
+                    `<b>Воркер ${worker} подал заявку на вступление в комьюнити.</b>`,
+                    {
+                      parse_mode: 'HTML',
+                      reply_markup: {
+                        inline_keyboard: [[
+                          { text: 'Принять', callback_data: `community_request_approve_${userId}` },
+                          { text: 'Отклонить', callback_data: `community_request_reject_${userId}` }
+                        ]]
+                      }
+                    }
+                  ).catch((notifyErr) => console.error('Error notifying community creator:', notifyErr));
+                }
+              );
+            }
+          );
+        }
+      );
       break;
 
     case 'feedback':
@@ -2195,6 +2284,65 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
 
   // Обновляем username пользователя при каждом callback
   updateUsername(userId, username);
+
+  // Решение по заявке доступно только создателю GROOMING COMMUNITY.
+  // Обрабатываем до проверки обычных защищённых меню: создатель может открыть
+  // кнопку из личного сообщения бота, а не из основного меню.
+  const communityDecision = data.match(/^community_request_(approve|reject)_(\d+)$/);
+  if (communityDecision) {
+    const [, action, applicantIdText] = communityDecision;
+    const applicantId = Number(applicantIdText);
+    if (userId !== GROOMING_COMMUNITY.creatorId) {
+      bot.answerCallbackQuery(query.id, { text: 'Решение доступно только создателю комьюнити.', show_alert: true });
+      return;
+    }
+
+    const approved = action === 'approve';
+    db.run(
+      `UPDATE community_join_requests
+       SET status = ?, decided_at = CURRENT_TIMESTAMP, decided_by = ?
+       WHERE community_key = ? AND user_id = ? AND status = 'pending'`,
+      [approved ? 'approved' : 'rejected', userId, GROOMING_COMMUNITY.key, applicantId],
+      function(decisionErr) {
+        if (decisionErr) {
+          console.error('Error deciding community request:', decisionErr);
+          bot.answerCallbackQuery(query.id, { text: 'Не удалось обработать заявку.' });
+          return;
+        }
+        if (!this.changes) {
+          bot.answerCallbackQuery(query.id, { text: 'Заявка уже обработана.' });
+          return;
+        }
+
+        const applicantText = approved
+          ? `<tg-emoji emoji-id="5451845805516302233">🌸</tg-emoji>Твоя заявка на вступление в <b>${GROOMING_COMMUNITY.title}</b> принята!`
+          : `<tg-emoji emoji-id="5451845805516302233">🌸</tg-emoji>Твоя заявка на вступление в <b>${GROOMING_COMMUNITY.title}</b> отклонена!`;
+        const options = { parse_mode: 'HTML' };
+        if (approved) {
+          db.run(
+            'INSERT OR IGNORE INTO community_members (community_key, user_id) VALUES (?, ?)',
+            [GROOMING_COMMUNITY.key, applicantId],
+            (memberErr) => {
+              if (memberErr) console.error('Error adding community member:', memberErr);
+              bot.sendMessage(applicantId, applicantText, {
+                ...options,
+                reply_markup: { inline_keyboard: [[{ text: 'Чат💬', url: GROOMING_COMMUNITY.chatUrl }]] }
+              }).catch((sendErr) => console.error('Error sending community approval:', sendErr));
+            }
+          );
+        } else {
+          bot.sendMessage(applicantId, applicantText, options).catch((sendErr) => console.error('Error sending community rejection:', sendErr));
+        }
+
+        bot.answerCallbackQuery(query.id, { text: approved ? 'Заявка принята.' : 'Заявка отклонена.' });
+        bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
+          chat_id: chatId,
+          message_id: query.message.message_id
+        }).catch(() => {});
+      }
+    );
+    return;
+  }
 
   // Уведомление воркеру о профите и прогрессе АХЕ PASS
   const formatXp = (xp) => String(Math.round(xp * 100) / 100).replace('.', ',');
@@ -3244,7 +3392,8 @@ ${withdrawal.check_message || ''}`;
                                'payout_wallet', 'wallet_set_cryptobot', 'wallet_set_trc20',
                                'wallet_set_bep20', 'wallet_cancel_input', 'detach_curator'];
 
-  if (protectedCallbacks.includes(data) || data.startsWith('wallet_confirm_') ||
+  if (protectedCallbacks.includes(data) || data === 'community_grooming' ||
+      data === 'community_join_grooming' || data === 'create_community' || data.startsWith('wallet_confirm_') ||
       data.startsWith('show_mentor_') || data.startsWith('assign_mentor_')) {
     db.get('SELECT application_approved FROM users WHERE user_id = ?', [userId], (err, user) => {
       if (err || !user || Number(user.application_approved) !== 1) {

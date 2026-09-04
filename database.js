@@ -90,6 +90,28 @@ db.serialize(() => {
     FOREIGN KEY (user_id) REFERENCES users(user_id)
   )`);
 
+  // Участники и заявки в комьюнити. Храним их отдельно от основной заявки
+  // воркера: вступление в одно комьюнити не меняет его доступ к AXE.
+  db.run(`CREATE TABLE IF NOT EXISTS community_members (
+    community_key TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (community_key, user_id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS community_join_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    community_key TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    decided_at DATETIME,
+    decided_by INTEGER,
+    UNIQUE (community_key, user_id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+  )`);
+
   // Добавляем колонку amount_to_pay если её нет
   db.run(`ALTER TABLE profits ADD COLUMN amount_to_pay INTEGER`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
