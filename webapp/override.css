@@ -7,16 +7,16 @@
 .profit-body { min-height: 190px; padding: 16px 17px 14px; }
 .profit-meta { justify-content: flex-end; min-height: 14px; }
 .profit-meta time { margin-left: 0; font-size: 11px; font-weight: 750; }
-.profit-layout { display: grid; grid-template-columns: 112px minmax(0,1fr); gap: 15px; align-items: start; margin-top: 15px; }
+.profit-layout { display: grid; grid-template-columns: 102px minmax(0,1fr); gap: 5px; align-items: start; margin-top: 15px; }
 .worker-stack { min-width: 0; }
+.worker-stack .service { display: inline-block; margin: 0 0 10px; padding: 6px 10px; font-size: 10px; }
 .worker-stack .avatar { display: block; width: 70px; height: 70px; border-radius: 18px; border-color: rgba(255,255,255,.55); }
 .worker-stack .placeholder { display: grid; place-items: center; font-size: 32px; }
 .worker-details { margin-top: 9px; min-width: 0; }
 .worker-details strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; line-height: 1.1; }
 .worker-label { font-size: 9px; margin-bottom: 3px; }
 .worker-details .curator { margin-top: 5px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
-.profit-value { min-width: 0; padding-top: 4px; }
+.profit-value { min-width: 0; padding-top: 37px; }
 .profit-value .amount { font-size: clamp(28px, 8.8vw, 38px); line-height: 1; font-weight: 900; letter-spacing: -.055em; white-space: nowrap; }
-.profit-value .service { display: inline-block; margin-top: 15px; padding: 7px 12px; font-size: 10px; }
 .profit-main, .worker { display: none; }
 .footer { right: 17px; bottom: 14px; }
