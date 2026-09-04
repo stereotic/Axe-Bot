@@ -43,14 +43,25 @@ const keyboards = {
 
   get menu() {
     const battlePassUrl = getBattlePassUrl();
-    const battlePassButton = battlePassUrl
+    const profitsButton = battlePassUrl
       ? { text: 'Профиты', icon_custom_emoji_id: '5445088267181531740', web_app: { url: battlePassUrl } }
       : { text: 'Профиты', icon_custom_emoji_id: '5445088267181531740', callback_data: 'battlepass_unavailable' };
+    let passUrl = battlePassUrl;
+    try {
+      const parsed = new URL(battlePassUrl);
+      parsed.pathname = '/pass';
+      parsed.search = '';
+      parsed.hash = '';
+      passUrl = parsed.toString();
+    } catch (e) { /* fallback to the configured mini-app URL */ }
+    const passButton = battlePassUrl
+      ? { text: 'AXE PASS', web_app: { url: passUrl } }
+      : { text: 'AXE PASS', callback_data: 'battlepass_unavailable' };
 
     return {
       inline_keyboard: [
         [{ text: 'Профиль', callback_data: 'profile' }],
-        [battlePassButton],
+        [passButton, profitsButton],
         [
           { text: 'Букмекер', callback_data: 'card' },
           { text: 'Кардинг', callback_data: 'work' }

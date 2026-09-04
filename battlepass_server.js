@@ -289,6 +289,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (url.pathname === '/pass') return serveStatic(req, res, '/pass.html');
+
   serveStatic(req, res, url.pathname);
 });
 
