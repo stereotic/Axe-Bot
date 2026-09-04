@@ -16,7 +16,7 @@
 .worker-details strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; line-height: 1.1; }
 .worker-label { font-size: 9px; margin-bottom: 3px; }
 .worker-details .curator { margin-top: 5px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
-.profit-value { min-width: 0; padding-top: 37px; }
+.profit-value { min-width: 0; padding-top: 53px; }
 .profit-value .amount { font-size: clamp(28px, 8.8vw, 38px); line-height: 1; font-weight: 900; letter-spacing: -.055em; white-space: nowrap; }
 .profit-main, .worker { display: none; }
 .footer { right: 17px; bottom: 14px; }
