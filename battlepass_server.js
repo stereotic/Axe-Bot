@@ -1,5 +1,6 @@
 require('dotenv').config();
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -13,6 +14,12 @@ const HOST = process.env.BATTLEPASS_HOST || '0.0.0.0';
 const DEV_MODE = process.env.BATTLEPASS_DEV === '1';
 const DEMO_EARNED = parseInt(process.env.BATTLEPASS_DEMO_EARNED || '30000', 10);
 const AUTH_TTL = 24 * 60 * 60; // initData живёт сутки
+const PREMIUM_EMOJI_IDS = {
+  search: '5874960879434338403',
+  settings: '5967574255670399788'
+};
+const premiumEmojiCache = new Map();
+const premiumEmojiLoading = new Map();
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -75,6 +82,64 @@ function sendJson(res, code, payload) {
     'Content-Length': Buffer.byteLength(body)
   });
   res.end(body);
+}
+
+function httpsBuffer(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, (response) => {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        response.resume();
+        reject(new Error(`HTTP ${response.statusCode}`));
+        return;
+      }
+      const chunks = [];
+      response.on('data', chunk => chunks.push(chunk));
+      response.on('end', () => resolve(Buffer.concat(chunks)));
+    }).on('error', reject);
+  });
+}
+
+async function loadPremiumEmoji(name) {
+  if (!PREMIUM_EMOJI_IDS[name]) throw new Error('unknown premium emoji');
+  if (premiumEmojiCache.has(name)) return premiumEmojiCache.get(name);
+  if (premiumEmojiLoading.has(name)) return premiumEmojiLoading.get(name);
+
+  const loading = (async () => {
+    const token = process.env.BOT_TOKEN;
+    if (!token) throw new Error('BOT_TOKEN is missing');
+    const ids = encodeURIComponent(JSON.stringify([PREMIUM_EMOJI_IDS[name]]));
+    const stickerResponse = JSON.parse((await httpsBuffer(
+      `https://api.telegram.org/bot${token}/getCustomEmojiStickers?custom_emoji_ids=${ids}`
+    )).toString('utf8'));
+    const sticker = stickerResponse.result?.[0];
+    // Для анимированных emoji используем статичный thumbnail в WebP.
+    const fileId = sticker?.thumbnail?.file_id || sticker?.file_id;
+    if (!fileId) throw new Error('premium emoji not found');
+    const fileResponse = JSON.parse((await httpsBuffer(
+      `https://api.telegram.org/bot${token}/getFile?file_id=${encodeURIComponent(fileId)}`
+    )).toString('utf8'));
+    const filePath = fileResponse.result?.file_path;
+    if (!filePath) throw new Error('premium emoji file path not found');
+    const emoji = { body: await httpsBuffer(`https://api.telegram.org/file/bot${token}/${filePath}`), contentType: 'image/webp' };
+    premiumEmojiCache.set(name, emoji);
+    return emoji;
+  })();
+  premiumEmojiLoading.set(name, loading);
+  try {
+    return await loading;
+  } finally {
+    premiumEmojiLoading.delete(name);
+  }
+}
+
+function servePremiumEmoji(res, name) {
+  loadPremiumEmoji(name).then((emoji) => {
+    res.writeHead(200, { 'Content-Type': emoji.contentType, 'Cache-Control': 'public, max-age=86400' });
+    res.end(emoji.body);
+  }).catch((error) => {
+    console.error('[battlepass] premium emoji error:', error.message);
+    res.writeHead(404).end();
+  });
 }
 
 function serveStatic(req, res, urlPath) {
@@ -215,6 +280,9 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/profits' && req.method === 'GET') return getProfits(res);
   if (url.pathname === '/api/profit-settings' && req.method === 'GET') return getProfitSettings(req, res, url);
   if (url.pathname === '/api/profit-settings' && req.method === 'POST') return saveProfitSettings(req, res, url);
+  if (url.pathname.startsWith('/api/premium-emoji/') && req.method === 'GET') {
+    return servePremiumEmoji(res, url.pathname.split('/').pop());
+  }
 
   if (url.pathname === '/health') {
     sendJson(res, 200, { ok: true });

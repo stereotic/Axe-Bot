@@ -53,12 +53,14 @@ function profileLink(user) {
 }
 
 function profitText(user, amount) {
-  const worker = user.name && user.name !== '#' ? user.name : `#${user.username}`;
-  return `<b><tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>УСПЕШНЫЙ ПРОФИТ<tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>\n\n` +
-    `<tg-emoji emoji-id="5445006366450164917">🏠</tg-emoji>Сервис: Кардинг\n` +
-    `┣<tg-emoji emoji-id="5445214049593766654">👤</tg-emoji>Воркер: <a href="${profileLink(user)}">${worker}</a>\n` +
-    `┣<tg-emoji emoji-id="5445152270784178138">💸</tg-emoji>Сумма: ${amountText(amount)}₽\n` +
-    `┗<tg-emoji emoji-id="5451845805516302233">😀</tg-emoji><a href="https://t.me/${process.env.GROOMING_BOT_USERNAME || 'AXE_GROOMING_xBot'}">GROOMING</a></b>`;
+  const worker = user.name && user.name !== '#' ? user.name.replace(/^#/, '') : (user.username || 'Воркер');
+  const botUsername = process.env.GROOMING_BOT_USERNAME || 'AXE_GROOMING_xBot';
+  return `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸</b>\n\n` +
+    `<b><tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>УСПЕШНЫЙ ПРОФИТ<tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji></b>\n\n` +
+    `<b><tg-emoji emoji-id="5445006366450164917">🏠</tg-emoji>Сервис: Кардинг</b>\n` +
+    `<b>┣<tg-emoji emoji-id="5445214049593766654">👤</tg-emoji>Воркер: #<a href="${profileLink(user)}">${worker}</a></b>\n` +
+    `<b>┣<tg-emoji emoji-id="5445152270784178138">💸</tg-emoji>Сумма: ${amountText(amount)}₽</b>\n` +
+    `<b>┗ <tg-emoji emoji-id="5451845805516302233">😀</tg-emoji><a href="https://t.me/${botUsername}">GROOMING</a></b>`;
 }
 
 function topKeyboard(period) {

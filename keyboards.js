@@ -81,7 +81,7 @@ const keyboards = {
 
   bookmaker: {
     inline_keyboard: [
-      [{ text: 'Work-Панель', web_app: { url: 'https://epicbet.space/traffer_panel.php' } }],
+      [{ text: 'Work-Панель', web_app: { url: 'https://limebet.top/traffpanel' } }],
       [{ text: 'Расписание матчей', url: 'https://t.me/+fDxvm7h765ZjZDQy' }],
       [{ text: 'Материалы', url: 'https://t.me/+GMixQrZvJkQ4ODE6' }],
       [{ text: 'Назад в меню', callback_data: 'back_to_menu' }]

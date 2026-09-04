@@ -2,7 +2,7 @@ require('dotenv').config();
 const db = require('./database');
 const axios = require('axios');
 
-const API_URL = process.env.EPICBET_API_URL || 'https://epicbet.space/eng/deposits/api_latest_profits';
+const API_URL = process.env.LIMEBET_API_URL || 'https://limebet.top/api/qqqqqqqqaaa3337';
 const POLL_INTERVAL_MS = (parseInt(process.env.EPICBET_POLL_SECONDS, 10) || 60) * 1000;
 
 function formatAmount(n) {
@@ -17,7 +17,7 @@ function parseTargets(raw, adminIds) {
 }
 
 function getSeenIds(cb) {
-  db.all('SELECT id FROM epicbet_profits', (err, rows) => {
+  db.all('SELECT id FROM limebet_profits', (err, rows) => {
     if (err) {
       console.error('[epicbet] error loading seen ids:', err);
       return cb(new Set());
@@ -28,7 +28,7 @@ function getSeenIds(cb) {
 
 function markSeen(p, callback) {
   db.run(
-    `INSERT OR IGNORE INTO epicbet_profits (id, mammoth, worker, amount, date) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT OR IGNORE INTO limebet_profits (id, mammoth, worker, amount, date) VALUES (?, ?, ?, ?, ?)`,
     [String(p.id), p.mammoth || '', p.worker || '', Number(p.amount) || 0, p.date || ''],
     (err) => {
       if (err) console.error('[epicbet] error marking seen:', err);
@@ -64,7 +64,7 @@ function setupEpicbetProfits(bot, adminIds) {
   const targets = parseTargets(process.env.EPICBET_NOTIFY_IDS, adminIds);
   console.log(`🔄 EpicBet profits poller: ${targets.length} получателей (интервал ${POLL_INTERVAL_MS / 1000}с)`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS epicbet_profits (
+  db.run(`CREATE TABLE IF NOT EXISTS limebet_profits (
     id TEXT PRIMARY KEY,
     mammoth TEXT,
     worker TEXT,

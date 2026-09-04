@@ -4,19 +4,21 @@
 
 /* Сумма на одном уровне с аватаром, ник — под аватаром. */
 .profit-card { border-color: rgba(255,255,255,.22); border-radius: 22px; }
-.profit-body { min-height: 190px; padding: 16px 17px 14px; }
+.profit-body { min-height: 236px; padding: 16px 17px 14px; }
 .profit-meta { justify-content: flex-end; min-height: 14px; }
 .profit-meta time { margin-left: 0; font-size: 11px; font-weight: 750; }
 .profit-layout { display: grid; grid-template-columns: 70px minmax(0,1fr); gap: 8px; align-items: start; margin-top: 15px; }
-.worker-stack { min-width: 0; }
-.worker-stack .service { display: inline-block; max-width: none; margin: 0 0 10px; padding: 6px 10px; overflow: visible; font-size: 10px; white-space: nowrap; }
+.worker-stack { min-width: 0; padding-top: 40px; }
+.worker-stack .service { position: absolute; top: 16px; left: 17px; display: inline-block; max-width: none; margin: 0; padding: 8px 13px; overflow: visible; font-size: 12px; white-space: nowrap; }
 .worker-stack .avatar { display: block; width: 70px; height: 70px; border-radius: 18px; border-color: rgba(255,255,255,.55); }
 .worker-stack .placeholder { display: grid; place-items: center; font-size: 32px; }
-.worker-details { margin-top: 9px; min-width: 0; }
-.worker-details strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; line-height: 1.1; }
+.worker-details { min-width: 0; min-height: 58px; margin-top: 9px; }
+.worker-details strong { display: block; width: 190px; overflow: visible; text-overflow: clip; white-space: normal; word-break: break-word; font-size: 17px; line-height: 1.1; }
 .worker-label { font-size: 9px; margin-bottom: 3px; }
-.worker-details .curator { margin-top: 5px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.worker-details .curator { width: 190px; margin-top: 6px; overflow: visible; white-space: normal; font-size: 10px; line-height: 1.25; }
 .profit-value { min-width: 0; padding-top: 53px; }
 .profit-value .amount { font-size: clamp(28px, 8.8vw, 38px); line-height: 1; font-weight: 900; letter-spacing: -.055em; white-space: nowrap; }
 .profit-main, .worker { display: none; }
 .footer { right: 17px; bottom: 14px; }
+.premium-emoji { width: 18px; height: 18px; object-fit: contain; vertical-align: -4px; }
+#settingsBtn .premium-emoji { width: 20px; height: 20px; vertical-align: -5px; }
