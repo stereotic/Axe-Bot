@@ -3,17 +3,21 @@
 }
 
 /* Портрет и тег слева, сумма справа — по референсу профита. */
-.profit-body { min-height: 185px; padding: 15px 16px 13px; }
-.profit-layout { display: grid; grid-template-columns: minmax(88px, .8fr) minmax(136px, 1.35fr); gap: 14px; align-items: start; margin-top: 16px; }
+.profit-card { border-color: rgba(255,255,255,.22); border-radius: 22px; box-shadow: 0 12px 28px rgba(0,0,0,.26); }
+.profit-body { min-height: 196px; padding: 17px 17px 14px; }
+.profit-meta { font-size: 14px; font-weight: 850; letter-spacing: -.01em; }
+.profit-meta time { font-size: 11px; font-weight: 750; }
+.profit-layout { display: grid; grid-template-columns: 104px minmax(0,1fr); gap: 16px; align-items: start; margin-top: 17px; }
 .worker-stack { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
-.worker-stack .avatar { width: 52px; height: 52px; flex-basis: 52px; border-radius: 15px; }
-.worker-stack .placeholder { font-size: 27px; }
-.worker-details { min-width: 0; margin-top: 7px; }
-.worker-details strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; line-height: 1.08; }
-.worker-label { margin-bottom: 2px; }
-.worker-stack .curator { max-width: 100%; margin-top: 5px; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.profit-value { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 4px; }
-.profit-value .amount { font-size: clamp(25px, 8vw, 34px); line-height: 1; white-space: nowrap; }
-.profit-value .service { max-width: 100%; padding: 7px 10px; font-size: 10px; }
+.worker-stack .avatar { width: 64px; height: 64px; flex-basis: 64px; border-radius: 17px; border-color: rgba(255,255,255,.55); background: #09090b; }
+.default-avatar { object-fit: contain; padding: 5px; }
+.worker-stack .placeholder { font-size: 30px; }
+.worker-details { min-width: 0; margin-top: 8px; }
+.worker-details strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; line-height: 1.08; letter-spacing: -.02em; }
+.worker-label { margin-bottom: 3px; font-size: 9px; }
+.worker-stack .curator { max-width: 190px; margin-top: 6px; color: #d7d7dc; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.profit-value { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 1px; }
+.profit-value .amount { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; border-radius: 15px; background: rgba(3,3,5,.76); padding: 10px 12px 11px; font-size: clamp(27px, 8.6vw, 35px); line-height: 1; letter-spacing: -.055em; white-space: nowrap; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.profit-value .service { max-width: 100%; padding: 7px 11px; font-size: 10px; font-weight: 900; background: rgba(255,255,255,.10); }
 .profit-main, .worker { display: none; }
-.footer { right: 15px; bottom: 13px; }
+.footer { right: 17px; bottom: 14px; font-size: 10px; }
