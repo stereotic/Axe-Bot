@@ -1252,6 +1252,7 @@ if (fs.existsSync(bookmakerImagePath)) {
 
     case 'community':
       bot.answerCallbackQuery(query.id);
+      const communityBannerPath = path.join(__dirname, 'images', 'community-list-banner.jpg');
       const communityKeyboard = {
         inline_keyboard: [
           [{ text: 'GROOMING COMMUNITY', icon_custom_emoji_id: '5451767267744328949', callback_data: 'community_grooming' }],
@@ -1260,33 +1261,33 @@ if (fs.existsSync(bookmakerImagePath)) {
         ]
       };
 
-      // Telegram не принимает пустой текст, поэтому используем невидимый символ:
-      // пользователь видит только кнопки, как в ТЗ.
-      replaceMenuMessage(chatId, messageId, {
-        type: 'text',
-        text: '\u2060',
-        reply_markup: communityKeyboard
+      // На баннере уже есть название раздела, поэтому caption оставляем невидимым.
+      replaceMenuMessage(chatId, messageId, fs.existsSync(communityBannerPath) ? {
+        type: 'photo', imagePath: communityBannerPath, caption: '\u2060', reply_markup: communityKeyboard
+      } : {
+        type: 'text', text: '\u2060', reply_markup: communityKeyboard
       });
       break;
 
     case 'community_grooming':
       bot.answerCallbackQuery(query.id);
+      const groomingBannerPath = path.join(__dirname, 'images', 'grooming-community-banner.jpg');
       db.get(
         'SELECT COALESCE(SUM(amount), 0) AS total FROM community_profits WHERE community_key = ?',
         [GROOMING_COMMUNITY.key],
         (err, row) => {
           const cash = err ? 0 : Number(row?.total || 0);
           const communityText = `<tg-emoji emoji-id="5451845805516302233">🌸</tg-emoji><b>GROOMING COMMUNITY</b>\n<b>— Создано: <i>${GROOMING_COMMUNITY.createdAt}</i></b>\n\n<tg-emoji emoji-id="5445006366450164917">💳</tg-emoji><b>Направление - Кардинг</b>\n\n<blockquote><tg-emoji emoji-id="5449873797052148929">💭</tg-emoji><b>Концепция - Фейк Тима</b></blockquote>\n\n<tg-emoji emoji-id="5445152270784178138">💸</tg-emoji><b>Касса комьюнити: ${utils.formatAmount(cash)}₽</b>\n\n<tg-emoji emoji-id="5451767267744328949">🏛</tg-emoji><b>Создатель: ${GROOMING_COMMUNITY.creatorUsername}</b>`;
-          replaceMenuMessage(chatId, messageId, {
-            type: 'text',
-            text: communityText,
-            parse_mode: 'HTML',
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: 'Вступить', callback_data: 'community_join_grooming' }],
-                [{ text: 'Назад', callback_data: 'community' }]
-              ]
-            }
+          const replyMarkup = {
+            inline_keyboard: [
+              [{ text: 'Вступить', callback_data: 'community_join_grooming' }],
+              [{ text: 'Назад', callback_data: 'community' }]
+            ]
+          };
+          replaceMenuMessage(chatId, messageId, fs.existsSync(groomingBannerPath) ? {
+            type: 'photo', imagePath: groomingBannerPath, caption: communityText, parse_mode: 'HTML', reply_markup: replyMarkup
+          } : {
+            type: 'text', text: communityText, parse_mode: 'HTML', reply_markup: replyMarkup
           });
         }
       );
