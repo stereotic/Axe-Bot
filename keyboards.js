@@ -52,8 +52,8 @@ const keyboards = {
       passUrl = parsed.toString();
     } catch (e) { /* fallback to the configured mini-app URL */ }
     const passButton = battlePassUrl
-      ? { text: 'AXE PASS', web_app: { url: passUrl } }
-      : { text: 'AXE PASS', callback_data: 'battlepass_unavailable' };
+      ? { text: 'AXE PASS', icon_custom_emoji_id: '5445088267181531740', web_app: { url: passUrl } }
+      : { text: 'AXE PASS', icon_custom_emoji_id: '5445088267181531740', callback_data: 'battlepass_unavailable' };
 
     return {
       inline_keyboard: [
