@@ -7,9 +7,9 @@
 .profit-body { min-height: 190px; padding: 16px 17px 14px; }
 .profit-meta { justify-content: flex-end; min-height: 14px; }
 .profit-meta time { margin-left: 0; font-size: 11px; font-weight: 750; }
-.profit-layout { display: grid; grid-template-columns: 102px minmax(0,1fr); gap: 5px; align-items: start; margin-top: 15px; }
+.profit-layout { display: grid; grid-template-columns: 70px minmax(0,1fr); gap: 8px; align-items: start; margin-top: 15px; }
 .worker-stack { min-width: 0; }
-.worker-stack .service { display: inline-block; margin: 0 0 10px; padding: 6px 10px; font-size: 10px; }
+.worker-stack .service { display: inline-block; max-width: none; margin: 0 0 10px; padding: 6px 10px; overflow: visible; font-size: 10px; white-space: nowrap; }
 .worker-stack .avatar { display: block; width: 70px; height: 70px; border-radius: 18px; border-color: rgba(255,255,255,.55); }
 .worker-stack .placeholder { display: grid; place-items: center; font-size: 32px; }
 .worker-details { margin-top: 9px; min-width: 0; }
