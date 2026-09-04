@@ -346,7 +346,7 @@ const WORK_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji>С
 const BOOKMAKER_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji>Сервис: Букмекер
 
 <tg-emoji emoji-id="5879585266426973039">🌐</tg-emoji>Сайт
-┗ https://epicbet.space/
+┗ https://limebet.top/
 
 <tg-emoji emoji-id="5258513401784573443">👾</tg-emoji>Тех.Поддержка
 ┣ [9-21] @Aether_AXE
