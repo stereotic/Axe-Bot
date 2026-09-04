@@ -43,9 +43,6 @@ const keyboards = {
 
   get menu() {
     const battlePassUrl = getBattlePassUrl();
-    const profitsButton = battlePassUrl
-      ? { text: 'Профиты', icon_custom_emoji_id: '5445088267181531740', web_app: { url: battlePassUrl } }
-      : { text: 'Профиты', icon_custom_emoji_id: '5445088267181531740', callback_data: 'battlepass_unavailable' };
     let passUrl = battlePassUrl;
     try {
       const parsed = new URL(battlePassUrl);
@@ -61,7 +58,7 @@ const keyboards = {
     return {
       inline_keyboard: [
         [{ text: 'Профиль', callback_data: 'profile' }],
-        [passButton, profitsButton],
+        [passButton],
         [
           { text: 'Букмекер', callback_data: 'card' },
           { text: 'Кардинг', callback_data: 'work' }
