@@ -76,6 +76,20 @@ db.serialize(() => {
     FOREIGN KEY (user_id) REFERENCES users(user_id)
   )`);
 
+  // Профиты, добавленные ботами комьюнити. Сама сумма также хранится в
+  // profits, поэтому входит в общую кассу AXE; эта таблица нужна для
+  // независимой кассы и топов каждого комьюнити.
+  db.run(`CREATE TABLE IF NOT EXISTS community_profits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    community_key TEXT NOT NULL,
+    profit_id INTEGER NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (profit_id) REFERENCES profits(id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+  )`);
+
   // Добавляем колонку amount_to_pay если её нет
   db.run(`ALTER TABLE profits ADD COLUMN amount_to_pay INTEGER`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
@@ -95,6 +109,14 @@ db.serialize(() => {
     if (err && !err.message.includes('duplicate column name')) {
       console.error('Error adding worker_number column:', err);
     }
+  });
+
+  // Оформление карточек профита в мини-приложении (data URL изображения).
+  db.run(`ALTER TABLE users ADD COLUMN profit_avatar TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) console.error('Error adding profit_avatar column:', err);
+  });
+  db.run(`ALTER TABLE users ADD COLUMN profit_background TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) console.error('Error adding profit_background column:', err);
   });
 
   // Реферальная система: кто привёл + заблокировал ли бота приведённый
@@ -375,6 +397,7 @@ db.serialize(() => {
   db.run(`CREATE INDEX IF NOT EXISTS idx_users_application_approved ON users(application_approved)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_profits_user_id ON profits(user_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_profits_created_at ON profits(created_at)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_community_profits_key_created ON community_profits(community_key, created_at)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_applications_user_id ON applications(user_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status)`);
 });

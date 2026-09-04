@@ -44,8 +44,8 @@ const keyboards = {
   get menu() {
     const battlePassUrl = getBattlePassUrl();
     const battlePassButton = battlePassUrl
-      ? { text: 'AXE PASS', icon_custom_emoji_id: '5445088267181531740', web_app: { url: battlePassUrl } }
-      : { text: 'AXE PASS', icon_custom_emoji_id: '5445088267181531740', callback_data: 'battlepass_unavailable' };
+      ? { text: 'Профиты', icon_custom_emoji_id: '5445088267181531740', web_app: { url: battlePassUrl } }
+      : { text: 'Профиты', icon_custom_emoji_id: '5445088267181531740', callback_data: 'battlepass_unavailable' };
 
     return {
       inline_keyboard: [

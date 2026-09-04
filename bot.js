@@ -2410,7 +2410,6 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
       const publicText = buildPublicText(profit);
 
       let hasError = false;
-      let cashOk = false;
 
       try {
         await bot.sendMessage(ACCOUNTING_CHAT_ID, accountingText, { parse_mode: 'HTML' });
@@ -2419,22 +2418,11 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
         hasError = true;
       }
 
-try {
-        await bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true });
-        cashOk = true;
-      } catch (err) {
-        console.error('Error sending to cash channel:', err);
-        hasError = true;
-      }
-
       try {
         await bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true });
       } catch (err) {
         console.error('Error sending to general chat:', err);
         hasError = true;
-        if (cashOk) {
-          bot.sendMessage(chatId, '⚠️ Профит отправлен в кассу, но НЕ отправлен в общий чат. Проверь права бота в чате.').catch(() => {});
-        }
       }
 
       updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((err) =>
@@ -2491,24 +2479,12 @@ try {
       const publicText = buildPublicText(profit);
 
       let hasError = false;
-      let cashOk = false;
-
-try {
-        await bot.sendMessage(CASH_CHANNEL_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true });
-        cashOk = true;
-      } catch (err) {
-        console.error('Error sending to cash channel:', err);
-        hasError = true;
-      }
 
       try {
         await bot.sendMessage(GENERAL_CHAT_ID, publicText, { parse_mode: 'HTML', disable_web_page_preview: true });
       } catch (err) {
         console.error('Error sending to general chat:', err);
         hasError = true;
-        if (cashOk) {
-          bot.sendMessage(chatId, '⚠️ Профит отправлен в кассу, но НЕ отправлен в общий чат. Проверь права бота в чате.').catch(() => {});
-        }
       }
 
       updatePinnedMessage(bot, GENERAL_CHAT_ID).catch((err) =>

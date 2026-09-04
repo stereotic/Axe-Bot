@@ -161,7 +161,7 @@ ${topWorkerLine}
 ┣<b>Основной бот -</b> <a href="https://t.me/AXE_xBot"><b>ССЫЛКА</b></a>
 ┣<b>Feedback</b> - <a href="https://t.me/FeedbackAXEbot"><b>ССЫЛКА</b></a>
 ┣<b>Материалы -</b> <a href="https://t.me/+GMixQrZvJkQ4ODE6"><b>ССЫЛКА</b></a>
-┣<b>Профиты</b> - <a href="https://t.me/+euO9gzLMUMFhNmJi"><b>ССЫЛКА</b></a>
+┣<b>Профиты</b> - ${battlePassUrl ? `<a href="${battlePassUrl}"><b>ОТКРЫТЬ</b></a>` : '<b>Временно недоступно</b>'}
 ┣<b>AXE SMS -</b> <a href="https://t.me/AXE_SMS_xBot"><b>ССЫЛКА</b></a>
 ┗<b>AXE NEWS -</b> <a href="https://t.me/+BO1F4O1KUd0zZTI6"><b>ССЫЛКА</b></a>
 

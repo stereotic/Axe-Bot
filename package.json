@@ -7,6 +7,7 @@
     "start": "node bot.js",
     "profit": "node profit_system.js",
     "dev": "node bot.js",
+    "grooming": "node grooming_bot.js",
     "bp": "node battlepass_server.js",
     "tunnel": "node tunnel.js",
     "test": "node --test tests/*.test.js"

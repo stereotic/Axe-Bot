@@ -4,13 +4,14 @@
 const fs = require('fs');
 const path = require('path');
 
-const LOCK_PATH = path.join(__dirname, 'bot.lock');
 
 // Возвращает { ok: true, release } или { ok: false, message }.
-function acquire() {
+function acquire(name = 'bot') {
+  const safeName = String(name).replace(/[^a-z0-9_-]/gi, '_');
+  const lockPath = path.join(__dirname, `${safeName}.lock`);
   try {
-    if (fs.existsSync(LOCK_PATH)) {
-      const raw = fs.readFileSync(LOCK_PATH, 'utf8');
+    if (fs.existsSync(lockPath)) {
+      const raw = fs.readFileSync(lockPath, 'utf8');
       const old = JSON.parse(raw || '{}');
       if (old.pid) {
         try {
@@ -25,12 +26,12 @@ function acquire() {
     }
   } catch (_) { /* битый лок-файл — перезаписываем */ }
 
-  fs.writeFileSync(LOCK_PATH, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }));
+  fs.writeFileSync(lockPath, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }));
 
   const release = () => {
     try {
-      const cur = JSON.parse(fs.readFileSync(LOCK_PATH, 'utf8'));
-      if (cur.pid === process.pid) fs.unlinkSync(LOCK_PATH);
+      const cur = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+      if (cur.pid === process.pid) fs.unlinkSync(lockPath);
     } catch (_) { /* уже удалён */ }
   };
 

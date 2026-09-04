@@ -6,6 +6,7 @@ database.db-wal
 *.log
 *.bak
 bot.lock
+grooming-bot.lock
 profit_list.txt
 photo_file_id_cache.json
 

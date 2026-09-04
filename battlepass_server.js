@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const battlepass = require('./battlepass');
+const db = require('./database');
 
 const WEBAPP_DIR = path.join(__dirname, 'webapp');
 const PORT = parseInt(process.env.BATTLEPASS_PORT || '8081', 10);
@@ -96,7 +97,7 @@ function serveStatic(req, res, urlPath) {
       'Content-Type': MIME[ext] || 'application/octet-stream',
       'Content-Length': stat.size,
       // В DEV кэш отключён целиком — иначе Telegram держит старую версию app.js.
-      'Cache-Control': (DEV_MODE || ext === '.html') ? 'no-store' : 'public, max-age=300'
+      'Cache-Control': 'no-store, max-age=0'
     });
     fs.createReadStream(target).pipe(res);
   });
@@ -146,6 +147,63 @@ function handleState(req, res, url) {
   });
 }
 
+function resolveWebAppUser(req, url) {
+  const initData = url.searchParams.get('initData') || req.headers['x-telegram-init-data'] || '';
+  const user = verifyInitData(initData, process.env.BOT_TOKEN);
+  if (user && user.id) return user;
+  if (DEV_MODE && url.searchParams.get('user_id')) return { id: parseInt(url.searchParams.get('user_id'), 10) };
+  return null;
+}
+
+function getProfits(res) {
+  db.all(`SELECT p.id, p.amount, p.direction, p.created_at, u.user_id, u.username, u.name, u.curator,
+                 u.profit_avatar, u.profit_background
+          FROM profits p JOIN users u ON u.user_id = p.user_id
+          ORDER BY p.created_at DESC, p.id DESC LIMIT 100`, (err, rows) => {
+    if (err) return sendJson(res, 500, { error: 'internal' });
+    sendJson(res, 200, { profits: rows || [] });
+  });
+}
+
+function getProfitSettings(req, res, url) {
+  const user = resolveWebAppUser(req, url);
+  if (!user) return sendJson(res, 401, { error: 'unauthorized' });
+  db.get('SELECT user_id, username, name, profit_avatar, profit_background FROM users WHERE user_id = ?', [user.id], (err, row) => {
+    if (err) return sendJson(res, 500, { error: 'internal' });
+    if (!row) return sendJson(res, 404, { error: 'user_not_found' });
+    sendJson(res, 200, { user: row });
+  });
+}
+
+function readJson(req, callback) {
+  let raw = '';
+  req.on('data', chunk => {
+    raw += chunk;
+    if (raw.length > 1_500_000) req.destroy();
+  });
+  req.on('end', () => {
+    try { callback(null, JSON.parse(raw || '{}')); } catch (error) { callback(error); }
+  });
+  req.on('error', callback);
+}
+
+function validImage(value) {
+  return value === null || (typeof value === 'string' && /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/i.test(value) && value.length <= 1_000_000);
+}
+
+function saveProfitSettings(req, res, url) {
+  const user = resolveWebAppUser(req, url);
+  if (!user) return sendJson(res, 401, { error: 'unauthorized' });
+  readJson(req, (error, body) => {
+    if (error || !validImage(body.avatar) || !validImage(body.background)) return sendJson(res, 400, { error: 'invalid_image' });
+    db.run('UPDATE users SET profit_avatar = ?, profit_background = ? WHERE user_id = ?', [body.avatar, body.background, user.id], function onSave(err) {
+      if (err) return sendJson(res, 500, { error: 'internal' });
+      if (!this.changes) return sendJson(res, 404, { error: 'user_not_found' });
+      sendJson(res, 200, { ok: true });
+    });
+  });
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
@@ -153,6 +211,10 @@ const server = http.createServer((req, res) => {
     handleState(req, res, url);
     return;
   }
+
+  if (url.pathname === '/api/profits' && req.method === 'GET') return getProfits(res);
+  if (url.pathname === '/api/profit-settings' && req.method === 'GET') return getProfitSettings(req, res, url);
+  if (url.pathname === '/api/profit-settings' && req.method === 'POST') return saveProfitSettings(req, res, url);
 
   if (url.pathname === '/health') {
     sendJson(res, 200, { ok: true });

@@ -11,6 +11,7 @@ const OPEN_CHAT_LINKS = {
   news: 'https://t.me/+BO1F4O1KUd0zZTI6',
   materials: 'https://t.me/+GMixQrZvJkQ4ODE6'
 };
+const PROFITS_APP_URL = process.env.BATTLEPASS_URL || 'https://axe.crystalcards.store';
 
 // Закрытые чаты: разблокируются при достижении unlockStatus.
 const STATUS_CHATS = [
@@ -67,7 +68,7 @@ const buildInfoKeyboard = (status) => ({
     [{ text: 'Общий чат 💬', url: OPEN_CHAT_LINKS.general }],
     buildChatButtons(status),
     [
-      { text: '💸Профиты', url: OPEN_CHAT_LINKS.profits },
+      { text: '💸Профиты', web_app: { url: PROFITS_APP_URL } },
       { text: '📢Новости', url: OPEN_CHAT_LINKS.news }
     ],
     [{ text: '📁Материалы', url: OPEN_CHAT_LINKS.materials }]
