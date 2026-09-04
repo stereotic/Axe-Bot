@@ -174,6 +174,7 @@ function handleState(req, res, url) {
 
   let userId = null;
   const tgUser = verifyInitData(initData, botToken);
+  console.log(`[battlepass] state request: initData=${initData ? 'yes' : 'no'}, verifiedUser=${tgUser?.id || 'none'}`);
 
   // DEV: ?earned=50000 — посмотреть любой уровень, не трогая базу.
   // Без подписи и без user_id тоже отдаём демо, чтобы голая ссылка не упиралась в 401.
@@ -205,9 +206,11 @@ function handleState(req, res, url) {
       return;
     }
     if (!state) {
+      console.warn(`[battlepass] state: user ${userId} not found`);
       sendJson(res, 404, { error: 'user_not_found' });
       return;
     }
+    console.log(`[battlepass] state ready for user ${userId}`);
     sendJson(res, 200, state);
   });
 }
