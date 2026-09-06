@@ -32,16 +32,10 @@ function getAxePassUrl() {
   if (axePassCache.url !== null && now - axePassCache.at < BATTLEPASS_CACHE_TTL) {
     return axePassCache.url;
   }
-  try {
-    const env = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
-    const m = env.match(/^AXE_PASS_URL=(.*)$/m);
-    let url = '';
-    if (m && /^https:\/\//.test(m[1].trim())) url = m[1].trim();
-    axePassCache = { url, at: now };
-    return url;
-  } catch (e) { /* .env нет */ }
-  axePassCache = { url: '', at: now };
-  return '';
+  let url = process.env.AXE_PASS_URL || '';
+  if (url && !/^https:\/\//.test(url)) url = '';
+  axePassCache = { url, at: now };
+  return url;
 }
 
 let pinnedMessageId = null;
