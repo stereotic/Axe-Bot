@@ -147,22 +147,29 @@ async function updatePinned() {
   const key = 'grooming_pinned_message_id';
   const saved = await get('SELECT value FROM stats WHERE key = ?', [key]);
   let id = saved && Number(saved.value);
+
   if (!id) {
-    const chat = await bot.getChat(COMMUNITY_CHAT_ID);
-    id = chat.pinned_message && chat.pinned_message.message_id;
+    try {
+      const chat = await bot.getChat(COMMUNITY_CHAT_ID);
+      id = chat.pinned_message && chat.pinned_message.message_id;
+    } catch (e) { /* ignore */ }
   }
+
   if (id) {
     try {
       await bot.editMessageText(text, { chat_id: COMMUNITY_CHAT_ID, message_id: id, parse_mode: 'HTML', disable_web_page_preview: true });
       await run('INSERT OR REPLACE INTO stats (key, value) VALUES (?, ?)', [key, String(id)]);
       return;
     } catch (error) {
-      if (!String(error.message).includes('message is not modified')) console.error('GROOMING pinned edit:', error.message);
+      if (String(error.message).includes('message is not modified')) return;
+      console.error('GROOMING pinned edit:', error.message);
     }
   }
+
   const sent = await bot.sendMessage(COMMUNITY_CHAT_ID, text, { parse_mode: 'HTML', disable_web_page_preview: true });
   await bot.pinChatMessage(COMMUNITY_CHAT_ID, sent.message_id, { disable_notification: true });
   await run('INSERT OR REPLACE INTO stats (key, value) VALUES (?, ?)', [key, String(sent.message_id)]);
+  console.log('📌 GROOMING pinned created, ID:', sent.message_id);
 }
 
 async function findWorker(username) {
