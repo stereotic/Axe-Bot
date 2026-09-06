@@ -27,8 +27,19 @@ if (!lock.ok) {
 }
 
 const bot = new TelegramBot(TOKEN, { polling: { interval: 100, params: { timeout: 30 } } });
-bot.setMyCommands([{ command: 'top', description: 'Топ GROOMING' }]).catch(() => {});
+bot.setMyCommands([{ command: 'top', description: 'Топ GROOMING' }, { command: 'start', description: 'Меню' }]).catch(() => {});
 bot.on('polling_error', error => console.error('GROOMING polling error:', error.message));
+
+bot.onText(/\/start(?:@[\w_]+)?(?:\s|$)/u, async message => {
+  try {
+    const text = `<b><tg-emoji emoji-id="5451845805516302233">🌸</tg-emoji>GROOMING COMMUNITY</b>\n\n` +
+      `Направление: Кардинг\n` +
+      `Концепция: Фейк Тима\n` +
+      `Создатель: @symphonik_AXE\n\n` +
+      `Используй <b>/top</b> чтобы увидеть топ грумеров.`;
+    await bot.sendMessage(message.chat.id, text, { parse_mode: 'HTML', disable_web_page_preview: true });
+  } catch (error) { console.error('GROOMING /start:', error); }
+});
 
 const query = (sql, params = []) => new Promise((resolve, reject) => {
   db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
