@@ -138,7 +138,9 @@ async function buildPinnedText() {
     `<tg-emoji emoji-id="5445152270784178138">💸</tg-emoji>Касса КМ: ${amountText(all.total)}₽\n` +
     `<tg-emoji emoji-id="5451805523018033441">💰</tg-emoji>Касса за сутки: ${amountText(day.total)}₽\n\n` +
     `<tg-emoji emoji-id="5451767267744328949">🌶</tg-emoji>Топ 1 грумер ${leader}\n\n` +
-    `┏  Мануал\n┣  Фейк Тима\n┗  CEO @symphonik_AXE\n\n` +
+    `┏  <a href="https://glas.su/fake-team-symphonik-axe-09-04">Мануал</a>\n` +
+    `┣  <a href="https://t.me/BrilliantCM_bot">Фейк Тима</a>\n` +
+    `┗  CEO <a href="https://t.me/symphonik_AXE">@symphonik_AXE</a>\n\n` +
     `<b><tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>УСПЕШНЫХ ПРОФИТОВ ${Number(profitCount?.cnt || 0).toLocaleString('ru-RU')}<tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji></b>`;
 }
 
