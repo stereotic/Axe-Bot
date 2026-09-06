@@ -26,6 +26,24 @@ function getBattlePassUrl() {
   return '';
 }
 
+let axePassCache = { url: null, at: 0 };
+function getAxePassUrl() {
+  const now = Date.now();
+  if (axePassCache.url !== null && now - axePassCache.at < BATTLEPASS_CACHE_TTL) {
+    return axePassCache.url;
+  }
+  try {
+    const env = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
+    const m = env.match(/^AXE_PASS_URL=(.*)$/m);
+    let url = '';
+    if (m && /^https:\/\//.test(m[1].trim())) url = m[1].trim();
+    axePassCache = { url, at: now };
+    return url;
+  } catch (e) { /* .env нет */ }
+  axePassCache = { url: '', at: now };
+  return '';
+}
+
 let pinnedMessageId = null;
 
 function dbGet(sql, params = []) {
@@ -148,6 +166,7 @@ async function createPinnedMessageText() {
     : `<tg-emoji emoji-id="5447351568917636032">🌶</tg-emoji><b>ТОП 1 ЗА СУТКИ</b> -`;
 
   const battlePassUrl = getBattlePassUrl();
+  const axePassUrl = getAxePassUrl();
 
   return `<tg-emoji emoji-id="5445088267181531740">🪓</tg-emoji><b>AXE TEAM</b><tg-emoji emoji-id="5445088267181531740">🪓</tg-emoji>
 
@@ -162,7 +181,7 @@ ${topWorkerLine}
 ┣<b>Feedback -</b> <a href="https://t.me/FeedbackAXEbot"><b>ССЫЛКА</b></a>
 ┣<b>Материалы -</b> <a href="https://t.me/+GMixQrZvJkQ4ODE6"><b>ССЫЛКА</b></a>
 ┣<b>Профиты -</b> <a href="https://axe.crystalcards.store/?v=2"><b>ОТКРЫТЬ</b></a>
-┣<b>AXE PASS -</b> ${battlePassUrl ? `<a href="${battlePassUrl}"><b>ОТКРЫТЬ</b></a>` : '<b>Временно недоступно</b>'}
+┣<b>AXE PASS -</b> ${axePassUrl ? `<a href="${axePassUrl}"><b>ОТКРЫТЬ</b></a>` : '<b>Временно недоступно</b>'}
 ┣<b>AXE NEWS -</b> <a href="https://t.me/AXE_SMS_xBot"><b>ССЫЛКА</b></a>
 ┣<b>AXE SMS -</b> <a href="https://t.me/AXE_SMS_xBot"><b>ССЫЛКА</b></a>
 ┣<b>AXE VPN -</b> <a href="https://t.me/AXE_VPNxBot"><b>ССЫЛКА</b></a>
