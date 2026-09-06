@@ -61,7 +61,7 @@ function buildState(totalEarned, passXp) {
   const nextCost = level < LEVELS.length ? LEVELS[level].xpCost : 0;
   const intoLevel = Math.max(0, xp - passedXp);
   const xpToNext = level < LEVELS.length ? Math.max(0, nextCost - intoLevel) : 0;
-  const rubToNext = Math.ceil(xpToNext / XP_PER_STEP) * RUB_PER_STEP;
+  const rubToNext = Math.ceil(xpToNext / XP_PER_STEP * RUB_PER_STEP);
 
   return {
     totalEarned,

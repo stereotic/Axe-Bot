@@ -54,13 +54,12 @@ function profileLink(user) {
 
 function profitText(user, amount) {
   const worker = user.name && user.name !== '#' ? user.name.replace(/^#/, '') : (user.username || 'Воркер');
-  const botUsername = process.env.GROOMING_BOT_USERNAME || 'AXE_GROOMING_xBot';
   return `<b>🌸УСПЕШНЫЙ ПРОФИТ🌸</b>\n\n` +
     `<b><tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>УСПЕШНЫЙ ПРОФИТ<tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji></b>\n\n` +
     `<b><tg-emoji emoji-id="5445006366450164917">🏠</tg-emoji>Сервис: Кардинг</b>\n` +
     `<b>┣<tg-emoji emoji-id="5445214049593766654">👤</tg-emoji>Воркер: #<a href="${profileLink(user)}">${worker}</a></b>\n` +
     `<b>┣<tg-emoji emoji-id="5445152270784178138">💸</tg-emoji>Сумма: ${amountText(amount)}₽</b>\n` +
-    `<b>┗ <tg-emoji emoji-id="5451845805516302233">😀</tg-emoji><a href="https://t.me/${botUsername}">GROOMING</a></b>`;
+    `<b>┗ <tg-emoji emoji-id="5451845805516302233">😀</tg-emoji><a href="https://t.me/+EcTOSMKQH9thNTQy">GROOMING</a></b>`;
 }
 
 function topKeyboard(period) {
@@ -88,15 +87,27 @@ async function buildTop(period = 'all') {
   const users = await query(`SELECT u.user_id, u.username, u.name, SUM(cp.amount) AS total
     FROM community_profits cp JOIN users u ON u.user_id = cp.user_id
     WHERE cp.community_key = ? ${where}
-    GROUP BY u.user_id ORDER BY total DESC, u.user_id ASC LIMIT 10`, params);
+    GROUP BY u.user_id ORDER BY total DESC, u.user_id ASC LIMIT 50`, params);
   const balance = users.length
     ? (await get(`SELECT COALESCE(SUM(amount), 0) AS total FROM community_profits WHERE community_key = ? ${range ? 'AND created_at >= ? AND created_at < ?' : ''}`, params)).total
     : 0;
   const heading = period === 'day' ? '🏆<b>Топ 10 GROOMING за день</b>' : period === 'month' ? '🏆<b>Топ 10 GROOMING за месяц</b>' : '🏆<b>Топ 10 GROOMING</b>';
   const ranks = ['🥇', '🥈', '🥉', '🥉', '🥉', '🥉', '🥉', '🥉', '🥉', '🥉'];
-  const lines = users.map((user, index) => {
-    const name = (user.name && user.name !== '#' ? user.name : `#${user.username}`).replace(/^#/, '');
-    return `${ranks[index]} <a href="${profileLink(user)}">${name}</a> — ${amountText(user.total)}₽`;
+  const merged = {};
+  users.forEach(u => {
+    const key = (u.name || u.username || '').toLowerCase().trim();
+    if (!merged[key]) {
+      merged[key] = { ...u, total: Number(u.total) };
+    } else {
+      merged[key].total += Number(u.total);
+    }
+  });
+  const deduped = Object.values(merged)
+    .sort((a, b) => b.total - a.total || a.user_id - b.user_id)
+    .slice(0, 10);
+  const lines = deduped.map((user, index) => {
+    const rawName = (user.name && user.name !== '#' ? user.name : `#${user.username}`).replace(/^#/, '');
+    return `${ranks[index]} <a href="${profileLink(user)}">${rawName}</a> — ${amountText(user.total)}₽`;
   });
   return { text: `${heading}\n\n${lines.length ? lines.join('\n') : 'Пока нет профитов.'}\n\n🏦<b>Касса комьюнити: ${amountText(balance)}₽</b>`, reply_markup: topKeyboard(period) };
 }
@@ -105,10 +116,11 @@ async function buildPinnedText() {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
-  const [all, day, top] = await Promise.all([
+  const [all, day, top, profitCount] = await Promise.all([
     get('SELECT COALESCE(SUM(amount), 0) AS total FROM community_profits WHERE community_key = ?', [COMMUNITY_KEY]),
     get('SELECT COALESCE(SUM(amount), 0) AS total FROM community_profits WHERE community_key = ? AND created_at >= ? AND created_at < ?', [COMMUNITY_KEY, start, end]),
-    get(`SELECT u.user_id, u.username, u.name FROM community_profits cp JOIN users u ON u.user_id = cp.user_id WHERE cp.community_key = ? AND cp.created_at >= ? AND cp.created_at < ? GROUP BY u.user_id ORDER BY SUM(cp.amount) DESC LIMIT 1`, [COMMUNITY_KEY, start, end])
+    get(`SELECT u.user_id, u.username, u.name FROM community_profits cp JOIN users u ON u.user_id = cp.user_id WHERE cp.community_key = ? AND cp.created_at >= ? AND cp.created_at < ? GROUP BY u.user_id ORDER BY SUM(cp.amount) DESC LIMIT 1`, [COMMUNITY_KEY, start, end]),
+    get('SELECT COUNT(*) AS cnt FROM community_profits WHERE community_key = ?', [COMMUNITY_KEY])
   ]);
   const leader = top ? `<a href="${profileLink(top)}">${top.name && top.name !== '#' ? top.name : `#${top.username}`}</a>` : '#';
   return `<b><tg-emoji emoji-id="5451845805516302233">😀</tg-emoji>GROOMING COMMUNITY</b>\n` +
@@ -116,7 +128,7 @@ async function buildPinnedText() {
     `<tg-emoji emoji-id="5451805523018033441">💰</tg-emoji>Касса за сутки: ${amountText(day.total)}₽\n\n` +
     `<tg-emoji emoji-id="5451767267744328949">🌶</tg-emoji>Топ 1 грумер ${leader}\n\n` +
     `┏  Мануал\n┣  Фейк Тима\n┗  CEO @symphonik_AXE\n\n` +
-    `<b><tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>УСПЕШНЫХ ПРОФИТОВ<tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji></b>`;
+    `<b><tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>УСПЕШНЫХ ПРОФИТОВ ${Number(profitCount?.cnt || 0).toLocaleString('ru-RU')}<tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji></b>`;
 }
 
 async function updatePinned() {

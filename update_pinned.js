@@ -159,11 +159,15 @@ ${topWorkerLine}
 
 <tg-emoji emoji-id="5445361044849467275">🏗️</tg-emoji><b>Инфраструктура</b>
 ┣<b>Основной бот -</b> <a href="https://t.me/AXE_xBot"><b>ССЫЛКА</b></a>
-┣<b>Feedback</b> - <a href="https://t.me/FeedbackAXEbot"><b>ССЫЛКА</b></a>
+┣<b>Feedback -</b> <a href="https://t.me/FeedbackAXEbot"><b>ССЫЛКА</b></a>
 ┣<b>Материалы -</b> <a href="https://t.me/+GMixQrZvJkQ4ODE6"><b>ССЫЛКА</b></a>
-┣<b>Профиты</b> - ${battlePassUrl ? `<a href="${battlePassUrl}"><b>ОТКРЫТЬ</b></a>` : '<b>Временно недоступно</b>'}
+┣<b>Профиты -</b> <a href="https://axe.crystalcards.store/?v=2"><b>ОТКРЫТЬ</b></a>
+┣<b>AXE PASS -</b> <a href="https://t.me/AXE_xBOT?startapp=battlepass"><b>ОТКРЫТЬ</b></a>
+┣<b>AXE NEWS -</b> <a href="https://t.me/AXE_SMS_xBot"><b>ССЫЛКА</b></a>
 ┣<b>AXE SMS -</b> <a href="https://t.me/AXE_SMS_xBot"><b>ССЫЛКА</b></a>
-┗<b>AXE NEWS -</b> <a href="https://t.me/+BO1F4O1KUd0zZTI6"><b>ССЫЛКА</b></a>
+┣<b>AXE VPN -</b> <a href="https://t.me/AXE_VPNxBot"><b>ССЫЛКА</b></a>
+┣<b>AXE DICE -</b> <a href="https://t.me/AXE_DICE_xBot"><b>ССЫЛКА</b></a>
+┗<b><a href="https://t.me/AXE_PokerProject_xBot">AXE Poker Project</a></b>
 
 <tg-emoji emoji-id="5445080531945432925">⌨️</tg-emoji><b>Команды чата</b>
 ┣<b>Топ -</b> <b>/top</b>

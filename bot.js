@@ -3894,15 +3894,28 @@ const buildTopContent = (period) => new Promise((resolve) => {
           GROUP BY u.user_id
           HAVING total_profit > 0
           ORDER BY total_profit DESC, u.user_id ASC
-          LIMIT 10`, params, (err, users) => {
+          LIMIT 50`, params, (err, users) => {
     if (err || !users || users.length === 0) {
       if (err) console.error('Error in top query:', err);
       resolve({ text: emptyText, reply_markup: TOP_KEYBOARDS[period] });
       return;
     }
 
+    const merged = {};
+    users.forEach(u => {
+      const key = (u.name || u.username || '').toLowerCase().trim();
+      if (!merged[key]) {
+        merged[key] = { ...u, total_profit: Number(u.total_profit) };
+      } else {
+        merged[key].total_profit += Number(u.total_profit);
+      }
+    });
+    const deduped = Object.values(merged)
+      .sort((a, b) => b.total_profit - a.total_profit || a.user_id - b.user_id)
+      .slice(0, 10);
+
     let topText = title;
-    users.forEach((user, index) => {
+    deduped.forEach((user, index) => {
       topText += formatTopLine(user, user.total_profit, index);
     });
 
