@@ -47,6 +47,8 @@ const GROOMING_COMMUNITY = {
   createdAt: '05.09.2026',
   chatUrl: 'https://t.me/+EcTOSMKQH9thNTQy'
 };
+// Чат модерации заявок в GROOMING COMMUNITY.
+const GROOMING_APPLICATIONS_CHAT_ID = '-1004330111419';
 
 // Временное хранилище для данных профита
 const profitData = {};
@@ -336,7 +338,7 @@ const WORK_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji>С
 
 <tg-emoji emoji-id="5258513401784573443">👾</tg-emoji><b>ТП</b> <i>(Обнальщик)</i>
 ┣ @Opium2D
-┗ 👨‍💻: @Enhtein
+┗ 👨‍💻: @arachnophobia_AXE
 
 <b><tg-emoji emoji-id="5258328383183396223">📚</tg-emoji> Мануал</b>:
 ┗ <a href="https://telegra.ph/Napravlenie-Karding-05-12">Кардинг</a> ← Читать
@@ -1338,21 +1340,25 @@ if (fs.existsSync(bookmakerImagePath)) {
 
                   const workerUsername = query.from?.username || '';
                   const worker = workerUsername ? `@${workerUsername}` : `#${userId}`;
+                  const requestText = `<b>Воркер ${worker} подал заявку на вступление в комьюнити.</b>`;
+                  const requestOptions = {
+                    parse_mode: 'HTML',
+                    reply_markup: {
+                      inline_keyboard: [[
+                        { text: 'Принять', callback_data: `community_request_approve_${userId}` },
+                        { text: 'Отклонить', callback_data: `community_request_reject_${userId}` }
+                      ]]
+                    }
+                  };
                   bot.answerCallbackQuery(query.id);
                   bot.sendMessage(chatId, '<tg-emoji emoji-id="5451947415852589066">📨</tg-emoji><b>Заявка на вступление отправлена создателю комьюнити</b>', { parse_mode: 'HTML' }).catch(() => {});
                   bot.sendMessage(
                     GROOMING_COMMUNITY.creatorId,
-                    `<b>Воркер ${worker} подал заявку на вступление в комьюнити.</b>`,
-                    {
-                      parse_mode: 'HTML',
-                      reply_markup: {
-                        inline_keyboard: [[
-                          { text: 'Принять', callback_data: `community_request_approve_${userId}` },
-                          { text: 'Отклонить', callback_data: `community_request_reject_${userId}` }
-                        ]]
-                      }
-                    }
+                    requestText,
+                    requestOptions
                   ).catch((notifyErr) => console.error('Error notifying community creator:', notifyErr));
+                  bot.sendMessage(GROOMING_APPLICATIONS_CHAT_ID, requestText, requestOptions)
+                    .catch((notifyErr) => console.error('Error notifying community applications chat:', notifyErr));
                 }
               );
             }
