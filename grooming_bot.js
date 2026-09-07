@@ -144,7 +144,15 @@ async function buildPinnedText() {
     `<b><tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>УСПЕШНЫХ ПРОФИТОВ ${Number(profitCount?.cnt || 0).toLocaleString('ru-RU')}<tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji></b>`;
 }
 
-async function updatePinned() {
+let pinnedUpdatePromise = null;
+
+function updatePinned() {
+  if (pinnedUpdatePromise) return pinnedUpdatePromise;
+  pinnedUpdatePromise = updatePinnedInner().finally(() => { pinnedUpdatePromise = null; });
+  return pinnedUpdatePromise;
+}
+
+async function updatePinnedInner() {
   const text = await buildPinnedText();
   const key = 'grooming_pinned_message_id';
   const saved = await get('SELECT value FROM stats WHERE key = ?', [key]);
@@ -165,6 +173,9 @@ async function updatePinned() {
     } catch (error) {
       if (String(error.message).includes('message is not modified')) return;
       console.error('GROOMING pinned edit:', error.message);
+      // Не создаём новый закреп при временной ошибке Telegram или ошибке HTML.
+      // Иначе каждое обновление превращается в новое сообщение в чате.
+      return;
     }
   }
 
