@@ -1353,13 +1353,17 @@ if (fs.existsSync(bookmakerImagePath)) {
                   };
                   bot.answerCallbackQuery(query.id);
                   bot.sendMessage(chatId, '<tg-emoji emoji-id="5451947415852589066">📨</tg-emoji><b>Заявка на вступление отправлена создателю комьюнити</b>', { parse_mode: 'HTML' }).catch(() => {});
-                  bot.sendMessage(
+                  // Основной получатель по ТЗ — создатель комьюнити. Копию
+                  // дополнительно получает указанный аккаунт модерации.
+                  const approvalRecipients = [...new Set([
                     GROOMING_COMMUNITY.creatorId,
-                    requestText,
-                    requestOptions
-                  ).catch((notifyErr) => console.error('Error notifying community creator:', notifyErr));
-                  bot.sendMessage(GROOMING_APPLICATIONS_CHAT_ID, requestText, requestOptions)
-                    .catch((notifyErr) => console.error('Error notifying community applications chat:', notifyErr));
+                    6383039210,
+                    GROOMING_APPLICATIONS_CHAT_ID
+                  ])];
+                  approvalRecipients.forEach((recipientId) => {
+                    bot.sendMessage(recipientId, requestText, requestOptions)
+                      .catch((notifyErr) => console.error(`Error notifying grooming application recipient ${recipientId}:`, notifyErr));
+                  });
                 }
               );
             }
@@ -2315,8 +2319,121 @@ function retryCommunityNotifications() {
   });
 }
 
+const MAIN_APPLICATION_RULES_TEXT = `<b>Поздравляем! 🥂</b>
+
+💌 <i>Твоя заявка принята, осталось ознакомиться с правилами проекта</i> <b><i>AXE TEAM.</i></b>
+
+<b>1. Оскорбления участников проекта ЗАПРЕЩЕНЫ, от администраторов до обычных пользователей.</b>
+
+<b>2. ЗАПРЕЩЕНА реклама в любом её проявлении: нативная или активная.</b>
+
+<b>3. ЗАПРЕЩЕНА дискредитация пользователей проекта AXE TEAM.</b>
+
+<b>4. Разжигание полит-новостей ЗАПРЕЩЕНО. Любые политические темы должны обсуждаться с нейтральной точкой зрения.</b>
+
+<b>5. ЗАПРЕЩЕНО попрошайничество в любом виде.</b>`;
+
+function recordMainApplicationNotification(applicationId, userId, delivered, error = null) {
+  db.run(
+    `INSERT INTO application_approval_notifications (application_id, user_id, delivered_at, attempts, last_error)
+     VALUES (?, ?, ?, 1, ?)
+     ON CONFLICT(application_id) DO UPDATE SET
+       delivered_at = CASE WHEN excluded.delivered_at IS NOT NULL THEN excluded.delivered_at ELSE application_approval_notifications.delivered_at END,
+       attempts = application_approval_notifications.attempts + 1,
+       last_error = excluded.last_error`,
+    [applicationId, userId, delivered ? new Date().toISOString() : null, error]
+  );
+}
+
+function deliverMainApplicationApproval(applicationId, userId) {
+  return bot.sendMessage(userId, MAIN_APPLICATION_RULES_TEXT, {
+    parse_mode: 'HTML',
+    reply_markup: keyboards.rules_confirm
+  }).then(() => {
+    recordMainApplicationNotification(applicationId, userId, true);
+    return true;
+  }).catch((err) => {
+    const error = String(err?.message || err).slice(0, 500);
+    console.error('Error sending main application approval:', error);
+    recordMainApplicationNotification(applicationId, userId, false, error);
+    return false;
+  });
+}
+
+function provisionAutoApprovedApplicant(application) {
+  db.run(
+    `INSERT INTO users (user_id, username, name, application_approved, welcome_keyboard_sent)
+     VALUES (?, ?, ?, 0, 0)
+     ON CONFLICT(user_id) DO UPDATE SET
+       username = excluded.username,
+       application_approved = 0,
+       welcome_keyboard_sent = 0`,
+    [application.user_id, application.username || '', application.username || '#'],
+    (userErr) => {
+      if (userErr) console.error('Error provisioning auto-approved applicant:', userErr);
+      deliverMainApplicationApproval(application.id, application.user_id);
+    }
+  );
+}
+
+let mainApplicationAutoApprovalRunning = false;
+function autoApproveMainApplications() {
+  if (mainApplicationAutoApprovalRunning) return;
+  mainApplicationAutoApprovalRunning = true;
+  db.all(
+    `SELECT id, user_id, username FROM applications
+     WHERE status = 'pending' AND created_at <= datetime('now', '-5 minutes')`,
+    (loadErr, applications) => {
+      if (loadErr) {
+        console.error('Error loading main application auto-approvals:', loadErr);
+        mainApplicationAutoApprovalRunning = false;
+        return;
+      }
+      if (!applications.length) {
+        mainApplicationAutoApprovalRunning = false;
+        return;
+      }
+      let remaining = applications.length;
+      const done = () => {
+        remaining -= 1;
+        if (!remaining) mainApplicationAutoApprovalRunning = false;
+      };
+      applications.forEach((application) => {
+        db.run(
+          `UPDATE applications SET status = 'approved', processed_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND status = 'pending'`,
+          [application.id],
+          function(approveErr) {
+            if (approveErr) console.error('Error auto-approving main application:', approveErr);
+            if (!approveErr && this.changes) {
+              provisionAutoApprovedApplicant(application);
+              console.log(`Auto-approved main application ${application.id} for ${application.user_id}`);
+            }
+            done();
+          }
+        );
+      });
+    }
+  );
+}
+
+function retryMainApplicationNotifications() {
+  db.all(
+    `SELECT application_id, user_id FROM application_approval_notifications
+     WHERE delivered_at IS NULL`,
+    (err, rows) => {
+      if (err) return console.error('Error loading pending main application notifications:', err);
+      rows.forEach(row => deliverMainApplicationApproval(row.application_id, row.user_id));
+    }
+  );
+}
+
 setTimeout(retryCommunityNotifications, 15000);
 setInterval(retryCommunityNotifications, 5 * 60 * 1000);
+setTimeout(autoApproveMainApplications, 30000);
+setInterval(autoApproveMainApplications, 30 * 1000);
+setTimeout(retryMainApplicationNotifications, 20000);
+setInterval(retryMainApplicationNotifications, 5 * 60 * 1000);
 
 bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
   const chatId = query.message.chat.id;
@@ -2364,14 +2481,12 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
             'SELECT status FROM community_join_requests WHERE community_key = ? AND user_id = ?',
             [GROOMING_COMMUNITY.key, applicantId],
             (requestErr, request) => {
-              if (requestErr || !request || request.status !== (approved ? 'approved' : 'rejected')) {
-                bot.answerCallbackQuery(query.id, { text: 'Заявка уже обработана с другим решением.' });
+              if (requestErr || !request) {
+                bot.answerCallbackQuery(query.id, { text: 'Заявка уже обработана.' });
                 return;
               }
-              deliverCommunityDecision(applicantId, approved).then(delivered => {
-                bot.answerCallbackQuery(query.id, {
-                  text: delivered ? 'Уведомление отправлено повторно.' : 'Не доставлено — бот повторит попытку автоматически.'
-                });
+              bot.answerCallbackQuery(query.id, {
+                text: request.status === 'approved' ? 'Заявка уже принята.' : 'Заявка уже отклонена.'
               });
             }
           );
@@ -2896,12 +3011,16 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
       }
 
       // Обновляем статус заявки
-      db.run('UPDATE applications SET status = ?, processed_at = CURRENT_TIMESTAMP WHERE id = ?',
+      db.run("UPDATE applications SET status = ?, processed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
         ['approved', applicationId],
-        (err) => {
+        function(err) {
           if (err) {
             console.error('Error updating application:', err);
             bot.sendMessage(chatId, '❌ Ошибка обновления заявки');
+            return;
+          }
+          if (!this.changes) {
+            bot.sendMessage(chatId, '✅ Заявка уже принята');
             return;
           }
 
@@ -2952,12 +3071,7 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
 
 <b>5. ЗАПРЕЩЕНО попрошайничество в любом виде.</b>`;
 
-          bot.sendMessage(application.user_id, rulesText, {
-            parse_mode: 'HTML',
-            reply_markup: keyboards.rules_confirm
-          }).catch(err => {
-            console.error('Error sending rules to user:', err);
-          });
+          deliverMainApplicationApproval(applicationId, application.user_id);
         }
       );
     });
@@ -2986,12 +3100,16 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
       }
 
       // Обновляем статус заявки
-      db.run('UPDATE applications SET status = ?, processed_at = CURRENT_TIMESTAMP WHERE id = ?',
+      db.run("UPDATE applications SET status = ?, processed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
         ['rejected', applicationId],
-        (err) => {
+        function(err) {
           if (err) {
             console.error('Error updating application:', err);
             bot.sendMessage(chatId, '❌ Ошибка обновления заявки');
+            return;
+          }
+          if (!this.changes) {
+            bot.sendMessage(chatId, '✅ Заявка уже принята');
             return;
           }
 

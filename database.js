@@ -293,6 +293,17 @@ db.serialize(() => {
     FOREIGN KEY (user_id) REFERENCES users(user_id)
   )`);
 
+  // Невручённые сообщения о принятии общей заявки. Нужны, чтобы временная
+  // ошибка Telegram не оставляла воркера без следующего шага регистрации.
+  db.run(`CREATE TABLE IF NOT EXISTS application_approval_notifications (
+    application_id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    delivered_at DATETIME,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
+    FOREIGN KEY (application_id) REFERENCES applications(id)
+  )`);
+
   // Таблица реквизитов
   db.run(`CREATE TABLE IF NOT EXISTS card_requisites (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
