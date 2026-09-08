@@ -112,6 +112,18 @@ db.serialize(() => {
     FOREIGN KEY (user_id) REFERENCES users(user_id)
   )`);
 
+  // Очередь уведомлений по заявкам: решение не теряется, если Telegram
+  // временно не смог доставить личное сообщение воркеру.
+  db.run(`CREATE TABLE IF NOT EXISTS community_join_notifications (
+    community_key TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    decision TEXT NOT NULL,
+    delivered_at DATETIME,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
+    PRIMARY KEY (community_key, user_id, decision)
+  )`);
+
   // Добавляем колонку amount_to_pay если её нет
   db.run(`ALTER TABLE profits ADD COLUMN amount_to_pay INTEGER`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {

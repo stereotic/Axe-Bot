@@ -49,6 +49,7 @@ const GROOMING_COMMUNITY = {
 };
 // Чат модерации заявок в GROOMING COMMUNITY.
 const GROOMING_APPLICATIONS_CHAT_ID = '-1004330111419';
+const GROOMING_DECISION_ADMIN_IDS = new Set([GROOMING_COMMUNITY.creatorId, ...adminIds]);
 
 // Временное хранилище для данных профита
 const profitData = {};
@@ -2277,6 +2278,46 @@ bot.on('message', perf.wrap('message_handler', async (msg) => {
 }));
 
 // Обработка callback кнопок (единый обработчик)
+function saveCommunityNotification(applicantId, decision, delivered, error = null) {
+  db.run(
+    `INSERT INTO community_join_notifications (community_key, user_id, decision, delivered_at, attempts, last_error)
+     VALUES (?, ?, ?, ?, 1, ?)
+     ON CONFLICT(community_key, user_id, decision) DO UPDATE SET
+       delivered_at = CASE WHEN excluded.delivered_at IS NOT NULL THEN excluded.delivered_at ELSE community_join_notifications.delivered_at END,
+       attempts = community_join_notifications.attempts + 1,
+       last_error = excluded.last_error`,
+    [GROOMING_COMMUNITY.key, applicantId, decision, delivered ? new Date().toISOString() : null, error]
+  );
+}
+
+function deliverCommunityDecision(applicantId, approved) {
+  const text = approved
+    ? `<tg-emoji emoji-id="5451845805516302233">🌸</tg-emoji>Твоя заявка на вступление в <b>${GROOMING_COMMUNITY.title}</b> принята!`
+    : `<tg-emoji emoji-id="5451845805516302233">🌸</tg-emoji>Твоя заявка на вступление в <b>${GROOMING_COMMUNITY.title}</b> отклонена!`;
+  const options = approved
+    ? { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: 'Чат💬', url: GROOMING_COMMUNITY.chatUrl }]] } }
+    : { parse_mode: 'HTML' };
+  return bot.sendMessage(applicantId, text, options).then(() => {
+    saveCommunityNotification(applicantId, approved ? 'approved' : 'rejected', true);
+    return true;
+  }).catch((err) => {
+    const error = String(err?.message || err).slice(0, 500);
+    console.error('Error sending community decision:', error);
+    saveCommunityNotification(applicantId, approved ? 'approved' : 'rejected', false, error);
+    return false;
+  });
+}
+
+function retryCommunityNotifications() {
+  db.all('SELECT user_id, decision FROM community_join_notifications WHERE community_key = ? AND delivered_at IS NULL', [GROOMING_COMMUNITY.key], (err, rows) => {
+    if (err) return console.error('Error loading pending community notifications:', err);
+    rows.forEach(row => deliverCommunityDecision(row.user_id, row.decision === 'approved'));
+  });
+}
+
+setTimeout(retryCommunityNotifications, 15000);
+setInterval(retryCommunityNotifications, 5 * 60 * 1000);
+
 bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
   const chatId = query.message.chat.id;
   const userId = query.from.id;
@@ -2299,7 +2340,7 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
   if (communityDecision) {
     const [, action, applicantIdText] = communityDecision;
     const applicantId = Number(applicantIdText);
-    if (userId !== GROOMING_COMMUNITY.creatorId) {
+    if (!GROOMING_DECISION_ADMIN_IDS.has(userId)) {
       bot.answerCallbackQuery(query.id, { text: 'Решение доступно только создателю комьюнити.', show_alert: true });
       return;
     }
@@ -2317,7 +2358,23 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
           return;
         }
         if (!this.changes) {
-          bot.answerCallbackQuery(query.id, { text: 'Заявка уже обработана.' });
+          // Повторное нажатие также повторяет личное уведомление: раньше
+          // единичная ошибка Telegram оставляла принятого воркера без сообщения.
+          db.get(
+            'SELECT status FROM community_join_requests WHERE community_key = ? AND user_id = ?',
+            [GROOMING_COMMUNITY.key, applicantId],
+            (requestErr, request) => {
+              if (requestErr || !request || request.status !== (approved ? 'approved' : 'rejected')) {
+                bot.answerCallbackQuery(query.id, { text: 'Заявка уже обработана с другим решением.' });
+                return;
+              }
+              deliverCommunityDecision(applicantId, approved).then(delivered => {
+                bot.answerCallbackQuery(query.id, {
+                  text: delivered ? 'Уведомление отправлено повторно.' : 'Не доставлено — бот повторит попытку автоматически.'
+                });
+              });
+            }
+          );
           return;
         }
 
@@ -2331,14 +2388,11 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
             [GROOMING_COMMUNITY.key, applicantId],
             (memberErr) => {
               if (memberErr) console.error('Error adding community member:', memberErr);
-              bot.sendMessage(applicantId, applicantText, {
-                ...options,
-                reply_markup: { inline_keyboard: [[{ text: 'Чат💬', url: GROOMING_COMMUNITY.chatUrl }]] }
-              }).catch((sendErr) => console.error('Error sending community approval:', sendErr));
+              deliverCommunityDecision(applicantId, true);
             }
           );
         } else {
-          bot.sendMessage(applicantId, applicantText, options).catch((sendErr) => console.error('Error sending community rejection:', sendErr));
+          deliverCommunityDecision(applicantId, false);
         }
 
         bot.answerCallbackQuery(query.id, { text: approved ? 'Заявка принята.' : 'Заявка отклонена.' });
