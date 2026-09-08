@@ -52,7 +52,9 @@ bot.onText(/\/setpin(?:@[\w_]+)?(?:\s|$)/u, async message => {
   }
   try {
     await run('INSERT OR REPLACE INTO stats (key, value) VALUES (?, ?)', ['grooming_pinned_message_id', String(target.message_id)]);
-    await bot.sendMessage(message.chat.id, '✅ Это сообщение выбрано для обновления кассы. Новые сообщения создаваться не будут.');
+    await updatePinned();
+    const confirmation = await bot.sendMessage(message.chat.id, '.');
+    setTimeout(() => bot.deleteMessage(message.chat.id, confirmation.message_id).catch(() => {}), 3000);
   } catch (error) {
     console.error('GROOMING setpin:', error.message);
   }
