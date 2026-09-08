@@ -9,6 +9,7 @@ const TOKEN = process.env.GROOMING_BOT_TOKEN;
 const COMMUNITY_CHAT_ID = String(process.env.GROOMING_CHAT_ID || '-1004330111419');
 const CASH_CHAT_ID = String(process.env.GROOMING_CASH_CHAT_ID || COMMUNITY_CHAT_ID);
 const COMMUNITY_KEY = 'grooming';
+const CONFIGURED_PINNED_MESSAGE_ID = Number(process.env.GROOMING_PINNED_MESSAGE_ID || 0);
 const MAIN_BOT_USERNAME = process.env.BOT_USERNAME || 'AXE_xBOT';
 const configuredAdmins = (process.env.GROOMING_ADMIN_IDS || process.env.ADMIN_IDS || '')
   .split(',').map(value => Number(value.trim())).filter(Number.isInteger);
@@ -39,6 +40,22 @@ bot.onText(/\/start(?:@[\w_]+)?(?:\s|$)/u, async message => {
       `Используй <b>/top</b> чтобы увидеть топ грумеров.`;
     await bot.sendMessage(message.chat.id, text, { parse_mode: 'HTML', disable_web_page_preview: true });
   } catch (error) { console.error('GROOMING /start:', error); }
+});
+
+// Привязывает обновление кассы к уже существующему сообщению бота.
+// Команду нужно отправить ответом на нужный статус в GROOMING-чате.
+bot.onText(/\/setpin(?:@[\w_]+)?(?:\s|$)/u, async message => {
+  if (!isAdmin(message) || String(message.chat.id) !== COMMUNITY_CHAT_ID) return;
+  const target = message.reply_to_message;
+  if (!target?.message_id || !target.from?.is_bot) {
+    return bot.sendMessage(message.chat.id, 'Ответь командой /setpin на сообщение GROOMING BOT, которое нужно обновлять.');
+  }
+  try {
+    await run('INSERT OR REPLACE INTO stats (key, value) VALUES (?, ?)', ['grooming_pinned_message_id', String(target.message_id)]);
+    await bot.sendMessage(message.chat.id, '✅ Это сообщение выбрано для обновления кассы. Новые сообщения создаваться не будут.');
+  } catch (error) {
+    console.error('GROOMING setpin:', error.message);
+  }
 });
 
 const query = (sql, params = []) => new Promise((resolve, reject) => {
@@ -140,6 +157,7 @@ async function buildPinnedText() {
     `<tg-emoji emoji-id="5451767267744328949">🌶</tg-emoji>Топ 1 грумер ${leader}\n\n` +
     `┏  <a href="https://glas.su/fake-team-symphonik-axe-09-04">Мануал</a>\n` +
     `┣  <a href="https://t.me/BrilliantCM_bot">Фейк Тима</a>\n` +
+    `┣ Зеркало Crystal @Crystal_CCbot\n` +
     `┗  CEO <a href="https://t.me/symphonik_AXE">@symphonik_AXE</a>\n\n` +
     `<b><tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>УСПЕШНЫХ ПРОФИТОВ ${Number(profitCount?.cnt || 0).toLocaleString('ru-RU')}<tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji></b>`;
 }
@@ -153,36 +171,22 @@ function updatePinned() {
 }
 
 async function updatePinnedInner() {
-  const text = await buildPinnedText();
   const key = 'grooming_pinned_message_id';
   const saved = await get('SELECT value FROM stats WHERE key = ?', [key]);
-  let id = saved && Number(saved.value);
-
+  const id = CONFIGURED_PINNED_MESSAGE_ID || (saved && Number(saved.value));
   if (!id) {
-    try {
-      const chat = await bot.getChat(COMMUNITY_CHAT_ID);
-      id = chat.pinned_message && chat.pinned_message.message_id;
-    } catch (e) { /* ignore */ }
+    console.warn('GROOMING pin update skipped: set GROOMING_PINNED_MESSAGE_ID or reply /setpin to the target message.');
+    return;
   }
 
-  if (id) {
-    try {
-      await bot.editMessageText(text, { chat_id: COMMUNITY_CHAT_ID, message_id: id, parse_mode: 'HTML', disable_web_page_preview: true });
-      await run('INSERT OR REPLACE INTO stats (key, value) VALUES (?, ?)', [key, String(id)]);
-      return;
-    } catch (error) {
-      if (String(error.message).includes('message is not modified')) return;
-      console.error('GROOMING pinned edit:', error.message);
-      // Не создаём новый закреп при временной ошибке Telegram или ошибке HTML.
-      // Иначе каждое обновление превращается в новое сообщение в чате.
-      return;
-    }
+  const text = await buildPinnedText();
+  try {
+    await bot.editMessageText(text, { chat_id: COMMUNITY_CHAT_ID, message_id: id, parse_mode: 'HTML', disable_web_page_preview: true });
+    await run('INSERT OR REPLACE INTO stats (key, value) VALUES (?, ?)', [key, String(id)]);
+  } catch (error) {
+    if (String(error.message).includes('message is not modified')) return;
+    console.error('GROOMING pinned edit:', error.message);
   }
-
-  const sent = await bot.sendMessage(COMMUNITY_CHAT_ID, text, { parse_mode: 'HTML', disable_web_page_preview: true });
-  await bot.pinChatMessage(COMMUNITY_CHAT_ID, sent.message_id, { disable_notification: true });
-  await run('INSERT OR REPLACE INTO stats (key, value) VALUES (?, ?)', [key, String(sent.message_id)]);
-  console.log('📌 GROOMING pinned created, ID:', sent.message_id);
 }
 
 async function findWorker(username) {
