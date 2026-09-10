@@ -567,6 +567,11 @@ async function publishProfit(bot, user) {
     const userId = AUTO_USER_ID_BASE + user.id;
     const workerPayout = utils.calculateWorkerPayout(amount, direction);
 
+    await dbRunP(
+      'UPDATE auto_profit_users SET last_profit_at = ? WHERE id = ?',
+      [Date.now(), user.id]
+    ).catch((err) => console.error('[ap] update last_profit_at:', err.message));
+
     const profit = {
       userId,
       username: worker,
@@ -601,8 +606,8 @@ async function publishProfit(bot, user) {
     await recordProfit(bot, user, profit, workerPayout);
 
     await dbRunP(
-      'UPDATE auto_profit_users SET total_amount = total_amount + ?, profit_count = profit_count + 1, last_profit_at = ?, amounts_pos = ?, enabled = ? WHERE id = ?',
-      [amount, Date.now(), nextPos, completed ? 0 : 1, user.id]
+      'UPDATE auto_profit_users SET total_amount = total_amount + ?, profit_count = profit_count + 1, amounts_pos = ?, enabled = ? WHERE id = ?',
+      [amount, nextPos, completed ? 0 : 1, user.id]
     ).catch((err) => console.error('[ap] update stats:', err.message));
 
     console.log(`[ap] ${worker} +${amount}₽ → в БД, касса и чат`);
