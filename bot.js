@@ -2558,7 +2558,7 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
       }
       profit._saved = true;
 
-      const saveProfitAndUpdateUser = (targetUserId) => {
+      const saveProfitAndUpdateUser = (targetUserId, onSaved) => {
         db.run('INSERT INTO profits (user_id, amount, amount_to_pay, direction) VALUES (?, ?, ?, ?)',
           [targetUserId, profit.amount, profit.workerPayout, profit.direction],
           function(err) {
@@ -2566,6 +2566,7 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
               console.error('Error saving profit:', err);
               return;
             }
+            if (onSaved) onSaved();
 
             const dbProfitId = this.lastID;
 
@@ -2675,8 +2676,7 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
       };
 
       if (profit.isRegistered && profit.userId !== 0) {
-        saveProfitAndUpdateUser(profit.userId);
-        showCombinedKeyboard();
+        saveProfitAndUpdateUser(profit.userId, showCombinedKeyboard);
       } else {
         // Рисованый профит: переиспользуем только ранее созданный фейковый
         // аккаунт (id выше FAKE_USER_ID_MIN). Реальные пользователи не
@@ -2684,8 +2684,7 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
         db.get('SELECT user_id FROM users WHERE LOWER(TRIM(COALESCE(username, \'\'))) = ? AND user_id > ?', [String(profit.username || '').trim().toLowerCase(), FAKE_USER_ID_MIN], (err, existingUser) => {
           if (existingUser) {
             profit.userId = existingUser.user_id;
-            saveProfitAndUpdateUser(existingUser.user_id);
-            showCombinedKeyboard();
+            saveProfitAndUpdateUser(existingUser.user_id, showCombinedKeyboard);
           } else {
             utils.generateWorkerNumber((err, workerNumber) => {
               if (err) {
@@ -2702,10 +2701,9 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
                     console.error('Error creating user:', err);
                     return;
                   }
-                  saveProfitAndUpdateUser(newUserId);
+                  saveProfitAndUpdateUser(newUserId, showCombinedKeyboard);
                 }
               );
-              showCombinedKeyboard();
             });
           }
         });
