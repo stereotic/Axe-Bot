@@ -12,6 +12,7 @@
 .worker-stack .service { position: absolute; top: 16px; left: 17px; display: inline-block; max-width: none; margin: 0; padding: 8px 13px; overflow: visible; font-size: 12px; white-space: nowrap; }
 .worker-stack .avatar { display: block; width: 70px; height: 70px; border-radius: 18px; border-color: rgba(255,255,255,.55); }
 .worker-stack .placeholder { display: grid; place-items: center; font-size: 32px; }
+.worker-stack .premium-avatar { padding: 8px; object-fit: contain; background: linear-gradient(145deg,#393940,#151519); }
 .worker-details { min-width: 0; min-height: 58px; margin-top: 9px; }
 .worker-details strong { display: block; width: 190px; overflow: visible; text-overflow: clip; white-space: normal; word-break: break-word; font-size: 17px; line-height: 1.1; }
 .worker-label { font-size: 9px; margin-bottom: 3px; }

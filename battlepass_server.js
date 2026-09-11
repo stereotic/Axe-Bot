@@ -16,7 +16,8 @@ const DEMO_EARNED = parseInt(process.env.BATTLEPASS_DEMO_EARNED || '30000', 10);
 const AUTH_TTL = 24 * 60 * 60; // initData живёт сутки
 const PREMIUM_EMOJI_IDS = {
   search: '5874960879434338403',
-  settings: '5967574255670399788'
+  settings: '5967574255670399788',
+  default_avatar: '5886412370347036129'
 };
 const premiumEmojiCache = new Map();
 const premiumEmojiLoading = new Map();
