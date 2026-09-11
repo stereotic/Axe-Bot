@@ -189,7 +189,7 @@ function getDirectionName(direction) {
 
 // Исключения из топов (тестовые / служебные аккаунты)
 const TOP_EXCLUDED_NAMES = ['#тестик', 'тестик', 'sss', '#testovhik', 'testovhik', '#sss', '#test', 'test'];
-const TOP_EXCLUDED_USERNAMES = ['sss', 'freeobnall', 'test'];
+const TOP_EXCLUDED_USERNAMES = ['sss', 'test'];
 
 function topExclusionWhere(alias = 'u') {
   const namesList = TOP_EXCLUDED_NAMES.map((n) => `'${n.replace(/'/g, "''")}'`).join(', ');

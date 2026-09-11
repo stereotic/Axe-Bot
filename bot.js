@@ -297,7 +297,7 @@ const INFO_BANNER = () => {
     }
 
     const excludedNames = ['@sss','@Testovhik','@тестик','тестик','@testovhik','testovhik','test','#test'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
-    const excludedUsernames = ['sss','freeobnall','test'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+    const excludedUsernames = ['sss','test'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
 
     db.get(`SELECT COALESCE(SUM(p.amount), 0) as total, COUNT(p.id) as count
             FROM profits p JOIN users u ON p.user_id = u.user_id
@@ -4005,7 +4005,7 @@ const formatCashLine = (balance, label = 'Касса проекта') => {
 const getPeriodBalance = (startStr, endStr) => {
   return new Promise((resolve) => {
     const excludedNames = ['@sss','@Testovhik','@тестик','тестик','@testovhik','testovhik','test','#test'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
-    const excludedUsernames = ['sss','freeobnall','test'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+    const excludedUsernames = ['sss','test'].map(n => `'${n.replace(/'/g, "''")}'`).join(',');
     db.get(`SELECT COALESCE(SUM(p.amount), 0) as total
             FROM profits p JOIN users u ON p.user_id = u.user_id
             WHERE p.created_at >= ? AND p.created_at < ?

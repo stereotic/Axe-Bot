@@ -134,7 +134,7 @@ async function getDailyStats() {
 }
 
 const EXCLUDED_NAMES = ['#sss', '#Testovhik', '#тестик', 'тестик', '#testovhik', 'testovhik'];
-const EXCLUDED_USERNAMES = ['sss', 'freeobnall'];
+const EXCLUDED_USERNAMES = ['sss'];
 
 async function createPinnedMessageText() {
   const excludedNameList = EXCLUDED_NAMES.map(n => `'${n.replace(/'/g, "''")}'`).join(',');
