@@ -69,7 +69,7 @@ const keyboards = {
         ],
         [
           { text: 'Feedback', callback_data: 'feedback' },
-          { text: 'Настройки', callback_data: 'settings' }
+          { text: 'Полезное', callback_data: 'useful' }
         ],
         [
           { text: 'AXE SMS', icon_custom_emoji_id: '5447245070908564837', url: 'https://t.me/AXE_SMS_xBot' },
@@ -111,6 +111,15 @@ const keyboards = {
   settings_menu: {
     inline_keyboard: [
       [{ text: 'Настройки профиля', callback_data: 'profile_settings' }],
+      [{ text: 'Назад в меню', callback_data: 'back_to_menu' }]
+    ]
+  },
+
+  useful: {
+    inline_keyboard: [
+      [{ text: 'AXE SMS', url: 'https://t.me/AXE_SMS_xBot' }],
+      [{ text: 'AXE SPAM', url: 'https://t.me/Axe_spm_xBOT' }],
+      [{ text: 'AXE VPN', url: 'https://t.me/AXE_VPNxBot' }],
       [{ text: 'Назад в меню', callback_data: 'back_to_menu' }]
     ]
   },

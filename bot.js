@@ -1394,6 +1394,19 @@ if (fs.existsSync(bookmakerImagePath)) {
       }
       break;
 
+    case 'useful':
+      bot.answerCallbackQuery(query.id);
+      replaceMenuMessage(chatId, messageId, {
+        type: 'text',
+        text: `<tg-emoji emoji-id="5451807855185273693">📨</tg-emoji><b>AXE SMS</b> - <a href="https://t.me/AXE_SMS_xBot"><b>ССЫЛКА</b></a>
+<tg-emoji emoji-id="5444879892548198876">📨</tg-emoji><b>AXE SPAM</b> - <a href="https://t.me/Axe_spm_xBOT"><b>ССЫЛКА</b></a>
+<tg-emoji emoji-id="5452080710162619656">📨</tg-emoji><b>AXE VPN</b> - <a href="https://t.me/AXE_VPNxBot"><b>ССЫЛКА</b></a>`,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        reply_markup: keyboards.useful
+      });
+      break;
+
     case 'settings':
       bot.answerCallbackQuery(query.id);
       const settingsImagePath = path.join(__dirname, 'images', 'settings.jpg');
@@ -3563,7 +3576,7 @@ ${withdrawal.check_message || ''}`;
 
   // Обработка остальных callback
   // Проверяем одобрена ли заявка для доступа к основному функционалу
-  const protectedCallbacks = ['profile', 'work', 'training', 'card', 'community', 'feedback', 'settings',
+  const protectedCallbacks = ['profile', 'work', 'training', 'card', 'community', 'feedback', 'settings', 'useful',
                                'materials', 'profile_settings', 'change_name', 'hide_profile',
                                'transfer_profile', 'withdraw', 'cancel_withdraw', 'back_to_menu',
                                'payout_wallet', 'wallet_set_cryptobot', 'wallet_set_trc20',

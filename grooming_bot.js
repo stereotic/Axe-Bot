@@ -28,7 +28,11 @@ if (!lock.ok) {
 }
 
 const bot = new TelegramBot(TOKEN, { polling: { interval: 100, params: { timeout: 30 } } });
-bot.setMyCommands([{ command: 'top', description: 'Топ GROOMING' }, { command: 'start', description: 'Меню' }]).catch(() => {});
+bot.setMyCommands([
+  { command: 'profit', description: 'Профит: /profit @воркер сумма' },
+  { command: 'top', description: 'Топ GROOMING' },
+  { command: 'start', description: 'Меню' }
+]).catch(() => {});
 bot.on('polling_error', error => console.error('GROOMING polling error:', error.message));
 
 bot.onText(/\/start(?:@[\w_]+)?(?:\s|$)/u, async message => {
@@ -210,10 +214,14 @@ async function saveProfit(draft) {
   }
 }
 
-bot.onText(/^@([\w_]+)\s+([\d\s.,]+)₽?\s*$/u, async message => {
-  if (!isAdmin(message)) return;
-  const username = message.text.match(/^@([\w_]+)/)[1];
-  const amount = Number(message.text.replace(/^@\w+\s+/, '').replace(/[^\d]/g, ''));
+// /profit работает и при включённой Privacy Mode в группе. Обычный формат
+// @воркер сумма оставлен для чатов, где бот видит все сообщения.
+bot.onText(/^(?:\/(?:profit|профит)(?:@[\w_]+)?\s+)?@([\w_]+)\s+([\d\s.,]+)₽?\s*$/u, async (message, match) => {
+  if (!isAdmin(message)) {
+    return bot.sendMessage(message.chat.id, '❌ Нет доступа к публикации профитов.');
+  }
+  const username = match[1];
+  const amount = Number(match[2].replace(/[^\d]/g, ''));
   if (!Number.isSafeInteger(amount) || amount <= 0) return bot.sendMessage(message.chat.id, '❌ Укажите корректную сумму.');
   try {
     const user = await findWorker(username);
@@ -224,7 +232,10 @@ bot.onText(/^@([\w_]+)\s+([\d\s.,]+)₽?\s*$/u, async message => {
       { text: 'Отправить в кассу/чат', callback_data: `grooming_send_${id}` },
       { text: 'Отправить везде', callback_data: `grooming_send_${id}` }
     ]] } });
-  } catch (error) { console.error('GROOMING draft:', error); }
+  } catch (error) {
+    console.error('GROOMING draft:', error);
+    bot.sendMessage(message.chat.id, '❌ Не удалось создать профит. Попробуйте ещё раз.').catch(() => {});
+  }
 });
 
 bot.onText(/\/(?:top|топ)(?:@[\w_]+)?(?:\s|$)/u, async message => {
