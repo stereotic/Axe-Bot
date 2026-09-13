@@ -175,8 +175,9 @@ ${topWorkerLine}
 ┣<b>Feedback -</b> <a href="https://t.me/FeedbackAXEbot"><b>ССЫЛКА</b></a>
 ┣<b>Материалы -</b> <a href="https://t.me/+GMixQrZvJkQ4ODE6"><b>ССЫЛКА</b></a>
 ┣<b>Профиты -</b> <a href="https://axe.crystalcards.store/?v=2"><b>ОТКРЫТЬ</b></a>
-┣<b>AXE PASS -</b> ${axePassUrl ? `<a href="${axePassUrl}"><b>ОТКРЫТЬ</b></a>` : '<b>Временно недоступно</b>'}
+┣<b>AXE PASS -</b> <a href="https://axe.crystalcards.store/pass"><b>ОТКРЫТЬ</b></a>
 ┣<b>AXE NEWS -</b> <a href="https://t.me/AXE_SMS_xBot"><b>ССЫЛКА</b></a>
+┣<b>AXE SPAM -</b> <a href="https://t.me/Axe_spm_xBOT"><b>ССЫЛКА</b></a>
 ┣<b>AXE SMS -</b> <a href="https://t.me/AXE_SMS_xBot"><b>ССЫЛКА</b></a>
 ┣<b>AXE VPN -</b> <a href="https://t.me/AXE_VPNxBot"><b>ССЫЛКА</b></a>
 ┣<b>AXE DICE -</b> <a href="https://t.me/AXE_DICE_xBot"><b>ССЫЛКА</b></a>
