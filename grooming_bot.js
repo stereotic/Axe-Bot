@@ -4,10 +4,12 @@ const TelegramBot = require('node-telegram-bot-api');
 const db = require('./database');
 const utils = require('./utils');
 const { acquire: acquireSingleInstance } = require('./single_instance');
+const { updatePinnedMessage } = require('./update_pinned');
 
 const TOKEN = process.env.GROOMING_BOT_TOKEN;
 const COMMUNITY_CHAT_ID = String(process.env.GROOMING_CHAT_ID || '-1004330111419');
 const CASH_CHAT_ID = String(process.env.GROOMING_CASH_CHAT_ID || COMMUNITY_CHAT_ID);
+const GENERAL_CHAT_ID = String(process.env.GENERAL_CHAT_ID || '-1003986505552');
 const COMMUNITY_KEY = 'grooming';
 const CONFIGURED_PINNED_MESSAGE_ID = Number(process.env.GROOMING_PINNED_MESSAGE_ID || 0);
 const MAIN_BOT_USERNAME = process.env.BOT_USERNAME || 'AXE_xBOT';
@@ -28,6 +30,9 @@ if (!lock.ok) {
 }
 
 const bot = new TelegramBot(TOKEN, { polling: { interval: 100, params: { timeout: 30 } } });
+// В общий AXE-чат публикует именно основной бот: у него уже есть права и он
+// владеет главным закрепом. GROOMING-бот публикует только в свои чаты.
+const mainBot = process.env.BOT_TOKEN ? new TelegramBot(process.env.BOT_TOKEN) : null;
 bot.setMyCommands([
   { command: 'profit', description: 'Профит: /profit @воркер сумма' },
   { command: 'top', description: 'Топ GROOMING' },
@@ -262,7 +267,12 @@ bot.on('callback_query', async callback => {
     await saveProfit(draft);
     const targets = [...new Set([COMMUNITY_CHAT_ID, CASH_CHAT_ID])];
     await Promise.all(targets.map(chatId => bot.sendMessage(chatId, profitText(draft.user, draft.amount), { parse_mode: 'HTML', disable_web_page_preview: true })));
-    await updatePinned();
+    if (!mainBot) throw new Error('BOT_TOKEN is missing: cannot publish GROOMING profit to AXE chat');
+    await mainBot.sendMessage(GENERAL_CHAT_ID, profitText(draft.user, draft.amount), { parse_mode: 'HTML', disable_web_page_preview: true });
+    await Promise.all([
+      updatePinned(),
+      updatePinnedMessage(mainBot, GENERAL_CHAT_ID).catch(error => console.error('AXE pinned update after GROOMING profit:', error.message))
+    ]);
     drafts.delete(data.slice('grooming_send_'.length));
     await bot.answerCallbackQuery(callback.id, { text: 'Профит опубликован' });
     await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: callback.message.chat.id, message_id: callback.message.message_id });

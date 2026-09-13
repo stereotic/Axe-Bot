@@ -1,5 +1,9 @@
 const sqlite3 = require('sqlite3').verbose();
-const db = new sqlite3.Database('./database.db');
+const path = require('path');
+
+// Одна абсолютная БД для основного бота, GROOMING-бота и Mini App.
+// Иначе PM2 с другим cwd создаёт отдельный ./database.db и профиты не видны.
+const db = new sqlite3.Database(path.join(__dirname, 'database.db'));
 
 // WAL mode для предотвращения SQLITE_BUSY при конкурентных чтениях/записях
 db.run('PRAGMA journal_mode=WAL');

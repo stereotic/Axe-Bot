@@ -1397,12 +1397,8 @@ if (fs.existsSync(bookmakerImagePath)) {
     case 'useful':
       bot.answerCallbackQuery(query.id);
       replaceMenuMessage(chatId, messageId, {
-        type: 'text',
-        text: `<tg-emoji emoji-id="5451807855185273693">📨</tg-emoji><b>AXE SMS</b> - <a href="https://t.me/AXE_SMS_xBot"><b>ССЫЛКА</b></a>
-<tg-emoji emoji-id="5444879892548198876">📨</tg-emoji><b>AXE SPAM</b> - <a href="https://t.me/Axe_spm_xBOT"><b>ССЫЛКА</b></a>
-<tg-emoji emoji-id="5452080710162619656">📨</tg-emoji><b>AXE VPN</b> - <a href="https://t.me/AXE_VPNxBot"><b>ССЫЛКА</b></a>`,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
+        type: 'photo',
+        imagePath: path.join(__dirname, 'images', 'useful.jpg'),
         reply_markup: keyboards.useful
       });
       break;
