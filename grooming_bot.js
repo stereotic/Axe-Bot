@@ -34,7 +34,6 @@ const bot = new TelegramBot(TOKEN, { polling: { interval: 100, params: { timeout
 // владеет главным закрепом. GROOMING-бот публикует только в свои чаты.
 const mainBot = process.env.BOT_TOKEN ? new TelegramBot(process.env.BOT_TOKEN) : null;
 bot.setMyCommands([
-  { command: 'profit', description: 'Профит: /profit @воркер сумма' },
   { command: 'top', description: 'Топ GROOMING' },
   { command: 'start', description: 'Меню' }
 ]).catch(() => {});
@@ -95,9 +94,9 @@ function profitText(user, amount) {
   const worker = user.name && user.name !== '#' ? user.name.replace(/^#/, '') : (user.username || 'Воркер');
   return `<b><tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>УСПЕШНЫЙ ПРОФИТ<tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji></b>\n\n` +
     `<b><tg-emoji emoji-id="5445006366450164917">🏠</tg-emoji>Сервис: Кардинг</b>\n` +
-    `<b>┣<tg-emoji emoji-id="5445214049593766654">👤</tg-emoji>Воркер: #<a href="${profileLink(user)}">${worker}</a></b>\n` +
+    `<b>┣<tg-emoji emoji-id="5445214049593766654">👤</tg-emoji>Воркер: <a href="${profileLink(user)}">#${worker}</a></b>\n` +
     `<b>┣<tg-emoji emoji-id="5445152270784178138">💸</tg-emoji>Сумма: ${amountText(amount)}₽</b>\n` +
-    `<b>┗ <tg-emoji emoji-id="5451845805516302233">😀</tg-emoji><a href="https://t.me/+EcTOSMKQH9thNTQy">GROOMING</a></b>`;
+    `<b>┗ <tg-emoji emoji-id="5451845805516302233">😀</tg-emoji><a href="https://t.me/AXE_xBot">GROOMING</a></b>`;
 }
 
 function topKeyboard(period) {
