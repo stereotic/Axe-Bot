@@ -83,6 +83,9 @@ const applicationData = {};
 // Временное хранилище для режима рассылки
 const broadcastMode = {};
 
+// Хранилище для админ-удаления профитов
+const profitDeleteState = {};
+
 // ID каналов для проверки подписки
 const REQUIRED_CHAT_ID = '-1003986505552'; // AXE | CHAT (https://t.me/+1EwzBdEWNQgxYWFi)
 const REQUIRED_CHANNEL_ID = '-1003772027635'; // AXE | NEWS (https://t.me/+BO1F4O1KUd0zZTI6)
@@ -4475,6 +4478,12 @@ bot.onText(/\/cancel/, (msg) => {
     bot.sendMessage(chatId, '❌ Редактирование рассылки отменено');
   }
 
+  // Отмена удаления профита
+  if (profitDeleteState[userId]) {
+    delete profitDeleteState[userId];
+    bot.sendMessage(chatId, '❌ Поиск профитов отменён');
+  }
+
   // Отмена настройки авто-публикации профитов
   if (cancelAutoFlow(userId)) {
     bot.sendMessage(chatId, '❌ Настройка авто-публикации отменена');
@@ -4555,5 +4564,345 @@ db.run(
     }
   }
 );
+
+// ==================== АДМИН-УДАЛЕНИЕ ПРОФИТОВ ====================
+
+// Показать список последних профитов для удаления
+function showProfitList(chatId, userId, page = 0) {
+  const PAGE_SIZE = 5;
+  const offset = page * PAGE_SIZE;
+
+  db.all(
+    `SELECT p.id, p.user_id, p.amount, p.amount_to_pay, p.direction, p.created_at,
+            u.username, u.name
+     FROM profits p
+     LEFT JOIN users u ON u.user_id = p.user_id
+     ORDER BY p.id DESC
+     LIMIT ? OFFSET ?`,
+    [PAGE_SIZE + 1, offset],
+    (err, rows) => {
+      if (err) {
+        console.error('Error fetching profits:', err);
+        bot.sendMessage(chatId, '❌ Ошибка при загрузке профитов');
+        return;
+      }
+
+      if (!rows || rows.length === 0) {
+        bot.sendMessage(chatId, '📭 Профитов не найдено');
+        return;
+      }
+
+      const hasMore = rows.length > PAGE_SIZE;
+      const profits = rows.slice(0, PAGE_SIZE);
+
+      let text = '<b>🗑 Удаление профитов</b>\n\nВыберите профит для удаления:\n\n';
+
+      const buttons = [];
+      for (const p of profits) {
+        const dirName = p.direction === 1 ? 'Кардинг' : p.direction === 2 ? 'Прямой' : 'Букмекер';
+        const date = p.created_at ? new Date(p.created_at + 'Z').toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '?';
+        const worker = p.username ? `@${p.username}` : p.name || `ID:${p.user_id}`;
+        text += `<b>#${p.id}</b> | ${worker} | ${p.amount.toLocaleString()}₽ | ${dirName} | ${date}\n`;
+        buttons.push([{ text: `❌ #${p.id} — ${p.amount.toLocaleString()}₽ (${worker})`, callback_data: `delprofit_select_${p.id}` }]);
+      }
+
+      const navRow = [];
+      if (page > 0) navRow.push({ text: '⬅️ Назад', callback_data: `delprofit_page_${page - 1}` });
+      if (hasMore) navRow.push({ text: 'Вперёд ➡️', callback_data: `delprofit_page_${page + 1}` });
+      if (navRow.length) buttons.push(navRow);
+
+      buttons.push([
+        { text: '🔍 Поиск по username', callback_data: 'delprofit_search' },
+        { text: '🔍 Поиск по ID профита', callback_data: 'delprofit_search_id' }
+      ]);
+      buttons.push([{ text: '❌ Отмена', callback_data: 'delprofit_cancel' }]);
+
+      bot.sendMessage(chatId, text, {
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: buttons }
+      });
+    }
+  );
+}
+
+// Показать подтверждение удаления
+function showDeleteConfirmation(chatId, profitId) {
+  db.get(
+    `SELECT p.id, p.user_id, p.amount, p.amount_to_pay, p.direction, p.created_at,
+            u.username, u.name, u.balance, u.total_earned, u.profit_count
+     FROM profits p
+     LEFT JOIN users u ON u.user_id = p.user_id
+     WHERE p.id = ?`,
+    [profitId],
+    (err, profit) => {
+      if (err || !profit) {
+        bot.sendMessage(chatId, '❌ Профит не найден');
+        return;
+      }
+
+      const dirName = profit.direction === 1 ? 'Кардинг' : profit.direction === 2 ? 'Прямой' : 'Букмекер';
+      const date = profit.created_at ? new Date(profit.created_at + 'Z').toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '?';
+      const worker = profit.username ? `@${profit.username}` : profit.name || `ID:${profit.user_id}`;
+
+      const text = `<b>⚠️ Подтвердите удаление профита</b>
+
+<b>ID:</b> #${profit.id}
+<b>Воркер:</b> ${worker}
+<b>Сумма:</b> ${profit.amount.toLocaleString()}₽
+<b>К выплате:</b> ${profit.amount_to_pay.toLocaleString()}₽
+<b>Направление:</b> ${dirName}
+<b>Дата:</b> ${date}
+
+<b>После удаления:</b>
+• Баланс воркера: ${profit.balance.toLocaleString()}₽ → ${Math.max(0, profit.balance - profit.amount_to_pay).toLocaleString()}₽
+• Всего заработано: ${profit.total_earned.toLocaleString()}₽ → ${Math.max(0, profit.total_earned - profit.amount).toLocaleString()}₽
+• Статистика профитов: ${profit.profit_count} → ${Math.max(0, profit.profit_count - 1)}
+• Проектная касса уменьшится на ${profit.amount.toLocaleString()}₽
+
+Это действие <b>необратимо</b>!`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: '✅ Да, удалить', callback_data: `delprofit_confirm_${profit.id}` }],
+          [{ text: '⬅️ Назад к списку', callback_data: 'delprofit_list' }, { text: '❌ Отмена', callback_data: 'delprofit_cancel' }]
+        ]
+      };
+
+      bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
+    }
+  );
+}
+
+// Выполнить удаление профита
+function executeProfitDeletion(chatId, profitId) {
+  db.get(
+    `SELECT p.id, p.user_id, p.amount, p.amount_to_pay, p.direction,
+            u.username, u.name
+     FROM profits p
+     LEFT JOIN users u ON u.user_id = p.user_id
+     WHERE p.id = ?`,
+    [profitId],
+    (err, profit) => {
+      if (err || !profit) {
+        bot.sendMessage(chatId, '❌ Профит не найден');
+        return;
+      }
+
+      const xpGain = battlepass.xpFromAmount(profit.amount, profit.direction);
+
+      // 1. Удаляем profit_shares
+      db.run('DELETE FROM profit_shares WHERE profit_id = ?', [profitId], (err) => {
+        if (err) console.error('Error deleting profit_shares:', err);
+      });
+
+      // 2. Удаляем community_profits (если есть)
+      db.run('DELETE FROM community_profits WHERE profit_id = ?', [profitId], (err) => {
+        if (err) console.error('Error deleting community_profits:', err);
+      });
+
+      // 3. Удаляем сам профит
+      db.run('DELETE FROM profits WHERE id = ?', [profitId], (err) => {
+        if (err) {
+          console.error('Error deleting profit:', err);
+          bot.sendMessage(chatId, '❌ Ошибка при удалении профита');
+          return;
+        }
+
+        // 4. Обновляем статистику воркера
+        db.run(`UPDATE users SET
+          balance = MAX(0, balance - ?),
+          total_earned = MAX(0, total_earned - ?),
+          battlepass_earned = MAX(0, COALESCE(battlepass_earned, 0) - ?),
+          battlepass_xp = MAX(0, COALESCE(battlepass_xp, 0) - ?),
+          profit_count = MAX(0, profit_count - 1)
+        WHERE user_id = ?`,
+        [profit.amount_to_pay, profit.amount, profit.amount, xpGain, profit.user_id],
+        (err) => {
+          if (err) console.error('Error updating user stats:', err);
+        });
+
+        // 5. Обновляем статус воркера
+        utils.updateWorkerStatus(profit.user_id, () => {});
+
+        // 6. Обновляем статистику проекта
+        db.get('SELECT value FROM stats WHERE key = ?', ['project_balance'], (err, row) => {
+          if (!err && row) {
+            const newBalance = Math.max(0, parseInt(row.value || '0') - profit.amount);
+            db.run('UPDATE stats SET value = ? WHERE key = ?', [newBalance.toString(), 'project_balance']);
+          }
+        });
+        db.get('SELECT value FROM stats WHERE key = ?', ['total_profits'], (err, row) => {
+          if (!err && row) {
+            const newCount = Math.max(0, parseInt(row.value || '0') - 1);
+            db.run('UPDATE stats SET value = ? WHERE key = ?', [newCount.toString(), 'total_profits']);
+          }
+        });
+
+        // 7. Обновляем закреп
+        updatePinnedMessage(bot, GENERAL_CHAT_ID).catch(() => {});
+
+        const worker = profit.username ? `@${profit.username}` : profit.name || `ID:${profit.user_id}`;
+        bot.sendMessage(chatId, `✅ <b>Профит #${profit.id} удалён</b>
+
+Воркер: ${worker}
+Сумма: ${profit.amount.toLocaleString()}₽
+Статистика воркера и проекта обновлены.`, { parse_mode: 'HTML' });
+      });
+    }
+  );
+}
+
+// Команда /delprofit — панель удаления профитов (только админы)
+bot.onText(/\/delprofit(?:@[\w_]+)?(?:\s|$)/, (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  if (!adminIds.includes(userId)) {
+    bot.sendMessage(chatId, '❌ У вас нет прав администратора');
+    return;
+  }
+
+  if (msg.chat.type !== 'private') {
+    bot.sendMessage(chatId, '❌ Эта команда работает только в личных сообщениях');
+    return;
+  }
+
+  showProfitList(chatId, userId, 0);
+});
+
+// Обработка callback для удаления профитов
+bot.on('callback_query', (query) => {
+  const chatId = query.message.chat.id;
+  const userId = query.from.id;
+  const data = query.data;
+
+  if (!data.startsWith('delprofit_')) return;
+  if (!adminIds.includes(userId)) {
+    bot.answerCallbackQuery(query.id, { text: '❌ Нет прав', show_alert: true });
+    return;
+  }
+
+  bot.answerCallbackQuery(query.id);
+
+  // Отмена
+  if (data === 'delprofit_cancel') {
+    bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
+    bot.sendMessage(chatId, '❌ Удаление профита отменено');
+    return;
+  }
+
+  // Список профитов
+  if (data === 'delprofit_list') {
+    bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
+    showProfitList(chatId, userId, 0);
+    return;
+  }
+
+  // Пагинация
+  if (data.startsWith('delprofit_page_')) {
+    const page = parseInt(data.replace('delprofit_page_', ''));
+    bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
+    showProfitList(chatId, userId, page);
+    return;
+  }
+
+  // Выбор профита
+  if (data.startsWith('delprofit_select_')) {
+    const profitId = parseInt(data.replace('delprofit_select_', ''));
+    bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
+    showDeleteConfirmation(chatId, profitId);
+    return;
+  }
+
+  // Подтверждение удаления
+  if (data.startsWith('delprofit_confirm_')) {
+    const profitId = parseInt(data.replace('delprofit_confirm_', ''));
+    bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
+    executeProfitDeletion(chatId, profitId);
+    return;
+  }
+
+  // Поиск по username
+  if (data === 'delprofit_search') {
+    bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
+    profitDeleteState[userId] = { mode: 'search_username' };
+    bot.sendMessage(chatId, '🔍 Введите username для поиска профитов (без @):');
+    return;
+  }
+
+  // Поиск по ID профита
+  if (data === 'delprofit_search_id') {
+    bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
+    profitDeleteState[userId] = { mode: 'search_id' };
+    bot.sendMessage(chatId, '🔍 Введите ID профита для поиска:');
+    return;
+  }
+});
+
+// Обработка текстовых сообщений для поиска профитов
+bot.on('message', (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  if (msg.chat.type !== 'private') return;
+  if (!adminIds.includes(userId)) return;
+
+  const state = profitDeleteState[userId];
+  if (!state) return;
+
+  const text = (msg.text || '').trim();
+  if (!text) return;
+
+  if (state.mode === 'search_username') {
+    const searchTerm = text.replace(/^@+/, '').toLowerCase();
+
+    db.all(
+      `SELECT p.id, p.user_id, p.amount, p.amount_to_pay, p.direction, p.created_at,
+              u.username, u.name
+       FROM profits p
+       LEFT JOIN users u ON u.user_id = p.user_id
+       WHERE LOWER(u.username) = ? OR LOWER(u.name) = ?
+       ORDER BY p.id DESC
+       LIMIT 10`,
+      [searchTerm, searchTerm],
+      (err, rows) => {
+        delete profitDeleteState[userId];
+
+        if (err) {
+          bot.sendMessage(chatId, '❌ Ошибка поиска');
+          return;
+        }
+
+        if (!rows || rows.length === 0) {
+          bot.sendMessage(chatId, '📭 Профиты не найдены для этого пользователя');
+          return;
+        }
+
+        let text = `<b>🔍 Результаты поиска:</b>\n\n`;
+        const buttons = [];
+        for (const p of rows) {
+          const dirName = p.direction === 1 ? 'Кардинг' : p.direction === 2 ? 'Прямой' : 'Букмекер';
+          const date = p.created_at ? new Date(p.created_at + 'Z').toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '?';
+          const worker = p.username ? `@${p.username}` : p.name || `ID:${p.user_id}`;
+          text += `<b>#${p.id}</b> | ${worker} | ${p.amount.toLocaleString()}₽ | ${dirName} | ${date}\n`;
+          buttons.push([{ text: `❌ #${p.id} — ${p.amount.toLocaleString()}₽`, callback_data: `delprofit_select_${p.id}` }]);
+        }
+        buttons.push([{ text: '⬅️ Назад к списку', callback_data: 'delprofit_list' }, { text: '❌ Отмена', callback_data: 'delprofit_cancel' }]);
+
+        bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } });
+      }
+    );
+  } else if (state.mode === 'search_id') {
+    const profitId = parseInt(text);
+
+    if (isNaN(profitId)) {
+      bot.sendMessage(chatId, '❌ Введите корректный числовой ID');
+      return;
+    }
+
+    delete profitDeleteState[userId];
+    showDeleteConfirmation(chatId, profitId);
+  }
+});
 
 console.log('🤖 Бот запущен...');
