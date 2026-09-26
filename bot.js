@@ -1983,19 +1983,20 @@ function buildPublicText(profit) {
     // В публикации выводим профильный тег, а не Telegram username из команды.
     const worker = String(profit.name || profit.username || '').replace(/^[@#]+/, '');
     const fmt = Number(profit.amount).toLocaleString('de-DE');
+    const curatorLine = profit.curator ? `\n┗<tg-emoji emoji-id="5451644835406586277">👨‍🏫</tg-emoji>Куратор: @${profit.curator}` : '';
     return `<b>${e(em.header, '🌸')}УСПЕШНЫЙ ПРОФИТ${e(em.header, '🌸')}
 
 ${e(em.service, '🏠')}Сервис: Букмекер
 ┣${e(em.worker, '👤')}Воркер: <a href="${profileLink}">#${worker}</a>
-┗${e(em.amount, '💸')}Сумма: ${fmt}₽</b>`;
+┣${e(em.amount, '💸')}Сумма: ${fmt}₽${curatorLine}</b>`;
   }
 
   let text = `<b>${e(em.header, '🌸')}УСПЕШНЫЙ ПРОФИТ${e(em.header, '🌸')}${profit.mammothCount ? `\n┗ X${profit.mammothCount}` : ''}
 
 ${e(em.service, '🏠')}Сервис: ${profit.directionName}
 ┣${e(em.worker, '👤')}Воркер: <a href="${profileLink}">${profit.name}</a>`;
-  if (profit.direction === 1 && profit.curator) {
-    text += `\n┣${e(em.amount, '💸')}Сумма: ${utils.formatAmount(profit.amount)}₽\n┗👨‍🏫Куратор: @${profit.curator}</b>`;
+  if ([1, 3].includes(profit.direction) && profit.curator) {
+    text += `\n┣${e(em.amount, '💸')}Сумма: ${utils.formatAmount(profit.amount)}₽\n┗<tg-emoji emoji-id="5451644835406586277">👨‍🏫</tg-emoji>Куратор: @${profit.curator}</b>`;
   } else {
     text += `\n┗${e(em.amount, '💸')}Сумма: ${utils.formatAmount(profit.amount)}₽</b>`;
   }

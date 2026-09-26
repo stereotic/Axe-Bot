@@ -464,8 +464,8 @@ ${e(em.service, '🏠')}Сервис: ${directionName}
 ┣${e(em.worker, '👤')}Воркер: <a href="${profileLink}">${workerName}</a>`;
 
         // Добавляем куратора, если он есть и направление = 1 (Кардинг)
-        if (direction === 1 && user.curator) {
-          publicText += `\n┣${e(em.amount, '💸')}Сумма: ${utils.formatAmount(amount)}₽\n┗👨‍🏫Куратор: @${user.curator}</b>`;
+        if ([1, 3].includes(direction) && user.curator) {
+          publicText += `\n┣${e(em.amount, '💸')}Сумма: ${utils.formatAmount(amount)}₽\n┗<tg-emoji emoji-id="5451644835406586277">👨‍🏫</tg-emoji>Куратор: @${user.curator}</b>`;
         } else {
           publicText += `\n┗${e(em.amount, '💸')}Сумма: ${utils.formatAmount(amount)}₽</b>`;
         }

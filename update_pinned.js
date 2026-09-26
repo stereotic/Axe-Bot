@@ -176,7 +176,7 @@ ${topWorkerLine}
 ┣<b>Материалы -</b> <a href="https://t.me/+GMixQrZvJkQ4ODE6"><b>ССЫЛКА</b></a>
 ┣<b>Профиты -</b> <a href="https://axe.crystalcards.store/?v=2"><b>ОТКРЫТЬ</b></a>
 ┣<b>AXE PASS -</b> <a href="https://axe.crystalcards.store/pass"><b>ОТКРЫТЬ</b></a>
-┣<b>AXE NEWS -</b> <a href="https://t.me/AXE_SMS_xBot"><b>ССЫЛКА</b></a>
+┣<b>AXE NEWS -</b> <a href="https://t.me/+BO1F4O1KUd0zZTI6"><b>ССЫЛКА</b></a>
 ┣<b>AXE SPAM -</b> <a href="https://t.me/Axe_spm_xBOT"><b>ССЫЛКА</b></a>
 ┣<b>AXE SMS -</b> <a href="https://t.me/AXE_SMS_xBot"><b>ССЫЛКА</b></a>
 ┣<b>AXE VPN -</b> <a href="https://t.me/AXE_VPNxBot"><b>ССЫЛКА</b></a>
@@ -194,6 +194,7 @@ ${topWorkerLine}
 <b>1.</b> #AXE в нике аккаунта +3% к выплате профита.
 <b>2.</b> Топ 1 суток +5% к выплате профита
 <b>3.</b> ${battlePassUrl ? `<a href="${battlePassUrl}"><b>AXE PASS</b></a>` : '<b>AXE PASS</b>'}
+<b>4.</b> <a href="https://t.me/+Cp7Am6bpR6o2YTQy"><b>Серия профитов</b></a>
 
 <tg-emoji emoji-id="5445101435551261855">⚡️</tg-emoji><a href="https://t.me/boost?c=3986505552"><b>BOOST CHAT</b></a>
 
