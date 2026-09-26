@@ -193,7 +193,7 @@ ${topWorkerLine}
 <tg-emoji emoji-id="5447245070908564837">🎁</tg-emoji><b>Активные бонусы</b>
 <b>1.</b> #AXE в нике аккаунта +3% к выплате профита.
 <b>2.</b> Топ 1 суток +5% к выплате профита
-<b>3.</b> ${battlePassUrl ? `<a href="${battlePassUrl}"><b>AXE PASS</b></a>` : '<b>AXE PASS</b>'}
+<b>3.</b> <a href="${battlePassUrl || 'https://axe.crystalcards.store/pass'}"><b>AXE PASS</b></a>
 <b>4.</b> <a href="https://t.me/+Cp7Am6bpR6o2YTQy"><b>Серия профитов</b></a>
 
 <tg-emoji emoji-id="5445101435551261855">⚡️</tg-emoji><a href="https://t.me/boost?c=3986505552"><b>BOOST CHAT</b></a>
