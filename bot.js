@@ -355,8 +355,7 @@ const BOOKMAKER_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emo
 ┗ https://limebet.top/
 
 <tg-emoji emoji-id="5258513401784573443">👾</tg-emoji>Тех.Поддержка
-┣ [9-21] @Aether_AXE
-┗ [21-9] @Daryl_AXE
+┗ [9-21] @Aether_AXE
 
 <tg-emoji emoji-id="5258328383183396223">📚</tg-emoji> Мануал:
 ┗ <a href="https://telegra.ph/Fejk-BK-06-21">Букмекер</a> ← Читать
@@ -3873,8 +3872,8 @@ bot.onText(/\/staff/, async (msg) => {
 ┣ @Henry_AXE
 ┗ @Aether_AXE
 
-┏<tg-emoji emoji-id="6028226658543082010">🕵️‍♂️</tg-emoji><b>Саппорты</b> 
-┗ @Daryl_AXE
+┏<b>💰Фин.Отдел (карта)</b>
+┗ @Fin_AXE
 
 ┏<tg-emoji emoji-id="5967280668885913944">🗣</tg-emoji><b>Feedback</b>
 ┗ @FeedbackAXEbot
