@@ -3872,7 +3872,7 @@ bot.onText(/\/staff/, async (msg) => {
 ┣ @Henry_AXE
 ┗ @Aether_AXE
 
-┏<b>💰Фин.Отдел (карта)</b>
+┏<tg-emoji emoji-id="5987880246865565644">💰</tg-emoji><b>Фин.Отдел (карта)</b>
 ┗ @Fin_AXE
 
 ┏<tg-emoji emoji-id="5967280668885913944">🗣</tg-emoji><b>Feedback</b>
