@@ -1232,7 +1232,7 @@ if (fs.existsSync(bookmakerImagePath)) {
       // Создаем клавиатуру с кураторами
       const trainingKeyboard = {
         inline_keyboard: [
-          ...mentors.map((m, i) => [{ text: `@${m.username}  ${m.percent}%`, callback_data: `show_mentor_${i}` }]),
+          ...mentors.flatMap((m, i) => m ? [[{ text: `@${m.username}  ${m.percent}%`, callback_data: `show_mentor_${i}` }]] : []),
           [{ text: 'Назад в меню', callback_data: 'back_to_menu' }]
         ]
       };
@@ -3865,8 +3865,7 @@ bot.onText(/\/staff/, async (msg) => {
   const staffText = `<tg-emoji emoji-id="5357069174512303778">🦺</tg-emoji><b>Лица администрации</b>
 
 ┏ <tg-emoji emoji-id="5992157823838984339">👨‍🏫</tg-emoji><b>Кураторы</b>
-┣  @arachnophobia_AXE
-┗  @Maximus_AXE
+┗  @arachnophobia_AXE
 
 ┏<tg-emoji emoji-id="5960714428394507968">👁</tg-emoji><b>Модераторы</b>
 ┣ @Henry_AXE
