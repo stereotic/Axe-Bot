@@ -463,7 +463,7 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
 ${e(em.service, '🏠')}Сервис: ${directionName}
 ┣${e(em.worker, '👤')}Воркер: <a href="${profileLink}">${workerName}</a>`;
 
-        // Добавляем куратора, если он есть и направление = 1 (Кардинг)
+        // Добавляем куратора, если он есть и направление = 1 (Биржа)
         if ([1, 3].includes(direction) && user.curator) {
           publicText += `\n┣${e(em.amount, '💸')}Сумма: ${utils.formatAmount(amount)}₽\n┗<tg-emoji emoji-id="5451644835406586277">👨‍🏫</tg-emoji>Куратор: @${user.curator}</b>`;
         } else {

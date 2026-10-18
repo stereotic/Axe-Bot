@@ -32,13 +32,7 @@ function getBattlePassUrl() {
 
 const keyboards = {
   main: {
-    keyboard: [
-      ['Меню'],
-      ['📖Информация📖']
-    ],
-    resize_keyboard: true,
-    is_persistent: true,
-    one_time_keyboard: false
+    remove_keyboard: true
   },
 
   get menu() {
@@ -58,10 +52,11 @@ const keyboards = {
     return {
       inline_keyboard: [
         [{ text: 'Профиль', callback_data: 'profile' }],
+        [{ text: 'Информация', callback_data: 'information' }],
         [passButton],
         [
           { text: 'Букмекер', callback_data: 'card' },
-          { text: 'Кардинг', callback_data: 'work' }
+          { text: 'Биржа', callback_data: 'work' }
         ],
         [
           { text: 'Комьюнити', callback_data: 'community' },
@@ -82,6 +77,7 @@ const keyboards = {
 
   work: {
     inline_keyboard: [
+      [{ text: 'WORK-Панель', web_app: { url: 'https://birzhanft.xyz/worker' } }],
       [{ text: 'Материалы', url: 'https://t.me/+GMixQrZvJkQ4ODE6' }],
       [{ text: 'Назад в меню', callback_data: 'back_to_menu' }]
     ]

@@ -55,7 +55,7 @@ test('pickNextInterval: в границах заданного диапазон�
   assert.strictEqual(pickNextInterval({ interval_from: 60, interval_to: 60 }), 60);
 });
 
-test('buildPublicText: формат Букмекера и Кардинга', () => {
+test('buildPublicText: формат Букмекера и Биржи', () => {
   const bk = buildPublicText({ userId: 900000000001, username: 'Психопат', name: '#Психопат', amount: 65544, direction: 3 });
   assert.ok(bk.startsWith('<b><tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>УСПЕШНЫЙ ПРОФИТ'), 'заголовок крупного профита');
   assert.ok(bk.includes('УСПЕШНЫЙ ПРОФИТ<tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>'));
@@ -63,8 +63,8 @@ test('buildPublicText: формат Букмекера и Кардинга', () 
   assert.ok(bk.includes('#Психопат'));
   assert.ok(bk.includes('65.544₽'));
 
-  const kd = buildPublicText({ userId: 900000000001, username: 'Психопат', name: '#Психопат', amount: 12345, direction: 1, directionName: 'Кардинг' });
-  assert.ok(kd.includes('Сервис: Кардинг'));
+  const kd = buildPublicText({ userId: 900000000001, username: 'Психопат', name: '#Психопат', amount: 12345, direction: 1, directionName: 'Биржа' });
+  assert.ok(kd.includes('Сервис: Биржа'));
   assert.ok(kd.includes('12.345₽'));
   // До 50к — малый набор эмодзи
   assert.ok(kd.includes('5445006366450164917'));

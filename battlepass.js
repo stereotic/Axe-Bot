@@ -37,7 +37,7 @@ function xpFromEarned(totalEarned) {
   return steps * XP_PER_STEP;
 }
 
-// XP за один профит по направлению. «Кардинг» (1) и «Букмекер» (3) — базовая
+// XP за один профит по направлению. «Биржа» (1) и «Букмекер» (3) — базовая
 // ставка, «Прямой» (2) — пониженная 0.2 XP за 10.000 ₽.
 function xpFromAmount(amount, direction) {
   const perStep = (direction === 2) ? DIRECT_XP_PER_STEP : XP_PER_STEP;

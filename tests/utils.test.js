@@ -3,10 +3,11 @@ const assert = require('node:assert');
 
 const utils = require('../utils');
 
-test('calculateWorkerPayout: 80% кардинг, 75% прямик, floor', () => {
-  assert.strictEqual(utils.calculateWorkerPayout(10000, 1), 8000);
+test('calculateWorkerPayout: 75% биржа, прямой и букмекер, floor', () => {
+  assert.strictEqual(utils.calculateWorkerPayout(10000, 1), 7500);
   assert.strictEqual(utils.calculateWorkerPayout(10000, 2), 7500);
-  assert.strictEqual(utils.calculateWorkerPayout(999, 1), 799);
+  assert.strictEqual(utils.calculateWorkerPayout(10000, 3), 7500);
+  assert.strictEqual(utils.calculateWorkerPayout(999, 1), 749);
 });
 
 test('calculateProfitShares: доли 5/5/3/7 от суммы', () => {
@@ -24,7 +25,7 @@ test('getStatusByTotal: пороги уровней', () => {
 });
 
 test('getDirectionName', () => {
-  assert.strictEqual(utils.getDirectionName(1), 'Кардинг');
+  assert.strictEqual(utils.getDirectionName(1), 'Биржа');
   assert.strictEqual(utils.getDirectionName(2), 'Прямой');
 });
 

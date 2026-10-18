@@ -42,7 +42,7 @@ bot.on('polling_error', error => console.error('GROOMING polling error:', error.
 bot.onText(/\/start(?:@[\w_]+)?(?:\s|$)/u, async message => {
   try {
     const text = `<b><tg-emoji emoji-id="5451845805516302233">🌸</tg-emoji>GROOMING COMMUNITY</b>\n\n` +
-      `Направление: Кардинг\n` +
+      `Направление: Биржа\n` +
       `Концепция: Фейк Тима\n` +
       `Создатель: @symphonik_AXE\n\n` +
       `Используй <b>/top</b> чтобы увидеть топ грумеров.`;
@@ -93,7 +93,7 @@ function profileLink(user) {
 function profitText(user, amount) {
   const worker = user.name && user.name !== '#' ? user.name.replace(/^#/, '') : (user.username || 'Воркер');
   return `<b><tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji>УСПЕШНЫЙ ПРОФИТ<tg-emoji emoji-id="5444984118519573636">🌸</tg-emoji></b>\n\n` +
-    `<b><tg-emoji emoji-id="5445006366450164917">🏠</tg-emoji>Сервис: Кардинг</b>\n` +
+    `<b><tg-emoji emoji-id="5445006366450164917">🏠</tg-emoji>Сервис: Биржа</b>\n` +
     `<b>┣<tg-emoji emoji-id="5445214049593766654">👤</tg-emoji>Воркер: <a href="${profileLink(user)}">#${worker}</a></b>\n` +
     `<b>┣<tg-emoji emoji-id="5445152270784178138">💸</tg-emoji>Сумма: ${amountText(amount)}₽</b>\n` +
     `<b>┗ <tg-emoji emoji-id="5451845805516302233">😀</tg-emoji><a href="https://t.me/AXE_xBot">GROOMING</a></b>`;

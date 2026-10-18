@@ -180,7 +180,7 @@ bot.setMyCommands([
   { command: 'materials', description: 'Обучающие материалы' },
   { command: 'top', description: 'Топ воркеров за все время' },
   { command: 'card', description: 'Актуальные реквизиты' },
-  { command: 'keyboard', description: 'Показать кнопки Меню и Информация' }
+  { command: 'keyboard', description: 'Убрать старые кнопки навигации' }
 ]).then(() => {
   console.log('✅ Меню команд установлено');
 }).catch((err) => {
@@ -313,21 +313,18 @@ const INFO_BANNER = () => {
 
       const projectBalance = parseInt(row?.total || '0');
       const totalProfits = parseInt(row?.count || '0');
-      const banner = `<b>AXE TEAM - Информация </b>
-
-<tg-emoji emoji-id="5987880246865565644">💸</tg-emoji><b>Проценты выплат
-┣Букмекер - 70%
-┣Кардинг - 80%
+      const banner = `<tg-emoji emoji-id="5987880246865565644">💸</tg-emoji><b>Выплаты:
+┏Пополнение - 75%
 ┗Прямой перевод - 75%</b>
 
-<tg-emoji emoji-id="5956561916573782596">🏠</tg-emoji><b>Сервисы</b>
-┣ <b>Букмекер
-┗ Кардинг</b>
+<tg-emoji emoji-id="5956561916573782596">🏠</tg-emoji><b>Сервисы:
+┏ Биржа WEB
+┗ Букмекер WEB</b>
 
 <tg-emoji emoji-id="5258330865674494479">🏦</tg-emoji><b>Касса проекта: </b><b><i>${projectBalance.toLocaleString('en-US')}₽</i>
 ┗Кол-во профитов: </b><b><i>${totalProfits} шт</i></b>
 
-<tg-emoji emoji-id="5258419835922030550">📆</tg-emoji><b>Дата открытия проекта 06.06.2026.</b>`;
+<tg-emoji emoji-id="5258419835922030550">📆</tg-emoji>Дата открытия проекта 06.06.2026`;
 
       infoBannerCache = { text: banner, timestamp: now };
       resolve(banner);
@@ -335,19 +332,18 @@ const INFO_BANNER = () => {
   });
 };
 
-const WORK_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji>Сервис:</b> <b>Кардинг</b> 
+const WORK_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji>Сервис: Биржа WEB </b><i>(TRADE, NFT, Акции, Exchange)</i>
 
-<b><tg-emoji emoji-id="5258093637450866522">🤖</tg-emoji>Бот</b> <i>(Магазин)</i>
-┗ @CrystalCC_xBot
+<tg-emoji emoji-id="5260730055880876557">🌐</tg-emoji><b>Сайт:</b>
+<b>┗ </b><a href="http://birzhanft.xyz">http://birzhanft.xyz</a>
 
-<tg-emoji emoji-id="5258513401784573443">👾</tg-emoji><b>ТП</b> <i>(Обнальщик)</i>
-┣ @Opium2D
-┗ 👨‍💻: @arachnophobia_AXE
+<tg-emoji emoji-id="5258513401784573443">👾</tg-emoji><b>ТП</b>
+<b>┗ [9-21] @arachnophobia_AXE</b>
 
 <b><tg-emoji emoji-id="5258328383183396223">📚</tg-emoji> Мануал</b>:
-┗ <a href="https://telegra.ph/Napravlenie-Karding-05-12">Кардинг</a> ← Читать
+┗ <a href="https://telegra.ph/Birzha-09-27"><b>Биржа</b></a> ← Читать
 
-• <b>WORK-Панель</b>, <i>и  реферальная ссылка находится в </i><i><b>магазине</b> по команде</i> /bb`;
+• <b>WORK-Панель открывается в формате WEB и MiniApp</b>`;
 
 const BOOKMAKER_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji>Сервис: Букмекер
 
@@ -1007,7 +1003,7 @@ function transferProfileData(sourceUserId, targetUserId, chatId) {
 }
 
 // Функция обработки защищенных callback'ов
-function handleProtectedCallback(query, data, chatId, userId) {
+async function handleProtectedCallback(query, data, chatId, userId) {
   const messageId = query.message.message_id;
   const hasPhoto = query.message.photo ? true : false;
 
@@ -1134,6 +1130,24 @@ ${mentor.benefits}`;
   }
 
   switch (data) {
+    case 'information': {
+      bot.answerCallbackQuery(query.id);
+      try {
+        const banner = await INFO_BANNER();
+        const infoImagePath = path.join(__dirname, 'images', 'menu.jpg');
+        const replyMarkup = await statusChats.buildInfoKeyboardForUser(userId);
+        replaceMenuMessage(chatId, messageId, fs.existsSync(infoImagePath) ? {
+          type: 'photo', imagePath: infoImagePath, caption: banner, parse_mode: 'HTML', reply_markup: replyMarkup
+        } : {
+          type: 'text', text: banner, parse_mode: 'HTML', reply_markup: replyMarkup
+        });
+      } catch (err) {
+        console.error('Information menu navigation error:', err);
+        bot.sendMessage(chatId, '❌ Ошибка получения информации').catch(() => {});
+      }
+      break;
+    }
+
     case 'back_to_menu':
       bot.answerCallbackQuery(query.id);
       const menuImagePath = path.join(__dirname, 'images', 'info.jpg');
@@ -1205,7 +1219,10 @@ if (fs.existsSync(bookmakerImagePath)) {
 
     case 'work':
       bot.answerCallbackQuery(query.id);
-      const workImagePath = path.join(__dirname, 'images', 'work.jpg');
+      const exchangeImagePath = path.join(__dirname, 'images', 'exchange.jpg');
+      const workImagePath = fs.existsSync(exchangeImagePath)
+        ? exchangeImagePath
+        : path.join(__dirname, 'images', 'work.jpg');
 
       if (fs.existsSync(workImagePath)) {
         replaceMenuMessage(chatId, messageId, {
@@ -1282,7 +1299,7 @@ if (fs.existsSync(bookmakerImagePath)) {
         [GROOMING_COMMUNITY.key],
         (err, row) => {
           const cash = err ? 0 : Number(row?.total || 0);
-          const communityText = `<tg-emoji emoji-id="5451845805516302233">🌸</tg-emoji><b>GROOMING COMMUNITY</b>\n<b>— Создано: <i>${GROOMING_COMMUNITY.createdAt}</i></b>\n\n<tg-emoji emoji-id="5445006366450164917">💳</tg-emoji><b>Направление - Кардинг</b>\n\n<blockquote><tg-emoji emoji-id="5449873797052148929">💭</tg-emoji><b>Концепция - Фейк Тима</b></blockquote>\n\n<tg-emoji emoji-id="5445152270784178138">💸</tg-emoji><b>Касса комьюнити: ${utils.formatAmount(cash)}₽</b>\n\n<tg-emoji emoji-id="5451767267744328949">🏛</tg-emoji><b>Создатель: ${GROOMING_COMMUNITY.creatorUsername}</b>`;
+          const communityText = `<tg-emoji emoji-id="5451845805516302233">🌸</tg-emoji><b>GROOMING COMMUNITY</b>\n<b>— Создано: <i>${GROOMING_COMMUNITY.createdAt}</i></b>\n\n<tg-emoji emoji-id="5445006366450164917">💳</tg-emoji><b>Направление - Биржа</b>\n\n<blockquote><tg-emoji emoji-id="5449873797052148929">💭</tg-emoji><b>Концепция - Фейк Тима</b></blockquote>\n\n<tg-emoji emoji-id="5445152270784178138">💸</tg-emoji><b>Касса комьюнити: ${utils.formatAmount(cash)}₽</b>\n\n<tg-emoji emoji-id="5451767267744328949">🏛</tg-emoji><b>Создатель: ${GROOMING_COMMUNITY.creatorUsername}</b>`;
           const replyMarkup = {
             inline_keyboard: [
               [{ text: 'Вступить', callback_data: 'community_join_grooming' }],
@@ -2031,7 +2048,8 @@ function prepareDrawProfit(chatId, { username: workerUsername, amount, direction
       : '#' + (workerData.name || workerData.username);
 
     const hasCurator = [1, 3].includes(direction) && user && user.curator;
-    const workerPayout = hasCurator ? Math.floor(amount * (direction === 3 ? 50 : 60) / 100) : utils.calculateWorkerPayout(amount, direction);
+    // База для Биржи и Букмекера — 75%; у ученика отдельно удерживается 20% куратора.
+    const workerPayout = hasCurator ? Math.floor(amount * 55 / 100) : utils.calculateWorkerPayout(amount, direction);
     const shares = utils.calculateProfitShares(amount);
     const directionName = utils.getDirectionName(direction);
 
@@ -2105,7 +2123,8 @@ bot.onText(/^@[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
       : '#' + (user.name || user.username);
 
     const hasCurator = [1, 3].includes(direction) && user.curator;
-    const workerPayout = hasCurator ? Math.floor(amount * (direction === 3 ? 50 : 60) / 100) : utils.calculateWorkerPayout(amount, direction);
+    // База для Биржи и Букмекера — 75%; у ученика отдельно удерживается 20% куратора.
+    const workerPayout = hasCurator ? Math.floor(amount * 55 / 100) : utils.calculateWorkerPayout(amount, direction);
     const shares = utils.calculateProfitShares(amount);
     const directionName = utils.getDirectionName(direction);
 
@@ -3575,7 +3594,7 @@ ${withdrawal.check_message || ''}`;
 
   // Обработка остальных callback
   // Проверяем одобрена ли заявка для доступа к основному функционалу
-  const protectedCallbacks = ['profile', 'work', 'training', 'card', 'community', 'feedback', 'settings', 'useful',
+  const protectedCallbacks = ['profile', 'information', 'work', 'training', 'card', 'community', 'feedback', 'settings', 'useful',
                                'materials', 'profile_settings', 'change_name', 'hide_profile',
                                'transfer_profile', 'withdraw', 'cancel_withdraw', 'back_to_menu',
                                'payout_wallet', 'wallet_set_cryptobot', 'wallet_set_trc20',
@@ -3717,7 +3736,7 @@ bot.onText(/\/kassaq(?:@[\w_]+)?(?:\s|$)/, async (msg) => {
           bot.sendMessage(chatId, '❌ Не удалось посчитать направления.');
           return;
         }
-        const names = { 1: 'Кардинг', 2: 'Прямой', 3: 'Букмекер' };
+        const names = { 1: 'Биржа', 2: 'Прямой', 3: 'Букмекер' };
         const directionLines = (directions || []).map((d) =>
           `<b>🚀${names[d.direction] || 'Другое'}</b>\n💸Сумма профита: ${fmt(d.amount)}₽ ~ ${fmt(usd(d.amount))}$\n💼К выплате: ${fmt(d.payout)}₽ ~ ${fmt(usd(d.payout))}$`
         ).join('\n\n');
@@ -4598,7 +4617,7 @@ function showProfitList(chatId, userId, page = 0) {
 
       const buttons = [];
       for (const p of profits) {
-        const dirName = p.direction === 1 ? 'Кардинг' : p.direction === 2 ? 'Прямой' : 'Букмекер';
+        const dirName = p.direction === 1 ? 'Биржа' : p.direction === 2 ? 'Прямой' : 'Букмекер';
         const date = p.created_at ? new Date(p.created_at + 'Z').toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '?';
         const worker = p.username ? `@${p.username}` : p.name || `ID:${p.user_id}`;
         text += `<b>#${p.id}</b> | ${worker} | ${p.amount.toLocaleString()}₽ | ${dirName} | ${date}\n`;
@@ -4639,7 +4658,7 @@ function showDeleteConfirmation(chatId, profitId) {
         return;
       }
 
-      const dirName = profit.direction === 1 ? 'Кардинг' : profit.direction === 2 ? 'Прямой' : 'Букмекер';
+      const dirName = profit.direction === 1 ? 'Биржа' : profit.direction === 2 ? 'Прямой' : 'Букмекер';
       const date = profit.created_at ? new Date(profit.created_at + 'Z').toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '?';
       const worker = profit.username ? `@${profit.username}` : profit.name || `ID:${profit.user_id}`;
 
@@ -4880,7 +4899,7 @@ bot.on('message', (msg) => {
         let text = `<b>🔍 Результаты поиска:</b>\n\n`;
         const buttons = [];
         for (const p of rows) {
-          const dirName = p.direction === 1 ? 'Кардинг' : p.direction === 2 ? 'Прямой' : 'Букмекер';
+          const dirName = p.direction === 1 ? 'Биржа' : p.direction === 2 ? 'Прямой' : 'Букмекер';
           const date = p.created_at ? new Date(p.created_at + 'Z').toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '?';
           const worker = p.username ? `@${p.username}` : p.name || `ID:${p.user_id}`;
           text += `<b>#${p.id}</b> | ${worker} | ${p.amount.toLocaleString()}₽ | ${dirName} | ${date}\n`;

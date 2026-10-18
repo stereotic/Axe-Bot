@@ -5,7 +5,7 @@ const mentors = [
     username: 'Arachnophobia_AXE',
     userId: null,
     banner: 'mentor_alprazalam.jpg',
-    service: 'Кардинг, Букмекер',
+    service: 'Биржа, Букмекер',
     hiredAt: '05.08.2026',
     percent: 20,
     trainingProfits: 5,
@@ -73,7 +73,7 @@ function notifyCuratorOfProfit(bot, db, profit) {
   const curatorCut = Math.floor(amount * percent / 100);
   const student = String(profit.username || profit.name || '').replace(/^[@#]+/, '');
   const studentLabel = student ? `@${student}` : 'ID';
-  const directionName = profit.directionName || 'Кардинг';
+  const directionName = profit.directionName || 'Биржа';
 
   const text = `<b><tg-emoji emoji-id="5445088267181531740">🪓</tg-emoji>Твой ученик совершил профит!
 

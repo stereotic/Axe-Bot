@@ -71,7 +71,8 @@ const buildInfoKeyboard = (status) => ({
       { text: '💸Профиты', web_app: { url: PROFITS_APP_URL } },
       { text: '📢Новости', url: OPEN_CHAT_LINKS.news }
     ],
-    [{ text: '📁Материалы', url: OPEN_CHAT_LINKS.materials }]
+    [{ text: '📁Материалы', url: OPEN_CHAT_LINKS.materials }],
+    [{ text: 'Меню', callback_data: 'back_to_menu' }]
   ]
 });
 

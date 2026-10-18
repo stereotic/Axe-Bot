@@ -19,7 +19,7 @@ const GENERAL_CHAT_ID = '-1003986505552'; // Общий чат
 const AUTO_USER_ID_BASE = 900000000000;
 
 const DIR_LABEL = { 1: 'кд', 2: 'пр', 3: 'бк' };
-const DIR_FULL = { 1: 'Кардинг', 2: 'Прямой', 3: 'Букмекер' };
+const DIR_FULL = { 1: 'Биржа', 2: 'Прямой', 3: 'Букмекер' };
 
 const addFlow = {};   // userId -> состояние добавления пользователя
 const editFlow = {};  // userId -> состояние редактирования (поле/значение)
@@ -257,7 +257,7 @@ ${nextLine}`;
 const ADD_PROMPT = {
   name: '✍️ <b>Отправь ник пользователя</b>\nНапример: Психопат',
   amounts: '💰 <b>Суммы профитов</b> через пробел (одна или несколько — бот выбирает случайно):\nНапример: <code>5000 8000 12000</code>',
-  direction: '📋 <b>Направление</b> (отправь цифру):\n<code>1</code> — Кардинг\n<code>2</code> — Прямой\n<code>3</code> — Букмекер',
+  direction: '📋 <b>Направление</b> (отправь цифру):\n<code>1</code> — Биржа\n<code>2</code> — Прямой\n<code>3</code> — Букмекер',
   time: '⏰ <b>Рабочее время, МСК</b> — начало и конец часа:\nНапример: <code>13-19</code>',
   interval: '🔁 <b>Частота публикации</b>, в минутах (можно диапазон):\nНапример: <code>60</code>\nИли: <code>45-120</code>'
 };
@@ -706,7 +706,7 @@ function setupAutoProfits(bot, adminIds) {
     const editActions = [
       ['ap_editname_', 'name', '✍️ Отправь новый ник:'],
       ['ap_editamounts_', 'amounts', '💰 Отправь новые суммы через пробел:\nНапример: <code>5000 8000 12000</code>'],
-      ['ap_editdir_', 'direction', '📋 Отправь направление:\n<code>1</code> — Кардинг\n<code>2</code> — Прямой\n<code>3</code> — Букмекер'],
+      ['ap_editdir_', 'direction', '📋 Отправь направление:\n<code>1</code> — Биржа\n<code>2</code> — Прямой\n<code>3</code> — Букмекер'],
       ['ap_edittime_', 'time', '⏰ Отправь новое время работы, МСК:\nНапример: <code>13-19</code>'],
       ['ap_editinterval_', 'interval', '🔁 Отправь новую частоту в минутах (или диапазон):\nНапример: <code>45-120</code>']
     ];
