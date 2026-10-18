@@ -52,7 +52,6 @@ const keyboards = {
     return {
       inline_keyboard: [
         [{ text: 'Профиль', callback_data: 'profile' }],
-        [{ text: 'Информация', callback_data: 'information' }],
         [passButton],
         [
           { text: 'Букмекер', callback_data: 'card' },
@@ -70,6 +69,7 @@ const keyboards = {
           { text: 'AXE SMS', icon_custom_emoji_id: '5447245070908564837', url: 'https://t.me/AXE_SMS_xBot' },
           { text: 'AXE DICE', icon_custom_emoji_id: '5447414344159631158', url: 'https://t.me/AXE_DICE_xBot' }
         ],
+        [{ text: 'INFO', icon_custom_emoji_id: '5449873797052148929', callback_data: 'information' }],
         [{ text: 'AXE Poker Project', icon_custom_emoji_id: '5445164597340316440', url: 'https://t.me/AXE_PokerProject_xBot' }]
       ]
     };
