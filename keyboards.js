@@ -66,7 +66,7 @@ const keyboards = {
           { text: 'Полезное', callback_data: 'useful' }
         ],
         [
-          { text: 'AXE SMS', icon_custom_emoji_id: '5447245070908564837', url: 'https://t.me/AXE_SMS_xBot' },
+          { text: 'AXE SMS', icon_custom_emoji_id: '5452028784008010696', url: 'https://t.me/AXE_SMS_xBot' },
           { text: 'AXE DICE', icon_custom_emoji_id: '5447414344159631158', url: 'https://t.me/AXE_DICE_xBot' }
         ],
         [{ text: 'INFO', icon_custom_emoji_id: '5449873797052148929', callback_data: 'information' }],
