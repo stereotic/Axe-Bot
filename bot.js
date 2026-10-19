@@ -335,7 +335,7 @@ const INFO_BANNER = () => {
 const WORK_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji>Сервис: Биржа WEB </b><i>(TRADE, NFT, Акции, Exchange)</i>
 
 <tg-emoji emoji-id="5260730055880876557">🌐</tg-emoji><b>Сайт:</b>
-<b>┗ </b><a href="http://birzhanft.xyz">http://birzhanft.xyz</a>
+<b>┗ <a href="https://enixbit.com">https://enixbit.com</a></b>
 
 <tg-emoji emoji-id="5258513401784573443">👾</tg-emoji><b>ТП</b>
 <b>┗ [9-21] @arachnophobia_AXE</b>

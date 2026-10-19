@@ -77,7 +77,7 @@ const keyboards = {
 
   work: {
     inline_keyboard: [
-      [{ text: 'WORK-Панель', web_app: { url: 'https://birzhanft.xyz/worker' } }],
+      [{ text: 'WORK-Панель', web_app: { url: 'https://enixbit.com/worker' } }],
       [{ text: 'Материалы', url: 'https://t.me/+GMixQrZvJkQ4ODE6' }],
       [{ text: 'Назад в меню', callback_data: 'back_to_menu' }]
     ]
