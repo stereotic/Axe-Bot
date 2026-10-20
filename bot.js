@@ -26,6 +26,7 @@ const { acquire: acquireSingleInstance } = require('./single_instance');
 const { mentors, getMentorByIndex, getMentorByUsername, resolveMentorChatId, notifyCuratorOfProfit } = require('./curators');
 const { setupAutoProfits, cancelAutoFlow, AUTO_USER_ID_BASE } = require('./auto_profits');
 const { sendPrizeNotifications } = require('./prize_notifications');
+const referrals = require('./referrals');
 
 // Короткий текст, если нет картинки для меню (пустой sendMessage/caption Telegram отклоняет).
 const MENU_PANEL_FALLBACK = 'Выбери раздел:';
@@ -1130,6 +1131,14 @@ ${mentor.benefits}`;
   }
 
   switch (data) {
+    case 'referral_workers':
+      bot.answerCallbackQuery(query.id);
+      sendReferralWorkersPanel(chatId, userId).catch((err) => {
+        console.error('Referral workers panel error:', err);
+        bot.sendMessage(chatId, '❌ Не удалось загрузить список рефералов.').catch(() => {});
+      });
+      break;
+
     case 'information': {
       bot.answerCallbackQuery(query.id);
       try {
@@ -2601,6 +2610,13 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
 
             const dbProfitId = this.lastID;
 
+            referrals.awardReferralProfit(bot, db, {
+              profitId: dbProfitId,
+              workerId: targetUserId,
+              amount: profit.amount,
+              direction: profit.direction
+            }).catch((refErr) => console.error('Referral reward error:', refErr));
+
             for (const [role, amount] of Object.entries(profit.shares)) {
               db.run('INSERT OR IGNORE INTO profit_shares (profit_id, role, percentage, amount) VALUES (?, ?, ?, ?)',
                 [dbProfitId, role, utils.PROFIT_SHARES[role], amount],
@@ -3594,7 +3610,7 @@ ${withdrawal.check_message || ''}`;
 
   // Обработка остальных callback
   // Проверяем одобрена ли заявка для доступа к основному функционалу
-  const protectedCallbacks = ['profile', 'information', 'work', 'training', 'card', 'community', 'feedback', 'settings', 'useful',
+  const protectedCallbacks = ['profile', 'information', 'referral_workers', 'work', 'training', 'card', 'community', 'feedback', 'settings', 'useful',
                                'materials', 'profile_settings', 'change_name', 'hide_profile',
                                'transfer_profile', 'withdraw', 'cancel_withdraw', 'back_to_menu',
                                'payout_wallet', 'wallet_set_cryptobot', 'wallet_set_trc20',
@@ -3776,7 +3792,9 @@ bot.onText(/\/me/, async (msg) => {
 // Доступна всем, в меню команд не добавляется (см. bot.setMyCommands выше).
 const REF_GENERAL_CHAT_ID = '-1003986505552'; // Общий чат
 
-bot.onText(/\/ref(?:@[\w_]+)?(?:\s|$)/, (msg) => {
+// Старая реализация оставлена недоступной на один релиз для безопасного отката.
+// Legacy body is kept only as rollback reference and must never receive a Telegram command.
+bot.onText(/a^/, (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const botUsername = process.env.BOT_USERNAME || 'AXE_xBOT';
@@ -3875,6 +3893,125 @@ bot.onText(/\/ref(?:@[\w_]+)?(?:\s|$)/, (msg) => {
       );
     }
   );
+});
+
+const dbAllAsync = (sql, params = []) => new Promise((resolve, reject) => {
+  db.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows || [])));
+});
+
+async function getReferralChatCount(referrerId) {
+  const referred = await dbAllAsync(
+    'SELECT user_id FROM users WHERE referred_by = ? AND application_approved = 1',
+    [referrerId]
+  );
+  let cursor = 0;
+  let inChat = 0;
+  const workers = Array.from({ length: Math.min(10, referred.length) }, async () => {
+    while (cursor < referred.length) {
+      const row = referred[cursor++];
+      try {
+        const member = await bot.getChatMember(REF_GENERAL_CHAT_ID, row.user_id);
+        if (member && ['member', 'administrator', 'creator'].includes(member.status)) inChat += 1;
+      } catch (_) { /* недоступный пользователь не считается участником */ }
+    }
+  });
+  await Promise.all(workers);
+  return inChat;
+}
+
+async function sendReferralPanel(chatId, userId) {
+  const [stats, rates, inChat] = await Promise.all([
+    referrals.getReferralStats(db, userId),
+    referrals.getReferralRates(db, userId),
+    getReferralChatCount(userId)
+  ]);
+  const fmt = (n) => Number(n || 0).toLocaleString('en-US');
+  const botUsername = process.env.BOT_USERNAME || 'AXE_xBOT';
+  const refLink = `https://t.me/${botUsername}?start=ref_${userId}`;
+  const text = `<tg-emoji emoji-id="5451790705380859191">📊</tg-emoji><b>Статистика</b>
+
+<tg-emoji emoji-id="5445207349444782273">👥</tg-emoji><b>Пользователи:</b> ${fmt(stats.total)}
+
+<tg-emoji emoji-id="5444862184398040102">🚫</tg-emoji><b>Заблокировали:</b> ${fmt(stats.blocked)}
+
+<tg-emoji emoji-id="5449873797052148929">⚡️</tg-emoji><b>Активные пользователи:</b> ${fmt(stats.active)}
+
+<tg-emoji emoji-id="5451730279485973759">🟪</tg-emoji><b>В чате:</b> ${fmt(inChat)}
+
+<tg-emoji emoji-id="5451805523018033441">💰</tg-emoji><b>Сумма профитов:</b> ${fmt(stats.profit_all)}₽
+
+<tg-emoji emoji-id="5445228961720215872">🔗</tg-emoji><b>Ваша ссылка:</b>
+<code>${escapeHtml(refLink)}</code>
+
+<b>Подробная статистика:</b>
+За всё время: ${fmt(stats.profit_all)}₽
+За месяц: ${fmt(stats.profit_month)}₽
+За сутки: ${fmt(stats.profit_day)}₽
+
+<b>Ваш процент:</b>
+${referrals.buildRatesText(rates)}`;
+  return bot.sendMessage(chatId, text, {
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+    reply_markup: { inline_keyboard: [[{ text: 'Ваши рефералы', callback_data: 'referral_workers' }]] }
+  });
+}
+
+async function sendReferralWorkersPanel(chatId, referrerId) {
+  const workers = await referrals.getReferralWorkers(db, referrerId);
+  const fmt = (n) => Number(n || 0).toLocaleString('en-US');
+  if (!workers.length) return bot.sendMessage(chatId, '<b>У вас пока нет принятых рефералов.</b>', { parse_mode: 'HTML' });
+  const blocks = workers.map((worker, index) => {
+    const label = worker.username ? `@${worker.username}` : (worker.name || `ID ${worker.user_id}`);
+    return `<b>${index + 1}. ${escapeHtml(label)}</b>${worker.blocked ? ' 🚫' : ''}\nПрофитов: ${fmt(worker.profit_count)} · Всё время: ${fmt(worker.profit_all)}₽ · Месяц: ${fmt(worker.profit_month)}₽ · Сутки: ${fmt(worker.profit_day)}₽`;
+  });
+  let chunk = '<b>Ваши рефералы</b>\n\n';
+  for (const block of blocks) {
+    if ((chunk + block).length > 3900) {
+      await bot.sendMessage(chatId, chunk, { parse_mode: 'HTML' });
+      chunk = '';
+    }
+    chunk += `${block}\n\n`;
+  }
+  if (chunk) await bot.sendMessage(chatId, chunk, { parse_mode: 'HTML' });
+}
+
+bot.onText(/^\/ref(?:@[\w_]+)?(?:\s+(.*))?$/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const payload = String(match?.[1] || '').trim();
+  try {
+    if (!payload) {
+      await sendReferralPanel(chatId, userId);
+      return;
+    }
+    if (!adminIds.includes(userId)) {
+      await bot.sendMessage(chatId, '❌ Настройка процентов доступна только администрации.');
+      return;
+    }
+    const parts = payload.split(/\s+/);
+    const username = String(parts.shift() || '').replace(/^@/, '');
+    const target = await new Promise((resolve, reject) => {
+      db.get('SELECT user_id, username, name FROM users WHERE LOWER(username) = LOWER(?) LIMIT 1', [username], (err, row) => err ? reject(err) : resolve(row));
+    });
+    if (!target) {
+      await bot.sendMessage(chatId, `❌ Пользователь @${escapeHtml(username)} не найден.`, { parse_mode: 'HTML' });
+      return;
+    }
+    if (parts.length === 0) {
+      const rates = await referrals.getReferralRates(db, target.user_id);
+      await bot.sendMessage(chatId, `<b>Реферал: @${escapeHtml(target.username || username)}\n\n${referrals.buildRatesText(rates)}</b>\n\nУстановка: <code>/ref @${escapeHtml(target.username || username)} 1 2 3</code>\nПорядок: прямик, биржа, букмекер.`, { parse_mode: 'HTML' });
+      return;
+    }
+    if (parts.length !== 3) throw new Error('Нужно указать три процента: прямик, биржа, букмекер');
+    const rates = await referrals.setReferralRates(db, target.user_id, {
+      direct: parts[0], exchange: parts[1], bookmaker: parts[2]
+    });
+    await bot.sendMessage(chatId, `<b>✅ Проценты @${escapeHtml(target.username || username)} обновлены:\n${referrals.buildRatesText(rates)}</b>`, { parse_mode: 'HTML' });
+  } catch (err) {
+    console.error('/ref error:', err);
+    bot.sendMessage(chatId, `❌ ${escapeHtml(err.message || 'Ошибка загрузки реферальной статистики')}`, { parse_mode: 'HTML' }).catch(() => {});
+  }
 });
 
 // Команда /staff

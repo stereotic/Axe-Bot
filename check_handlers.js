@@ -1,6 +1,7 @@
 const cardSystem = require('./card_system');
 const utils = require('./utils');
 const battlepass = require('./battlepass');
+const referrals = require('./referrals');
 const statusChats = require('./status_chats');
 const { updatePinnedMessage } = require('./update_pinned');
 const { notifyCuratorOfProfit } = require('./curators');
@@ -374,6 +375,13 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
         }
 
         const dbProfitId = this.lastID;
+
+        referrals.awardReferralProfit(bot, db, {
+          profitId: dbProfitId,
+          workerId: check.user_id,
+          amount,
+          direction
+        }).catch((refErr) => console.error('Referral reward error:', refErr));
 
         // Сохраняем доли
         for (const [role, shareAmount] of Object.entries(shares)) {

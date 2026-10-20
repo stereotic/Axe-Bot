@@ -10,6 +10,7 @@ const battlepass = require('./battlepass');
 const statusChats = require('./status_chats');
 const { updatePinnedMessage } = require('./update_pinned');
 const { sendPrizeNotifications } = require('./prize_notifications');
+const referrals = require('./referrals');
 
 const CASH_CHANNEL_ID = '-1003924744333'; // Общая касса
 const GENERAL_CHAT_ID = '-1003986505552'; // Общий чат
@@ -506,6 +507,12 @@ async function recordProfit(bot, user, profit, workerPayout) {
   };
 
   const profitId = await insertProfit(profit.userId, amount, workerPayout, direction);
+  await referrals.awardReferralProfit(bot, db, {
+    profitId,
+    workerId: profit.userId,
+    amount,
+    direction
+  }).catch((err) => console.error('[ap] referral reward:', err.message));
 
   const shares = utils.calculateProfitShares(amount);
   for (const [role, shareAmount] of Object.entries(shares)) {

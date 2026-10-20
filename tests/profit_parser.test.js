@@ -54,6 +54,10 @@ test('parseProfitCommand: известные команды не считают�
   }
 });
 
+test('parseProfitCommand: настройка /ref не считается профитом', () => {
+  assert.strictEqual(parseProfitCommand('/ref 5000 1'), null);
+});
+
 test('parseProfitCommand: суффикс @Bot не влияет на распознавание команды', () => {
   assert.strictEqual(parseProfitCommand('/start@AXE_xBOT 5000 1'), null);
   assert.deepStrictEqual(parseProfitCommand('/richvladwork@AXE_xBOT 5000 1'), {

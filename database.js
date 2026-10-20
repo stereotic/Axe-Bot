@@ -26,6 +26,9 @@ db.serialize(() => {
     application_approved INTEGER DEFAULT 0,
     referred_by INTEGER,
     referral_blocked INTEGER DEFAULT 0,
+    referral_percent_direct REAL DEFAULT 0,
+    referral_percent_exchange REAL DEFAULT 0,
+    referral_percent_bookmaker REAL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
@@ -168,6 +171,25 @@ db.serialize(() => {
       console.error('Error adding referral_blocked column:', err);
     }
   });
+  for (const column of ['referral_percent_direct', 'referral_percent_exchange', 'referral_percent_bookmaker']) {
+    db.run(`ALTER TABLE users ADD COLUMN ${column} REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error(`Error adding ${column} column:`, err);
+      }
+    });
+  }
+  db.run(`CREATE TABLE IF NOT EXISTS referral_rewards (
+    profit_id INTEGER PRIMARY KEY,
+    referrer_id INTEGER NOT NULL,
+    worker_id INTEGER NOT NULL,
+    direction INTEGER NOT NULL,
+    percentage REAL NOT NULL DEFAULT 0,
+    amount INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (profit_id) REFERENCES profits(id),
+    FOREIGN KEY (referrer_id) REFERENCES users(user_id),
+    FOREIGN KEY (worker_id) REFERENCES users(user_id)
+  )`);
 
   // Колонки кошелька для выплат
   db.run(`ALTER TABLE users ADD COLUMN payout_method TEXT DEFAULT 'cryptobot'`, (err) => {

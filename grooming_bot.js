@@ -5,6 +5,7 @@ const db = require('./database');
 const utils = require('./utils');
 const { acquire: acquireSingleInstance } = require('./single_instance');
 const { updatePinnedMessage } = require('./update_pinned');
+const referrals = require('./referrals');
 
 const TOKEN = process.env.GROOMING_BOT_TOKEN;
 const COMMUNITY_CHAT_ID = String(process.env.GROOMING_CHAT_ID || '-1004330111419');
@@ -211,7 +212,7 @@ async function saveProfit(draft) {
     await run('UPDATE users SET balance = balance + ?, total_earned = total_earned + ?, battlepass_earned = COALESCE(battlepass_earned, 0) + ?, profit_count = profit_count + 1 WHERE user_id = ?', [payout, draft.amount, draft.amount, draft.user.user_id]);
     await run('COMMIT');
     utils.updateProjectStats(draft.amount, () => {});
-    return true;
+    return result.lastID;
   } catch (error) {
     await run('ROLLBACK').catch(() => {});
     throw error;
@@ -263,10 +264,16 @@ bot.on('callback_query', async callback => {
     const draft = drafts.get(data.slice('grooming_send_'.length));
     if (!draft || draft.sent) return bot.answerCallbackQuery(callback.id, { text: 'Профит уже обработан или устарел.' });
     draft.sent = true;
-    await saveProfit(draft);
+    const profitId = await saveProfit(draft);
     const targets = [...new Set([COMMUNITY_CHAT_ID, CASH_CHAT_ID])];
     await Promise.all(targets.map(chatId => bot.sendMessage(chatId, profitText(draft.user, draft.amount), { parse_mode: 'HTML', disable_web_page_preview: true })));
     if (!mainBot) throw new Error('BOT_TOKEN is missing: cannot publish GROOMING profit to AXE chat');
+    await referrals.awardReferralProfit(mainBot, db, {
+      profitId,
+      workerId: draft.user.user_id,
+      amount: draft.amount,
+      direction: 1
+    }).catch(error => console.error('GROOMING referral reward:', error.message));
     await mainBot.sendMessage(GENERAL_CHAT_ID, profitText(draft.user, draft.amount), { parse_mode: 'HTML', disable_web_page_preview: true });
     await Promise.all([
       updatePinned(),
