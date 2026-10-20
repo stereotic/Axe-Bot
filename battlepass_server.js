@@ -76,6 +76,7 @@ function verifyInitData(initData, botToken) {
 }
 
 function sendJson(res, code, payload) {
+  if (res.headersSent || res.destroyed) return;
   const body = JSON.stringify(payload);
   res.writeHead(code, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -274,7 +275,13 @@ function saveProfitSettings(req, res, url) {
 }
 
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  let url;
+  try {
+    url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  } catch (error) {
+    sendJson(res, 400, { error: 'bad_request' });
+    return;
+  }
 
   if (url.pathname === '/api/state') {
     handleState(req, res, url);
@@ -302,9 +309,27 @@ function startBattlePassServer() {
   server.listen(PORT, HOST, () => {
     console.log(`🎁 Battle Pass mini app: http://${HOST}:${PORT}${DEV_MODE ? ' (DEV: ?user_id= разрешён)' : ''}`);
   });
-  server.on('error', (err) => console.error('[battlepass] server error:', err));
+  server.on('error', (err) => {
+    console.error('[battlepass] server error:', err);
+    // Ошибки самого listener (например EADDRINUSE) не восстанавливаются внутри
+    // текущего процесса. Код 1 позволяет PM2 применить backoff и перезапустить.
+    if (!server.listening) {
+      const exitTimer = setTimeout(() => process.exit(1), 100);
+      exitTimer.unref();
+    }
+  });
   return server;
 }
+
+server.requestTimeout = 15_000;
+server.headersTimeout = 20_000;
+server.keepAliveTimeout = 5_000;
+server.maxRequestsPerSocket = 1000;
+server.on('clientError', (error, socket) => {
+  console.warn('[battlepass] client error:', error.code || error.message);
+  if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n');
+  else socket.destroy();
+});
 
 module.exports = { startBattlePassServer, verifyInitData };
 

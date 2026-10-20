@@ -169,7 +169,12 @@ setupProfitSystem(bot, adminIds);
 setupRassSystem(bot, adminIds);
 setupAutoProfits(bot, adminIds);
 setupEpicbetProfits(bot, adminIds);
-startBattlePassServer();
+// В production mini app запускается отдельным PM2-процессом. Так перезапуск
+// Telegram polling не роняет AXE Pass и ленту профитов. Для старого/local
+// запуска поведение остаётся прежним, пока BATTLEPASS_EMBEDDED явно не равно 0.
+if (process.env.BATTLEPASS_EMBEDDED !== '0') {
+  startBattlePassServer();
+}
 statusChats.migrateExistingWorkers(bot);
 backfillReferralBlocked(bot);
 logRefProfitSource();
@@ -206,13 +211,25 @@ bot.on('error', (error) => {
   console.error('Bot error:', error);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
+let fatalShutdownStarted = false;
 
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-});
+function fatalShutdown(kind, error) {
+  if (fatalShutdownStarted) return;
+  fatalShutdownStarted = true;
+  console.error(`[fatal] ${kind}:`, error && error.stack ? error.stack : error);
+
+  // После uncaughtException состояние процесса неизвестно. Не продолжаем
+  // работать "полуживыми": останавливаем long polling и даём PM2 поднять
+  // чистый процесс. Таймер не позволяет зависнуть на сетевом stopPolling.
+  const hardExit = setTimeout(() => process.exit(1), 5000);
+  hardExit.unref();
+  Promise.resolve(bot.stopPolling({ cancel: true }))
+    .catch(stopError => console.error('[fatal] stopPolling failed:', stopError.message))
+    .finally(() => process.exit(1));
+}
+
+process.on('unhandledRejection', reason => fatalShutdown('unhandledRejection', reason));
+process.on('uncaughtException', error => fatalShutdown('uncaughtException', error));
 
 // Реферальная статистика: фиксируем, кто из приведённых заблокировал бота
 // (статус kicked в личке). Разблокировка (повторный /start) сбрасывает флаг.
