@@ -7,6 +7,9 @@ const DEFAULT_CHAT_TARGET = '-1003986505552';
 const rassEdit = {};
 const rassPanelMsg = {};
 const lastCallback = {};
+const activeBroadcasts = new Set();
+const retryAfter = new Map();
+const RETRY_DELAY_MS = 5 * 60 * 1000;
 
 function dedupeCallback(userId, data) {
   const key = `${userId}_${data}`;
@@ -277,52 +280,79 @@ function askTarget(bot, chatId, userId, time) {
 }
 
 function sendScheduledRow(bot, row, today) {
-  // Занимаем слот сразу: массовая отправка идёт долго (90мс × получатели),
-  // и без этого 30-секундные тики успевали запустить её повторно.
-  db.run('UPDATE scheduled_broadcasts SET last_sent_date = ? WHERE id = ?', [today, row.id], (err) => {
-    if (err) console.error('[rass] error updating last_sent_date:', err);
-  });
+  // Не отмечаем слот отправленным заранее. Иначе краткий обрыв Telegram
+  // превращает неудачную попытку в окончательно пропущенную рассылку.
+  if (activeBroadcasts.has(row.id)) return;
+  activeBroadcasts.add(row.id);
 
-  const done = (success, fail) => {
-    console.log(`[rass] ${row.time} → ${row.target === 'all' ? 'всем' : row.target}: ok=${success}, fail=${fail}`);
+  const commit = (success, fail) => {
+    retryAfter.delete(row.id);
+    db.run('UPDATE scheduled_broadcasts SET last_sent_date = ? WHERE id = ?', [today, row.id], (err) => {
+      if (err) {
+        console.error(`[rass] ${row.time} delivered but commit failed:`, err);
+        return;
+      }
+      console.log(`[rass] ${row.time} → ${row.target === 'all' ? 'всем' : row.target}: ok=${success}, fail=${fail}, committed=${today}`);
+    });
+  };
+
+  const retry = (reason) => {
+    retryAfter.set(row.id, Date.now() + RETRY_DELAY_MS);
+    console.error(`[rass] ${row.time} not committed; retry in 5 min: ${reason}`);
   };
 
   if (row.target && row.target !== 'all') {
-    sendBroadcastContent(bot, row.target, row).then(() => done(1, 0)).catch((e) => {
+    sendBroadcastContent(bot, row.target, row).then(() => commit(1, 0)).catch((e) => {
       console.error(`[rass] failed to send ${row.time} to ${row.target}:`, e.message);
-      done(0, 1);
-    });
+      retry(e.message);
+    }).finally(() => activeBroadcasts.delete(row.id));
     return;
   }
 
   db.all('SELECT user_id FROM users', (err, users) => {
     const recipients = (users || []).map(u => u.user_id);
-    if (err || recipients.length === 0) return;
+    if (err || recipients.length === 0) {
+      retry(err ? err.message : 'recipient list is empty');
+      activeBroadcasts.delete(row.id);
+      return;
+    }
 
     let success = 0;
     let fail = 0;
+    let completed = 0;
+
+    const finishOne = () => {
+      completed++;
+      if (completed !== recipients.length) return;
+      activeBroadcasts.delete(row.id);
+      if (success > 0) commit(success, fail);
+      else retry(`all ${fail} deliveries failed`);
+    };
 
     recipients.forEach((recipient, index) => {
       setTimeout(() => {
-        sendBroadcastContent(bot, recipient, row).then(() => {
-          success++;
-        }).catch(() => {
-          fail++;
-        }).then(() => {
-          if (index === recipients.length - 1) done(success, fail);
-        });
+        sendBroadcastContent(bot, recipient, row)
+          .then(() => { success++; })
+          .catch((error) => {
+            fail++;
+            if (fail <= 3) console.error(`[rass] ${row.time} failed for ${recipient}:`, error.message);
+          })
+          .finally(finishOne);
       }, index * SEND_DELAY_MS);
     });
   });
 }
 
-// Окно «догоняющей» отправки: если точный тик пропущен (перезапуск бота,
-// блокировка цикла), рассылка уйдёт с опозданием до RASS_GRACE_MIN минут.
-const RASS_GRACE_MIN = 60;
-
 function hmToMinutes(hm) {
   const [h, m] = String(hm).split(':').map(Number);
   return (h || 0) * 60 + (m || 0);
+}
+
+function slotDelayLimit(hm) {
+  const current = hmToMinutes(hm);
+  const ordered = RASS_TIMES.map(hmToMinutes).sort((a, b) => a - b);
+  const next = ordered.find(value => value > current);
+  return (next === undefined ? 24 * 60 : next) - current - 1;
 }
 
 function checkScheduledBroadcasts(bot) {
@@ -335,11 +365,13 @@ function checkScheduledBroadcasts(bot) {
       if (!RASS_TIMES.includes(row.time)) return;
       if (!row.content_type) return;
       if (row.last_sent_date === today) return;
+      if (activeBroadcasts.has(row.id)) return;
+      if ((retryAfter.get(row.id) || 0) > Date.now()) return;
 
       // Не «минута в минуту», а окно: слот считается наступившим и не
       // пропускается, если тик на точной минуте был пропущен.
       const delayMin = nowMin - hmToMinutes(row.time);
-      if (delayMin < 0 || delayMin > RASS_GRACE_MIN) return;
+      if (delayMin < 0 || delayMin > slotDelayLimit(row.time)) return;
       if (delayMin > 0) console.log(`[rass] ${row.time} догоняющая отправка (+${delayMin} мин)`);
 
       sendScheduledRow(bot, row, today);
@@ -511,6 +543,9 @@ function setupRassSystem(bot, adminIds) {
   });
 
   // Планировщик рассылок - проверка каждые 30 секунд
+  // Проверяем сразу после старта: рестарт на границе слота не должен ждать
+  // первого интервального тика или терять рассылку.
+  checkScheduledBroadcasts(bot);
   setInterval(() => checkScheduledBroadcasts(bot), 30000);
 
   console.log('📢 Система рассылок готова (время: ' + RASS_TIMES.join(', ') + ')');
@@ -519,5 +554,7 @@ function setupRassSystem(bot, adminIds) {
 module.exports = {
   setupRassSystem,
   isRassEditing,
-  cancelRassEdit
+  cancelRassEdit,
+  hmToMinutes,
+  slotDelayLimit
 };
