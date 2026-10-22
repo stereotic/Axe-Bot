@@ -58,7 +58,7 @@ function restoreNext(entries) {
 
   const [nameOrUsername, amount] = entries[0];
   const workerPayout = utils.calculateWorkerPayout(amount, direction);
-  const shares = utils.calculateProfitShares(amount);
+  const shares = utils.calculateProfitShares(amount, direction);
 
   findUser(nameOrUsername, (err, user) => {
     if (!user) {
@@ -84,7 +84,7 @@ function restoreNext(entries) {
         for (const [role, shareAmount] of shareRoles) {
           db.run(
             'INSERT INTO profit_shares (profit_id, role, percentage, amount) VALUES (?, ?, ?, ?)',
-            [profitId, role, utils.PROFIT_SHARES[role], shareAmount],
+            [profitId, role, utils.DIRECTION_PROFIT_SHARES[direction][role], shareAmount],
             () => {
               shareDone++;
               if (shareDone === shareRoles.length) {

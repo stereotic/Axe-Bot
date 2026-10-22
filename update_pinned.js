@@ -93,6 +93,10 @@ async function findCurrentPinnedMessageId(bot, chatId) {
 
 async function getUsdRate() {
   try {
+    const saved = await dbGet('SELECT value FROM stats WHERE key = ?', ['usd_rate']);
+    const manualRate = Number(saved?.value);
+    if (Number.isFinite(manualRate) && manualRate > 0) return manualRate;
+
     const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
     const data = await response.json();
     return Math.round(data.rates.RUB);
@@ -260,5 +264,6 @@ async function updatePinnedMessage(bot, GENERAL_CHAT_ID) {
 
 module.exports = {
   loadPinnedMessageId,
-  updatePinnedMessage
+  updatePinnedMessage,
+  getUsdRate
 };

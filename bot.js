@@ -2074,9 +2074,8 @@ function prepareDrawProfit(chatId, { username: workerUsername, amount, direction
       : '#' + (workerData.name || workerData.username);
 
     const hasCurator = [1, 3].includes(direction) && user && user.curator;
-    // База для Биржи и Букмекера — 75%; у ученика отдельно удерживается 20% куратора.
-    const workerPayout = hasCurator ? Math.floor(amount * 55 / 100) : utils.calculateWorkerPayout(amount, direction);
-    const shares = utils.calculateProfitShares(amount);
+    const workerPayout = utils.calculateWorkerPayout(amount, direction);
+    const shares = utils.calculateProfitShares(amount, direction);
     const directionName = utils.getDirectionName(direction);
 
     const profitId = `${workerData.user_id}_${Date.now()}`;
@@ -2149,9 +2148,8 @@ bot.onText(/^@[^\s]+\s+\d+₽?\s+[123]/, (msg) => {
       : '#' + (user.name || user.username);
 
     const hasCurator = [1, 3].includes(direction) && user.curator;
-    // База для Биржи и Букмекера — 75%; у ученика отдельно удерживается 20% куратора.
-    const workerPayout = hasCurator ? Math.floor(amount * 55 / 100) : utils.calculateWorkerPayout(amount, direction);
-    const shares = utils.calculateProfitShares(amount);
+    const workerPayout = utils.calculateWorkerPayout(amount, direction);
+    const shares = utils.calculateProfitShares(amount, direction);
     const directionName = utils.getDirectionName(direction);
 
     const profitId = `${user.user_id}_${Date.now()}`;
@@ -2636,7 +2634,7 @@ bot.on('callback_query', perf.wrap('callback_handler', async (query) => {
 
             for (const [role, amount] of Object.entries(profit.shares)) {
               db.run('INSERT OR IGNORE INTO profit_shares (profit_id, role, percentage, amount) VALUES (?, ?, ?, ?)',
-                [dbProfitId, role, utils.PROFIT_SHARES[role], amount],
+                [dbProfitId, role, utils.DIRECTION_PROFIT_SHARES[profit.direction][role], amount],
                 (err) => {
                   if (err) console.error('Error saving share:', err);
                 }
@@ -3732,6 +3730,46 @@ bot.onText(/\/keyboard/, (msg) => {
       console.error('/keyboard failed:', telegramErrorSummary(err));
       bot.sendMessage(chatId, '❌ Не удалось показать кнопки. Напиши /start или обратись к администратору.');
     });
+  });
+});
+
+// Ручной курс USD/RUB для закреплённого сообщения.
+bot.onText(/\/kyrs(?:@[\w_]+)?(?:\s+(.+))?$/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  if (!adminIds.includes(userId)) {
+    bot.sendMessage(chatId, '❌ Команда доступна только администрации.');
+    return;
+  }
+
+  const saveRate = (raw) => {
+    const rate = Number(String(raw || '').replace(',', '.').trim());
+    if (!Number.isFinite(rate) || rate <= 0) {
+      bot.sendMessage(chatId, '❌ Некорректный курс. Введите положительное число.');
+      return;
+    }
+
+    const normalized = String(Math.round(rate * 100) / 100);
+    db.run('INSERT OR REPLACE INTO stats (key, value) VALUES (?, ?)', ['usd_rate', normalized], async (err) => {
+      if (err) {
+        bot.sendMessage(chatId, '❌ Не удалось сохранить курс.');
+        return;
+      }
+      await updatePinnedMessage(bot, GENERAL_CHAT_ID);
+      bot.sendMessage(chatId, `✅ Курс USD/RUB установлен: ${normalized}₽. Закреп обновлён.`);
+    });
+  };
+
+  if (match?.[1]?.trim()) {
+    saveRate(match[1]);
+    return;
+  }
+
+  bot.sendMessage(chatId, '💵 Введите новый курс USD/RUB:');
+  guard.setPendingInput(userId, chatId, (inputMsg) => {
+    guard.clearPendingInput(userId);
+    saveRate(inputMsg.text);
   });
 });
 

@@ -10,8 +10,18 @@ test('calculateWorkerPayout: 75% биржа, прямой и букмекер, f
   assert.strictEqual(utils.calculateWorkerPayout(999, 1), 749);
 });
 
-test('calculateProfitShares: доли 5/5/3/7 от суммы', () => {
-  assert.deepStrictEqual(utils.calculateProfitShares(10000), { owner: 500, admin: 500, investor: 300, coder: 700 });
+test('calculateProfitShares: доли зависят от направления', () => {
+  assert.deepStrictEqual(utils.calculateProfitShares(10000, 1), { ts: 1300, investor: 200 });
+  assert.deepStrictEqual(utils.calculateProfitShares(10000, 2), { ts: 1250, fin: 1250, investor: 100 });
+  assert.deepStrictEqual(utils.calculateProfitShares(10000, 3), { ts: 2300, investor: 200 });
+});
+
+test('buildAccountingText: формат кассы по направлениям', () => {
+  const direct = utils.buildAccountingText({ direction: 2, username: 'worker', amount: 10000, workerPayout: 7500, shares: utils.calculateProfitShares(10000, 2) });
+  assert.ok(direct.includes('💳Прямой'));
+  assert.ok(direct.includes('Тс: 1 250₽'));
+  assert.ok(direct.includes('Фин: 1 250₽'));
+  assert.ok(direct.includes('Инвестор: 100₽'));
 });
 
 test('getStatusByTotal: пороги уровней', () => {

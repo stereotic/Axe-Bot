@@ -45,7 +45,7 @@ function createUser(name, callback) {
 function addProfit(userId, amount, dateStr, callback) {
   const direction = 1;
   const workerPayout = utils.calculateWorkerPayout(amount, direction);
-  const shares = utils.calculateProfitShares(amount);
+  const shares = utils.calculateProfitShares(amount, direction);
 
   db.run('INSERT INTO profits (user_id, amount, amount_to_pay, direction, created_at) VALUES (?, ?, ?, ?, ?)',
     [userId, amount, workerPayout, direction, dateStr],
@@ -56,7 +56,7 @@ function addProfit(userId, amount, dateStr, callback) {
       let done = 0;
       for (const [role, shareAmount] of entries) {
         db.run('INSERT INTO profit_shares (profit_id, role, percentage, amount) VALUES (?, ?, ?, ?)',
-          [profitId, role, utils.PROFIT_SHARES[role], shareAmount],
+          [profitId, role, utils.DIRECTION_PROFIT_SHARES[direction][role], shareAmount],
           () => {
             done++;
             if (done === entries.length) {

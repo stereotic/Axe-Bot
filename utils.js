@@ -17,13 +17,16 @@ const DIRECTION_PERCENTAGES = {
   3: 75  // Букмекер
 };
 
-// Распределение долей
-const PROFIT_SHARES = {
-  owner: 5,
-  admin: 5,
-  investor: 3,
-  coder: 7
+// Распределение долей по направлениям.
+// 1 — Биржа, 2 — Прямой, 3 — Букмекер.
+const DIRECTION_PROFIT_SHARES = {
+  1: { ts: 13, investor: 2 },
+  2: { ts: 12.5, fin: 12.5, investor: 1 },
+  3: { ts: 23, investor: 2 }
 };
+
+// Оставлено как плоский справочник ролей для совместимости внешних модулей.
+const PROFIT_SHARES = { ts: 0, fin: 0, investor: 0 };
 
 /**
  * Получить статус по общей сумме профитов
@@ -81,11 +84,11 @@ function calculateWorkerPayout(amount, direction) {
 /**
  * Рассчитать доли от профита
  */
-function calculateProfitShares(amount) {
+function calculateProfitShares(amount, direction = 2) {
   const shares = {};
-  const totalSharePercentage = Object.values(PROFIT_SHARES).reduce((a, b) => a + b, 0);
+  const percentages = DIRECTION_PROFIT_SHARES[Number(direction)] || DIRECTION_PROFIT_SHARES[2];
 
-  for (const [role, percentage] of Object.entries(PROFIT_SHARES)) {
+  for (const [role, percentage] of Object.entries(percentages)) {
     shares[role] = Math.floor(amount * percentage / 100);
   }
 
@@ -206,48 +209,23 @@ function formatAmount(amount) {
   return amount.toLocaleString('ru-RU').replace(/,/g, '.');
 }
 
-// Проценты бухгалтерии Букмекера сверх выплаты воркеру.
-const BOOKMAKER_ACCOUNT_PERCENTAGES = { tp: 5, owner: 11, investor: 4 };
-
-// Блок бухгалтерии Букмекера: суммы через '.' и только Тп/Владелец.
-function buildBookmakerAccountingText({ username, amount, workerPayout, curator, curatorPayout, note = '' }) {
-  const fmt = (n) => Number(n).toLocaleString('de-DE');
-  const worker = String(username || '').replace(/^@+/, '');
-  const tp = Math.floor(Number(amount) * BOOKMAKER_ACCOUNT_PERCENTAGES.tp / 100);
-  const owner = Math.floor(Number(amount) * BOOKMAKER_ACCOUNT_PERCENTAGES.owner / 100);
-  const investor = Math.floor(Number(amount) * BOOKMAKER_ACCOUNT_PERCENTAGES.investor / 100);
-  const curatorLine = curator ? `@Куратор: ${fmt(curatorPayout ?? Math.floor(Number(amount) * 20 / 100))}₽\n` : '';
-  const body =
-    curatorLine +
-    `⚽️ Букмекер\n` +
-    `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${worker}\n` +
-    `💸Сумма профита: ${fmt(amount)}₽\n` +
-    `<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${fmt(workerPayout)}₽\n` +
-    `👥 Тп: ${fmt(tp)}₽\n` +
-    `👑Владелец: ${fmt(owner)}₽\n` +
-    `🍌Инвестор: ${fmt(investor)}₽` +
-    (note ? `\n${note}` : '');
-  return `<b>${body}</b>`;
-}
-
 // Общий блок бухгалтерии: готовые суммы, а не проценты.
 function buildAccountingText({ direction, directionName, username, amount, workerPayout, shares, curator, curatorPayout, note = '' }) {
-  if (Number(direction) === 3) {
-    return buildBookmakerAccountingText({ username, amount, workerPayout, curator, curatorPayout, note });
-  }
-  const fmt = (n) => Number(n).toLocaleString();
+  const dir = Number(direction);
+  const fmt = (n) => Number(n).toLocaleString('ru-RU');
   const worker = String(username || '').replace(/^@+/, '');
-  const curatorLine = curator ? `@Куратор: ${fmt(curatorPayout ?? Math.floor(Number(amount) * 20 / 100))}₽\n` : '';
+  const header = dir === 2 ? '💳Прямой' : dir === 1 ? '📈Биржа' : '⚽️БК';
+  const roleLines = [
+    shares.ts != null ? `Тс: ${fmt(shares.ts)}₽` : '',
+    shares.fin != null ? `Фин: ${fmt(shares.fin)}₽` : '',
+    shares.investor != null ? `Инвестор: ${fmt(shares.investor)}₽` : ''
+  ].filter(Boolean).join('\n');
   const body =
-    `🚀${directionName}\n` +
-    `<tg-emoji emoji-id="5920344347152224466">👤</tg-emoji>Воркер: @${worker}\n` +
-    `💸Сумма профита: ${fmt(amount)}₽\n` +
-    `<tg-emoji emoji-id="5258204546391351475">💼</tg-emoji>К выплате: ${fmt(workerPayout)}₽\n` +
-    curatorLine +
-    `👑Владелец: ${fmt(shares.owner)}₽\n` +
-    `👾ТП: ${fmt(shares.admin)}₽\n` +
-    `🍌Инвестор: ${fmt(shares.investor)}₽\n` +
-    `🧑‍💻Кодер: ${fmt(shares.coder)}₽` +
+    `${header}\n` +
+    `Воркер: @${worker}\n` +
+    `Сумма: ${fmt(amount)}₽\n` +
+    `К выплате: ${fmt(workerPayout)}₽\n` +
+    roleLines +
     (note ? `\n${note}` : '');
   return `<b>${body}</b>`;
 }
@@ -320,6 +298,7 @@ module.exports = {
   STATUS_THRESHOLDS,
   DIRECTION_PERCENTAGES,
   PROFIT_SHARES,
+  DIRECTION_PROFIT_SHARES,
   MEMBER_CHAT_ID,
   getStatusByTotal,
   updateWorkerStatus,

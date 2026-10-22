@@ -357,7 +357,7 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
 
     // Рассчитываем суммы
     const workerPayout = utils.calculateWorkerPayout(amount, direction);
-    const shares = utils.calculateProfitShares(amount);
+    const shares = utils.calculateProfitShares(amount, direction);
     const directionName = utils.getDirectionName(direction);
 
     // Обновляем статистику проекта
@@ -386,7 +386,7 @@ function sendAutomaticProfit(bot, check, adminIds, GENERAL_CHAT_ID, ACCOUNTING_C
         // Сохраняем доли
         for (const [role, shareAmount] of Object.entries(shares)) {
           db.run('INSERT OR IGNORE INTO profit_shares (profit_id, role, percentage, amount) VALUES (?, ?, ?, ?)',
-            [dbProfitId, role, utils.PROFIT_SHARES[role], shareAmount],
+            [dbProfitId, role, utils.DIRECTION_PROFIT_SHARES[direction][role], shareAmount],
             (err) => {
               if (err) console.error('Error saving share:', err);
             }
