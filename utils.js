@@ -212,22 +212,14 @@ function formatAmount(amount) {
 // Общий блок бухгалтерии: готовые суммы, а не проценты.
 function buildAccountingText({ direction, directionName, username, amount, workerPayout, shares, curator, curatorPayout, note = '' }) {
   const dir = Number(direction);
-  const fmt = (n) => Number(n).toLocaleString('ru-RU');
   const worker = String(username || '').replace(/^@+/, '');
-  const header = dir === 2 ? '💳Прямой' : dir === 1 ? '📈Биржа' : '⚽️БК';
-  const roleLines = [
-    shares.ts != null ? `Тс: ${fmt(shares.ts)}₽` : '',
-    shares.fin != null ? `Фин: ${fmt(shares.fin)}₽` : '',
-    shares.investor != null ? `Инвестор: ${fmt(shares.investor)}₽` : ''
-  ].filter(Boolean).join('\n');
-  const body =
-    `${header}\n` +
-    `Воркер: @${worker}\n` +
-    `Сумма: ${fmt(amount)}₽\n` +
-    `К выплате: ${fmt(workerPayout)}₽\n` +
-    roleLines +
-    (note ? `\n${note}` : '');
-  return `<b>${body}</b>`;
+  const fmt = (value) => Number(value || 0).toLocaleString('en-US');
+  const templates = {
+    1: `📈Биржа\nВоркер: @${worker}\nСумма: ${fmt(amount)}₽\nК выплате: ${fmt(workerPayout)}₽\nТс: ${fmt(shares.ts)}₽\nИнвестор: ${fmt(shares.investor)}₽`,
+    2: `💳Прямой\nВоркер: @${worker}\nСумма: ${fmt(amount)}₽\nК выплате: ${fmt(workerPayout)}₽\nТс: ${fmt(shares.ts)}₽\nФин: ${fmt(shares.fin)}₽\nИнвестор: ${fmt(shares.investor)}₽`,
+    3: `⚽️БК\nВоркер: @${worker}\nСумма: ${fmt(amount)}₽\nК выплате: ${fmt(workerPayout)}₽\nТс: ${fmt(shares.ts)}₽\nИнвестор: ${fmt(shares.investor)}₽`
+  };
+  return templates[dir] + (note ? `\n${note}` : '');
 }
 
 // Общий чат проекта — эталон членства: юзер, состоящий в нём, считается зарегистрированным.

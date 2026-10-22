@@ -18,10 +18,13 @@ test('calculateProfitShares: доли зависят от направления
 
 test('buildAccountingText: формат кассы по направлениям', () => {
   const direct = utils.buildAccountingText({ direction: 2, username: 'worker', amount: 10000, workerPayout: 7500, shares: utils.calculateProfitShares(10000, 2) });
-  assert.ok(direct.includes('💳Прямой'));
-  assert.ok(direct.includes('Тс: 1 250₽'));
-  assert.ok(direct.includes('Фин: 1 250₽'));
-  assert.ok(direct.includes('Инвестор: 100₽'));
+  assert.strictEqual(direct, '💳Прямой\nВоркер: @worker\nСумма: 10,000₽\nК выплате: 7,500₽\nТс: 1,250₽\nФин: 1,250₽\nИнвестор: 100₽');
+
+  const exchange = utils.buildAccountingText({ direction: 1, username: '@worker', amount: 10000, workerPayout: 7500, shares: utils.calculateProfitShares(10000, 1) });
+  assert.strictEqual(exchange, '📈Биржа\nВоркер: @worker\nСумма: 10,000₽\nК выплате: 7,500₽\nТс: 1,300₽\nИнвестор: 200₽');
+
+  const bookmaker = utils.buildAccountingText({ direction: 3, username: 'worker', amount: 10000, workerPayout: 7500, shares: utils.calculateProfitShares(10000, 3) });
+  assert.strictEqual(bookmaker, '⚽️БК\nВоркер: @worker\nСумма: 10,000₽\nК выплате: 7,500₽\nТс: 2,300₽\nИнвестор: 200₽');
 });
 
 test('getStatusByTotal: пороги уровней', () => {
