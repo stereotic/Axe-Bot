@@ -115,6 +115,17 @@ if (!instanceLock.ok) {
 
 const bot = new TelegramBot(token, botOptions);
 
+// Telegram callback query живёт недолго. Поздний ответ (двойной клик, очередь,
+// сетевой retry) возвращает 400 и не должен превращаться в рестарт всего бота.
+const answerCallbackQuery = bot.answerCallbackQuery.bind(bot);
+bot.answerCallbackQuery = (...args) => answerCallbackQuery(...args).catch(error => {
+  const message = error && error.message ? error.message : String(error);
+  if (!message.includes('query is too old') && !message.includes('query ID is invalid')) {
+    console.error('[callback] answer failed:', message);
+  }
+  return null;
+});
+
 // Кэш file_id статичных картинок меню: первая отправка грузит файл,
 // последующие — пересылают по file_id без повторной загрузки на сервер Telegram.
 // Сухранём на диск: file_id глобальны для бота, а правка меню на месте (editMessageMedia)
@@ -228,7 +239,12 @@ function fatalShutdown(kind, error) {
     .finally(() => process.exit(1));
 }
 
-process.on('unhandledRejection', reason => fatalShutdown('unhandledRejection', reason));
+// Rejected Promise не повреждает синхронное состояние Node-процесса. Telegram
+// API регулярно возвращает ожидаемые 400/403; перезапускать из-за них polling
+// и планировщик хуже, чем записать точный отказ и продолжить.
+process.on('unhandledRejection', reason => {
+  console.error('[unhandledRejection]:', reason && reason.stack ? reason.stack : reason);
+});
 process.on('uncaughtException', error => fatalShutdown('uncaughtException', error));
 
 // Реферальная статистика: фиксируем, кто из приведённых заблокировал бота

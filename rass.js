@@ -10,6 +10,7 @@ const lastCallback = {};
 const activeBroadcasts = new Set();
 const retryAfter = new Map();
 const RETRY_DELAY_MS = 5 * 60 * 1000;
+let schedulerBootLogged = false;
 
 function dedupeCallback(userId, data) {
   const key = `${userId}_${data}`;
@@ -360,7 +361,24 @@ function checkScheduledBroadcasts(bot) {
   const nowMin = hmToMinutes(hm);
 
   db.all('SELECT * FROM scheduled_broadcasts', (err, rows) => {
-    if (err || !rows || !rows.length) return;
+    if (err) {
+      console.error('[rass] scheduler database error:', err);
+      return;
+    }
+    if (!rows || !rows.length) {
+      if (!schedulerBootLogged) console.warn(`[rass] scheduler tick ${today} ${hm}: no configured rows`);
+      schedulerBootLogged = true;
+      return;
+    }
+
+    if (!schedulerBootLogged) {
+      const pending = rows
+        .filter(row => RASS_TIMES.includes(row.time) && row.content_type && row.last_sent_date !== today)
+        .map(row => row.time)
+        .join(', ') || 'none';
+      console.log(`[rass] scheduler tick ${today} ${hm} Europe/Moscow: rows=${rows.length}, pending=${pending}`);
+      schedulerBootLogged = true;
+    }
     rows.forEach(row => {
       if (!RASS_TIMES.includes(row.time)) return;
       if (!row.content_type) return;
