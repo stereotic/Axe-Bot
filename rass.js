@@ -172,9 +172,25 @@ function buildRowFromMessage(msg) {
   return null;
 }
 
-function sendBroadcastContent(bot, chatId, row) {
+function htmlToPlainText(html) {
+  return String(html || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/blockquote\s*>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&#(\d+);/g, (_, value) => String.fromCodePoint(Number(value)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, value) => String.fromCodePoint(parseInt(value, 16)))
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+function sendBroadcastContent(bot, chatId, row, useHtml = true) {
   const caption = row.text ? row.text : undefined;
-  const opts = { parse_mode: 'HTML', disable_web_page_preview: true };
+  const opts = useHtml
+    ? { parse_mode: 'HTML', disable_web_page_preview: true }
+    : { disable_web_page_preview: true };
 
   if (row.content_type === 'photo') {
     return bot.sendPhoto(chatId, row.file_id, caption ? { ...opts, caption } : opts);
@@ -204,6 +220,21 @@ function sendBroadcastContent(bot, chatId, row) {
     return bot.sendMessage(chatId, row.text, opts);
   }
   return Promise.resolve();
+}
+
+async function sendBroadcastContentReliable(bot, chatId, row) {
+  try {
+    return await sendBroadcastContent(bot, chatId, row, true);
+  } catch (error) {
+    const message = error && error.message ? error.message : String(error);
+    if (!message.includes("can't parse entities")) throw error;
+
+    console.warn(`[rass] ${row.time} invalid HTML; retrying without parse_mode: ${message}`);
+    return sendBroadcastContent(bot, chatId, {
+      ...row,
+      text: htmlToPlainText(row.text)
+    }, false);
+  }
 }
 
 function renderPanel(bot, chatId, userId) {
@@ -303,7 +334,7 @@ function sendScheduledRow(bot, row, today) {
   };
 
   if (row.target && row.target !== 'all') {
-    sendBroadcastContent(bot, row.target, row).then(() => commit(1, 0)).catch((e) => {
+    sendBroadcastContentReliable(bot, row.target, row).then(() => commit(1, 0)).catch((e) => {
       console.error(`[rass] failed to send ${row.time} to ${row.target}:`, e.message);
       retry(e.message);
     }).finally(() => activeBroadcasts.delete(row.id));
@@ -332,7 +363,7 @@ function sendScheduledRow(bot, row, today) {
 
     recipients.forEach((recipient, index) => {
       setTimeout(() => {
-        sendBroadcastContent(bot, recipient, row)
+        sendBroadcastContentReliable(bot, recipient, row)
           .then(() => { success++; })
           .catch((error) => {
             fail++;
@@ -574,5 +605,6 @@ module.exports = {
   isRassEditing,
   cancelRassEdit,
   hmToMinutes,
-  slotDelayLimit
+  slotDelayLimit,
+  htmlToPlainText
 };
