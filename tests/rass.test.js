@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { hmToMinutes, slotDelayLimit, htmlToPlainText } = require('../rass');
+const { hmToMinutes, slotDelayLimit, htmlToPlainText, repairTelegramHtml } = require('../rass');
 
 test('hmToMinutes converts configured broadcast times', () => {
   assert.equal(hmToMinutes('00:00'), 0);
@@ -19,5 +19,19 @@ test('htmlToPlainText preserves visible caption content', () => {
   assert.equal(
     htmlToPlainText('<b>AXE <tg-emoji emoji-id="123">⚡</tg-emoji></b><br>&lt;19:00&gt; &amp; ready'),
     'AXE ⚡\n<19:00> & ready'
+  );
+});
+
+test('repairTelegramHtml fixes formatting that crosses a custom emoji', () => {
+  assert.equal(
+    repairTelegramHtml('<b>Внимание <tg-emoji emoji-id="123">🚨</b></tg-emoji> розыск!</b>'),
+    '<b>Внимание <tg-emoji emoji-id="123">🚨</tg-emoji></b> розыск!'
+  );
+});
+
+test('repairTelegramHtml reopens ordinary formatting after crossed tags', () => {
+  assert.equal(
+    repairTelegramHtml('<b>bold <i>both</b> italic</i>'),
+    '<b>bold <i>both</i></b><i> italic</i>'
   );
 });

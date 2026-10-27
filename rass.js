@@ -186,6 +186,57 @@ function htmlToPlainText(html) {
     .replace(/&amp;/g, '&');
 }
 
+function repairTelegramHtml(html) {
+  const input = String(html || '');
+  const tagPattern = /<\/?([a-z][a-z0-9-]*)(?:\s[^<>]*?)?>/gi;
+  const atomicTags = new Set(['tg-emoji']);
+  const stack = [];
+  let result = '';
+  let lastIndex = 0;
+  let match;
+
+  while ((match = tagPattern.exec(input)) !== null) {
+    result += input.slice(lastIndex, match.index);
+    lastIndex = tagPattern.lastIndex;
+
+    const token = match[0];
+    const name = match[1].toLowerCase();
+    const isClosing = token.startsWith('</');
+
+    if (!isClosing) {
+      result += token;
+      stack.push({ name, openTag: token });
+      continue;
+    }
+
+    let index = -1;
+    for (let i = stack.length - 1; i >= 0; i--) {
+      if (stack[i].name === name) {
+        index = i;
+        break;
+      }
+    }
+    if (index === -1) continue;
+
+    const interrupted = stack.splice(index + 1);
+    for (let i = interrupted.length - 1; i >= 0; i--) {
+      result += `</${interrupted[i].name}>`;
+    }
+    result += `</${name}>`;
+    stack.pop();
+
+    for (const tag of interrupted) {
+      if (atomicTags.has(tag.name)) continue;
+      result += tag.openTag;
+      stack.push(tag);
+    }
+  }
+
+  result += input.slice(lastIndex);
+  while (stack.length) result += `</${stack.pop().name}>`;
+  return result;
+}
+
 function sendBroadcastContent(bot, chatId, row, useHtml = true) {
   const caption = row.text ? row.text : undefined;
   const opts = useHtml
@@ -223,8 +274,11 @@ function sendBroadcastContent(bot, chatId, row, useHtml = true) {
 }
 
 async function sendBroadcastContentReliable(bot, chatId, row) {
+  const repairedRow = row.text
+    ? { ...row, text: repairTelegramHtml(row.text) }
+    : row;
   try {
-    return await sendBroadcastContent(bot, chatId, row, true);
+    return await sendBroadcastContent(bot, chatId, repairedRow, true);
   } catch (error) {
     const message = error && error.message ? error.message : String(error);
     if (!message.includes("can't parse entities")) throw error;
@@ -232,7 +286,7 @@ async function sendBroadcastContentReliable(bot, chatId, row) {
     console.warn(`[rass] ${row.time} invalid HTML; retrying without parse_mode: ${message}`);
     return sendBroadcastContent(bot, chatId, {
       ...row,
-      text: htmlToPlainText(row.text)
+      text: htmlToPlainText(repairedRow.text)
     }, false);
   }
 }
@@ -606,5 +660,6 @@ module.exports = {
   cancelRassEdit,
   hmToMinutes,
   slotDelayLimit,
-  htmlToPlainText
+  htmlToPlainText,
+  repairTelegramHtml
 };
