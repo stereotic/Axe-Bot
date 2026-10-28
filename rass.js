@@ -274,6 +274,10 @@ function sendBroadcastContent(bot, chatId, row, useHtml = true) {
 }
 
 async function sendBroadcastContentReliable(bot, chatId, row) {
+  // Telegram copies the original entities and custom emoji without rebuilding HTML.
+  if (row.source_chat_id && row.source_message_id) {
+    return bot.copyMessage(chatId, row.source_chat_id, row.source_message_id);
+  }
   const repairedRow = row.text
     ? { ...row, text: repairTelegramHtml(row.text) }
     : row;
@@ -344,7 +348,7 @@ function startContentEdit(bot, chatId, userId, time) {
   db.get('SELECT * FROM scheduled_broadcasts WHERE time = ?', [time], (err, row) => {
     if (!err && row && row.content_type) {
       bot.sendMessage(chatId, `✏️ Текущее сообщение рассылки в <b>${time}</b>. Отправь новое вместо него:`, { parse_mode: 'HTML' }).then(() => {
-        sendBroadcastContent(bot, chatId, row).catch(() => {});
+        sendBroadcastContentReliable(bot, chatId, row).catch(() => {});
       }).catch(() => {});
     } else {
       bot.sendMessage(chatId, `✏️ Отправь сообщение для рассылки в <b>${time}</b>.\n\nПоддерживаются: текст (с форматированием), фото, гифки, видео, документ, стикер, кружок, аудио, голос.\nОтмена: /cancel`, { parse_mode: 'HTML' }).catch(() => {});
@@ -550,13 +554,15 @@ function setupRassSystem(bot, adminIds) {
         return;
       }
 
-      db.run(`INSERT INTO scheduled_broadcasts (time, content_type, text, file_id, target)
-              VALUES (?, ?, ?, ?, 'all')
+      db.run(`INSERT INTO scheduled_broadcasts (time, content_type, text, file_id, source_chat_id, source_message_id, target)
+              VALUES (?, ?, ?, ?, ?, ?, 'all')
               ON CONFLICT(time) DO UPDATE SET
                 content_type = excluded.content_type,
                 text = excluded.text,
-                file_id = excluded.file_id`,
-        [state.time, row.content_type, row.text, row.file_id], (err) => {
+                file_id = excluded.file_id,
+                source_chat_id = excluded.source_chat_id,
+                source_message_id = excluded.source_message_id`,
+        [state.time, row.content_type, row.text, row.file_id, String(chatId), msg.message_id], (err) => {
           if (err) {
             console.error('[rass] error saving broadcast:', err);
             bot.sendMessage(chatId, '❌ Ошибка сохранения рассылки');
@@ -591,7 +597,7 @@ function setupRassSystem(bot, adminIds) {
           bot.sendMessage(chatId, `⏰ <b>${time}</b> — сообщение ещё не задано. Нажми ✏️.`, { parse_mode: 'HTML' });
           return;
         }
-        sendBroadcastContent(bot, chatId, row).catch(() => {});
+        sendBroadcastContentReliable(bot, chatId, row).catch(() => {});
       });
       return;
     }
@@ -661,5 +667,6 @@ module.exports = {
   hmToMinutes,
   slotDelayLimit,
   htmlToPlainText,
-  repairTelegramHtml
+  repairTelegramHtml,
+  sendBroadcastContentReliable
 };

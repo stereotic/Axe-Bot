@@ -412,10 +412,18 @@ db.serialize(() => {
     content_type TEXT,
     text TEXT,
     file_id TEXT,
+    source_chat_id TEXT,
+    source_message_id INTEGER,
     target TEXT DEFAULT 'all',
     last_sent_date TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+  db.run('ALTER TABLE scheduled_broadcasts ADD COLUMN source_chat_id TEXT', (err) => {
+    if (err && !/duplicate column name/i.test(err.message)) console.error('[db] broadcast source_chat_id:', err);
+  });
+  db.run('ALTER TABLE scheduled_broadcasts ADD COLUMN source_message_id INTEGER', (err) => {
+    if (err && !/duplicate column name/i.test(err.message)) console.error('[db] broadcast source_message_id:', err);
+  });
 
   // Билеты на розыгрыши (призы AXE PASS с ticketName)
   db.run(`CREATE TABLE IF NOT EXISTS tickets (
