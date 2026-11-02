@@ -52,13 +52,13 @@ const getStatus = (userId) => new Promise((resolve) => {
   });
 });
 
-// Кнопки трёх закрытых чатов: 🔒 пока закрыт, 💬 когда разблокирован.
+// В панели показываем только PRO-чат: остальные уровни не рекламируем.
 const buildChatButtons = (status) => {
-  return STATUS_CHATS.map((chat) => {
+  return STATUS_CHATS.filter((chat) => chat.key === 'newpro').map((chat) => {
     if (isChatUnlocked(status, chat)) {
-      return { text: `${chat.label} 💬`, url: chat.link };
+      return { text: `${chat.label} чат 💬`, url: chat.link };
     }
-    return { text: `${chat.label} 🔒`, callback_data: `chat_locked_${chat.key}` };
+    return { text: `${chat.label} чат 🔒`, callback_data: `chat_locked_${chat.key}` };
   });
 };
 
@@ -81,12 +81,12 @@ const buildInfoKeyboardForUser = async (userId) => {
   return buildInfoKeyboard(status);
 };
 
-// Отправляет воркеру уведомления о всех чатах, которые ему уже доступны, но ещё не отправлены.
+// Отправляет воркеру уведомление о PRO-чате, когда он становится доступен.
 // Один чат — одно уведомление за всё время (таблица chat_unlocks).
 const sendPendingUnlocks = (bot, userId, status) => new Promise((resolve) => {
   db.all('SELECT chat_key FROM chat_unlocks WHERE user_id = ?', [userId], (err, rows) => {
     const sent = new Set((rows || []).map((r) => r.chat_key));
-    const pending = STATUS_CHATS.filter((c) => !sent.has(c.key) && isChatUnlocked(status, c));
+    const pending = STATUS_CHATS.filter((c) => c.key === 'newpro' && !sent.has(c.key) && isChatUnlocked(status, c));
 
     let i = 0;
     const next = () => {
@@ -94,8 +94,11 @@ const sendPendingUnlocks = (bot, userId, status) => new Promise((resolve) => {
       const chat = pending[i++];
       bot.sendMessage(
         userId,
-        `<b><tg-emoji emoji-id="${CONGRATS_EMOJI.id}">${CONGRATS_EMOJI.fallback}</tg-emoji>Поздравляем тебе доступен чат уровня ${chat.label}</b>`,
-        { parse_mode: 'HTML' }
+        `<b><tg-emoji emoji-id="${CONGRATS_EMOJI.id}">${CONGRATS_EMOJI.fallback}</tg-emoji> Поздравляем! Тебе доступен ${chat.label} чат.</b>`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: { inline_keyboard: [[{ text: 'Вступить в PRO чат', url: chat.link }]] }
+        }
       ).catch(() => {}).finally(() => {
         db.run('INSERT OR IGNORE INTO chat_unlocks (user_id, chat_key) VALUES (?, ?)', [userId, chat.key], () => next());
       });
