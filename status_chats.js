@@ -36,6 +36,8 @@ const STATUS_CHATS = [
 ];
 
 const CONGRATS_EMOJI = { id: '5994502837327892086', fallback: '🎉' };
+const PRO_BUTTON_EMOJI_ID = '5451849211425367548';
+const MATERIALS_BUTTON_EMOJI_ID = '5451805523018033441';
 
 const statusRank = (status) => CHAT_STATUS_ORDER.indexOf(status);
 
@@ -56,22 +58,22 @@ const getStatus = (userId) => new Promise((resolve) => {
 const buildChatButtons = (status) => {
   return STATUS_CHATS.filter((chat) => chat.key === 'newpro').map((chat) => {
     if (isChatUnlocked(status, chat)) {
-      return { text: `${chat.label} чат 💬`, url: chat.link };
+      return { text: `${chat.label} чат`, icon_custom_emoji_id: PRO_BUTTON_EMOJI_ID, url: chat.link };
     }
-    return { text: `${chat.label} чат 🔒`, callback_data: `chat_locked_${chat.key}` };
+    return { text: `${chat.label} чат`, icon_custom_emoji_id: PRO_BUTTON_EMOJI_ID, callback_data: `chat_locked_${chat.key}` };
   });
 };
 
 // Клавиатура панели «Информация»
 const buildInfoKeyboard = (status) => ({
   inline_keyboard: [
-    [{ text: 'Общий чат 💬', url: OPEN_CHAT_LINKS.general }],
+    [{ text: 'Общий чат', url: OPEN_CHAT_LINKS.general }],
     buildChatButtons(status),
     [
-      { text: '💸Профиты', web_app: { url: PROFITS_APP_URL } },
-      { text: '📢Новости', url: OPEN_CHAT_LINKS.news }
+      { text: 'Профиты', web_app: { url: PROFITS_APP_URL } },
+      { text: 'Новости', url: OPEN_CHAT_LINKS.news }
     ],
-    [{ text: '📁Материалы', url: OPEN_CHAT_LINKS.materials }],
+    [{ text: 'Материалы', icon_custom_emoji_id: MATERIALS_BUTTON_EMOJI_ID, url: OPEN_CHAT_LINKS.materials }],
     [{ text: 'Меню', callback_data: 'back_to_menu' }]
   ]
 });

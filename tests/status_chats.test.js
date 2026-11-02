@@ -7,11 +7,24 @@ test('info panel offers only the PRO status chat', () => {
   const locked = statusChats.buildInfoKeyboard('NEW').inline_keyboard;
   const unlocked = statusChats.buildInfoKeyboard('PRO').inline_keyboard;
 
-  assert.deepEqual(locked[1], [{ text: 'PRO чат 🔒', callback_data: 'chat_locked_newpro' }]);
+  assert.deepEqual(locked[1], [{
+    text: 'PRO чат',
+    icon_custom_emoji_id: '5451849211425367548',
+    callback_data: 'chat_locked_newpro'
+  }]);
   assert.deepEqual(unlocked[1], [{
-    text: 'PRO чат 💬',
+    text: 'PRO чат',
+    icon_custom_emoji_id: '5451849211425367548',
     url: statusChats.STATUS_CHATS.find((chat) => chat.key === 'newpro').link
   }]);
+  assert.deepEqual(unlocked.map((row) => row.map((button) => button.text)), [
+    ['Общий чат'],
+    ['PRO чат'],
+    ['Профиты', 'Новости'],
+    ['Материалы'],
+    ['Меню']
+  ]);
+  assert.equal(unlocked[3][0].icon_custom_emoji_id, '5451805523018033441');
   assert.equal(locked.length, 5);
   assert.equal(unlocked.length, 5);
 });
