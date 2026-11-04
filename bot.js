@@ -934,6 +934,7 @@ const walletAddressInput = {};
 const walletPendingConfirm = {};
 
 const getPayoutLabel = (method) => {
+  if (method === 'xrocket') return 'XRocket';
   if (method === 'trc20') return 'TRC20';
   if (method === 'bep20') return 'BEP20';
   return 'CryptoBot';
@@ -1554,6 +1555,20 @@ if (fs.existsSync(bookmakerImagePath)) {
         }
         getUser(userId, (err, user) => {
           if (err || !user) return;
+          showWalletScreen(chatId, messageId, user, hasPhoto);
+        });
+      });
+      break;
+
+    case 'wallet_set_xrocket':
+      bot.answerCallbackQuery(query.id, { text: '✅ XRocket установлен' });
+      db.run("UPDATE users SET payout_method = 'xrocket' WHERE user_id = ?", [userId], (err) => {
+        if (err) {
+          console.error('Error setting payout_method:', err);
+          return;
+        }
+        getUser(userId, (getErr, user) => {
+          if (getErr || !user) return;
           showWalletScreen(chatId, messageId, user, hasPhoto);
         });
       });
@@ -3351,8 +3366,8 @@ db.get('SELECT battlepass_earned, battlepass_xp FROM users WHERE user_id = ?', [
           });
 
           // Отправляем заявку админу
-          const walletLine = payoutMethod === 'cryptobot'
-            ? '⚪️Кошелек для выплаты: CryptoBot'
+          const walletLine = payoutMethod === 'cryptobot' || payoutMethod === 'xrocket'
+            ? `⚪️Кошелек для выплаты: ${getPayoutLabel(payoutMethod)}`
             : `${payoutMethod === 'trc20' ? '🔴' : '🟢'}Кошелек для выплаты ${payoutMethod === 'trc20' ? 'трс20' : 'BEP20'}: <code>${payoutAddress}</code>`;
 
           const adminText = `✅Новая заявка на выплату!
@@ -3648,7 +3663,7 @@ ${withdrawal.check_message || ''}`;
   const protectedCallbacks = ['profile', 'information', 'referral_workers', 'work', 'training', 'card', 'community', 'feedback', 'settings', 'useful',
                                'materials', 'profile_settings', 'change_name', 'hide_profile',
                                'transfer_profile', 'withdraw', 'cancel_withdraw', 'back_to_menu',
-                               'payout_wallet', 'wallet_set_cryptobot', 'wallet_set_trc20',
+                               'payout_wallet', 'wallet_set_cryptobot', 'wallet_set_xrocket', 'wallet_set_trc20',
                                'wallet_set_bep20', 'wallet_cancel_input', 'detach_curator'];
 
   if (protectedCallbacks.includes(data) || data === 'community_grooming' ||
