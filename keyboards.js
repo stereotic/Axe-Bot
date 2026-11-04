@@ -142,7 +142,7 @@ const keyboards = {
   payout_wallet: (method) => ({
     inline_keyboard: [
       [{ text: method === 'cryptobot' ? 'СryptoBot✅' : 'СryptoBot', callback_data: 'wallet_set_cryptobot' }],
-      [{ text: method === 'xrocket' ? 'XRocket✅' : 'XRocket', callback_data: 'wallet_set_xrocket' }],
+      [{ text: method === 'xrocket' ? 'xRocket✅' : 'xRocket', callback_data: 'wallet_set_xrocket' }],
       [
         { text: method === 'trc20' ? 'TRC20✅' : 'TRC20', callback_data: 'wallet_set_trc20' },
         { text: method === 'bep20' ? 'BEP20✅' : 'BEP20', callback_data: 'wallet_set_bep20' }

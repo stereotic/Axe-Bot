@@ -934,7 +934,7 @@ const walletAddressInput = {};
 const walletPendingConfirm = {};
 
 const getPayoutLabel = (method) => {
-  if (method === 'xrocket') return 'XRocket';
+  if (method === 'xrocket') return 'xRocket';
   if (method === 'trc20') return 'TRC20';
   if (method === 'bep20') return 'BEP20';
   return 'CryptoBot';
@@ -1561,7 +1561,7 @@ if (fs.existsSync(bookmakerImagePath)) {
       break;
 
     case 'wallet_set_xrocket':
-      bot.answerCallbackQuery(query.id, { text: '✅ XRocket установлен' });
+      bot.answerCallbackQuery(query.id, { text: '✅ xRocket установлен' });
       db.run("UPDATE users SET payout_method = 'xrocket' WHERE user_id = ?", [userId], (err) => {
         if (err) {
           console.error('Error setting payout_method:', err);
