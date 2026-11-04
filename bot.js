@@ -372,7 +372,7 @@ const WORK_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji>С
 <b>┗ <a href="https://enixbit.com">https://enixbit.com</a></b>
 
 <tg-emoji emoji-id="5253959125838090076">👁</tg-emoji><b>Фейк отзывы:</b>
-<b>├ <a href="https://zeronoise.wiki/">https://zeronoise.wiki/</a>
+<b>┏ <a href="https://zeronoise.wiki/">https://zeronoise.wiki/</a>
 ┗ <a href="https://kursiv.world/">https://kursiv.world/</a></b>
 
 <tg-emoji emoji-id="5258513401784573443">👾</tg-emoji><b>ТП</b>
