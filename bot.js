@@ -103,7 +103,7 @@ const botOptions = {
 };
 if (telegramProxy) {
   botOptions.request = { proxy: telegramProxy };
-  console.log(`🌐 Telegram API через прокси: ${telegramProxy}`);
+  console.log(`🌐 Telegram API через прокси: ${new URL(telegramProxy).host}`);
 }
 
 // Защита от нескольких запущенных экземпляров с одним BOT_TOKEN.
