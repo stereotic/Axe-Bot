@@ -183,6 +183,7 @@ ${topWorkerLine}
 ┣<b>AXE NEWS -</b> <a href="https://t.me/+BO1F4O1KUd0zZTI6"><b>ССЫЛКА</b></a>
 ┣<b>AXE SPAM -</b> <a href="https://t.me/Axe_spm_xBOT"><b>ССЫЛКА</b></a>
 ┣<b>AXE SMS -</b> <a href="https://t.me/AXE_SMS_xBot"><b>ССЫЛКА</b></a>
+┣<b>AXE PROXI -</b> <a href="https://t.me/AxeProxyrobot"><b>ССЫЛКА</b></a>
 ┣<b>AXE VPN -</b> <a href="https://t.me/AXE_VPNxBot"><b>ССЫЛКА</b></a>
 ┣<b>AXE DICE -</b> <a href="https://t.me/AXE_DICE_xBot"><b>ССЫЛКА</b></a>
 ┗<b>AXE Poker Project -</b> <a href="https://t.me/AXE_PokerProject_xBot"><b>ССЫЛКА</b></a>

@@ -379,7 +379,7 @@ const WORK_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emoji>С
 <b>┗ [9-21] @arachnophobia_AXE</b>
 
 <b><tg-emoji emoji-id="5258328383183396223">📚</tg-emoji> Мануал</b>:
-┗ <a href="https://telegra.ph/Birzha-09-27"><b>Биржа</b></a> ← Читать
+┗ <a href="https://telegra.ph/Birzha-11-11-4"><b>Биржа</b></a> ← Читать
 
 • <b>WORK-Панель открывается в формате WEB и MiniApp</b>`;
 
@@ -392,7 +392,7 @@ const BOOKMAKER_INFO = `<b><tg-emoji emoji-id="5257969839313526622">🏠</tg-emo
 ┗ [9-21] @Aether_AXE
 
 <tg-emoji emoji-id="5258328383183396223">📚</tg-emoji> Мануал:
-┗ <a href="https://telegra.ph/Fejk-BK-06-21">Букмекер</a> ← Читать
+┗ <a href="https://telegra.ph/Bukmeker-11-09">Букмекер</a> ← Читать
 
 • WORK-Панель открывается в формате WEB и MiniApp</b>`;
 

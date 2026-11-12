@@ -113,6 +113,7 @@ const keyboards = {
 
   useful: {
     inline_keyboard: [
+      [{ text: 'AXE PROXI', icon_custom_emoji_id: '5449523636958438337', url: 'https://t.me/AxeProxyrobot' }],
       [{ text: 'AXE SMS', icon_custom_emoji_id: '5451807855185273693', url: 'https://t.me/AXE_SMS_xBot' }],
       [{ text: 'AXE SPAM', icon_custom_emoji_id: '5444879892548198876', url: 'https://t.me/Axe_spm_xBOT' }],
       [{ text: 'AXE VPN', icon_custom_emoji_id: '5452080710162619656', url: 'https://t.me/AXE_VPNxBot' }],
