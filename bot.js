@@ -349,7 +349,7 @@ const INFO_BANNER = () => {
       const totalProfits = parseInt(row?.count || '0');
       const banner = `<tg-emoji emoji-id="5987880246865565644">💸</tg-emoji><b>Выплаты:
 ┏Пополнение - 75%
-┣ТП Биржа - 5%
+┣ТП Биржа - 10%
 ┗Прямой перевод - 77%</b>
 
 <tg-emoji emoji-id="5956561916573782596">🏠</tg-emoji><b>Сервисы:
