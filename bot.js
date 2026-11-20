@@ -349,7 +349,7 @@ const INFO_BANNER = () => {
       const totalProfits = parseInt(row?.count || '0');
       const banner = `<tg-emoji emoji-id="5987880246865565644">💸</tg-emoji><b>Выплаты:
 ┏Пополнение - 75%
-┣ТП - 10%
+┣ТП Биржа - 5%
 ┗Прямой перевод - 77%</b>
 
 <tg-emoji emoji-id="5956561916573782596">🏠</tg-emoji><b>Сервисы:
@@ -4253,7 +4253,7 @@ const formatTopLine = (user, value, index) => {
   const displayName = (user.name || user.username || '').replace(/^#/, '');
   const nameB64 = Buffer.from(displayName).toString('base64url');
   const profileLink = `https://t.me/${process.env.BOT_USERNAME || 'AXE_xBOT'}?start=profile_${user.user_id}_n_${nameB64}`;
-  return `<b>${rankEmojiTag(index)}<a href="${profileLink}">${displayName}</a> - ${value.toLocaleString('de-DE')}₽</b>\n`;
+  return `<b>${rankEmojiTag(index)}<a href="${profileLink}">${escapeHtml(displayName)}</a> - ${value.toLocaleString('de-DE')}₽</b>\n`;
 };
 
 const formatCashLine = (balance, label = 'Касса проекта') => {
